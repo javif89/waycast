@@ -46,30 +46,93 @@ namespace plugins
                 return results; // Require at least 2 characters to avoid huge result sets
             }
 
+            // Check if query looks like a path (contains / or ends with /)
+            bool isPathQuery = query.contains('/');
+            std::string pathFilter;
+            std::string searchTerm = query.toStdString();
+            
+            if (isPathQuery)
+            {
+                // Extract path component and search term
+                QString queryStr = query;
+                int lastSlash = queryStr.lastIndexOf('/');
+                
+                if (lastSlash != -1)
+                {
+                    pathFilter = queryStr.left(lastSlash + 1).toStdString(); // Include the trailing slash
+                    searchTerm = queryStr.mid(lastSlash + 1).toStdString();  // Filename part after last slash
+                    
+                    // If search term is empty (query ends with /), search for any file in that path
+                    if (searchTerm.empty())
+                    {
+                        searchTerm = ""; // Will match all files in the path
+                    }
+                }
+                else
+                {
+                    pathFilter = queryStr.toStdString();
+                    searchTerm = "";
+                }
+            }
+
+            // Filter files based on path if this is a path query
+            std::vector<std::filesystem::path> candidateFiles;
+            if (isPathQuery && !pathFilter.empty())
+            {
+                for (const auto &file : m_allFiles)
+                {
+                    std::string fullPath = file.string();
+                    // Check if the file path contains the path filter
+                    if (fullPath.find(pathFilter) != std::string::npos)
+                    {
+                        candidateFiles.push_back(file);
+                    }
+                }
+            }
+            else
+            {
+                candidateFiles = m_allFiles; // Use all files for regular search
+            }
+
             // Convert file paths to strings for fuzzy matching
             std::vector<std::string> filePaths;
-            filePaths.reserve(m_allFiles.size());
+            filePaths.reserve(candidateFiles.size());
 
-            for (const auto &file : m_allFiles)
+            for (const auto &file : candidateFiles)
             {
                 filePaths.push_back(file.filename().string()); // Match against filename only
             }
 
             // Use fuzzy finder to get matches
-            auto fuzzyMatches = m_fuzzyFinder.find(filePaths, query.toStdString(), 50);
+            std::vector<fuzzy::FuzzyMatch> fuzzyMatches;
+            if (searchTerm.empty())
+            {
+                // If no search term (just path/), return all files in that path
+                for (size_t i = 0; i < filePaths.size() && i < 50; ++i)
+                {
+                    fuzzy::FuzzyMatch match;
+                    match.text = filePaths[i];
+                    match.score = 100; // High score for direct path matches
+                    fuzzyMatches.push_back(match);
+                }
+            }
+            else
+            {
+                fuzzyMatches = m_fuzzyFinder.find(filePaths, searchTerm, 50);
+            }
 
             // Convert fuzzy matches back to ListItems
             results.reserve(fuzzyMatches.size());
             for (const auto &match : fuzzyMatches)
             {
                 // Find the original file path that corresponds to this match
-                auto it = std::find_if(m_allFiles.begin(), m_allFiles.end(),
+                auto it = std::find_if(candidateFiles.begin(), candidateFiles.end(),
                                        [&match](const std::filesystem::path &path)
                                        {
                                            return path.filename().string() == match.text;
                                        });
 
-                if (it != m_allFiles.end())
+                if (it != candidateFiles.end())
                 {
                     auto item = createFileListItem(*it, match.score);
                     results.push_back(item);
