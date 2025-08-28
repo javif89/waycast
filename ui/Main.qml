@@ -45,7 +45,7 @@ ApplicationWindow {
         Keys.onUpPressed: listView.decrementCurrentIndex()
         Keys.onReturnPressed: {
           if (listView.currentItem) {
-            console.log("Selected:", appModel.data(appModel.index(listView.currentIndex, 0), Qt.UserRole + 1))
+            console.log("Selected:", appModel.data(appModel.index(listView.currentIndex, 0), Qt.UserRole + 2))
           }
         }
       }
@@ -105,7 +105,7 @@ ApplicationWindow {
             
             onClicked: {
               listView.currentIndex = index
-              console.log("Clicked:", model.name)
+              console.log("Clicked:", model.exec)
             }
           }
         }

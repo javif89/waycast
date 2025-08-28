@@ -21,37 +21,46 @@ namespace dmenu
         DesktopEntry(std::string path)
         {
             GDesktopAppInfo *info = g_desktop_app_info_new_from_filename(path.c_str());
-            if (!info) {
+            if (!info)
+            {
                 std::cerr << "Failed to create desktop app info for: " << path << std::endl;
                 return;
             }
-            
+
             GAppInfo *app = G_APP_INFO(info);
-            if (!app) {
+            if (!app)
+            {
                 std::cerr << "Failed to get app info for: " << path << std::endl;
                 g_object_unref(info);
                 return;
             }
 
             const char *app_id = g_app_info_get_id(app);
-            if (app_id) id = app_id;
-            
+            if (app_id)
+                id = app_id;
+
             const char *app_name = g_app_info_get_name(app);
-            if (app_name) name = app_name;
-            
+            if (app_name)
+                name = app_name;
+
             GIcon *icon = g_app_info_get_icon(app);
-            if (icon) {
-                char* icon_str = g_icon_to_string(icon);
-                if (icon_str) {
+            if (icon)
+            {
+                char *icon_str = g_icon_to_string(icon);
+                if (icon_str)
+                {
                     icon_path = icon_str;
                     g_free(icon_str);
                 }
             }
-                
-            const char *ex = g_app_info_get_executable(app);
+
+            const char *ex = g_desktop_app_info_get_string(info, "Exec");
             if (ex)
+            {
                 exec = ex;
-                
+                g_free((gpointer)ex);
+            }
+
             display = g_desktop_app_info_get_boolean(info, "NoDisplay") ? false : true;
             g_object_unref(info);
         }
@@ -80,8 +89,9 @@ namespace dmenu
     inline DEVec get_dmenu_app_data()
     {
         DEVec out = std::make_unique<std::vector<DesktopEntry>>();
-        const char* env_dirs = std::getenv("XDG_DATA_DIRS");
-        if (!env_dirs) {
+        const char *env_dirs = std::getenv("XDG_DATA_DIRS");
+        if (!env_dirs)
+        {
             std::cerr << "XDG_DATA_DIRS environment variable not set" << std::endl;
             return out;
         }
@@ -97,7 +107,8 @@ namespace dmenu
             for (const auto &dfile : desktopFiles)
             {
                 DesktopEntry entry(dfile.string());
-                if (entry.display) {
+                if (entry.display)
+                {
                     out->push_back(std::move(entry));
                 }
             }
