@@ -133,9 +133,7 @@ QUrl AppListModel::getIconUrl(const dmenu::DesktopEntry &app) const
     
     // Use Qt's proper icon theme search which follows XDG spec
     QIcon icon = QIcon::fromTheme(iconName);
-    if (icon.isNull()) {
-        return QUrl();
-    }
+    bool themeFound = !icon.isNull();
     
     // Qt doesn't expose the resolved file path directly, so let's use QStandardPaths
     // to search in the proper system directories
@@ -150,7 +148,7 @@ QUrl AppListModel::getIconUrl(const dmenu::DesktopEntry &app) const
         "icons/hicolor/128x128/apps",
         "icons/Adwaita/scalable/apps",
         "icons/Adwaita/48x48/apps",
-        "pixmaps"
+        "pixmaps"  // This should search /path/to/share/pixmaps/
     };
     
     QStringList extensions = {"", ".png", ".svg", ".xpm"};

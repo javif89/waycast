@@ -24,7 +24,6 @@ ApplicationWindow {
 
   Rectangle {
     anchors.fill: parent
-    radius: 8
     border.width: 1
     border.color: palette.mid
     color: palette.window
