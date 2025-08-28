@@ -2,6 +2,7 @@
 
 #include "PluginInterface.hpp"
 #include "GenericListItem.hpp"
+#include "IconUtil.hpp"
 #include "files.hpp"
 #include "fuzzy.hpp"
 #include <QUrl>
@@ -241,90 +242,12 @@ namespace plugins
             // Create description showing parent directory
             QString description = parentDir.isEmpty() ? fullPath : QString("%1/.../%2").arg(parentDir, fileName);
 
-            // Simple icon based on file extension
-            QUrl icon = getFileIcon(filePath);
+            // Get icon using shared utility
+            QUrl icon = IconUtil::getFileIcon(filePath);
 
             return ListItems::createFile(fileName, fullPath, icon);
         }
 
-        QUrl getFileIcon(const std::filesystem::path &filePath) const
-        {
-            QString ext = QString::fromStdString(filePath.extension().string()).toLower();
-            QString iconName;
-            
-            // Map file extensions to freedesktop.org standard icon names
-            if (ext == ".txt" || ext == ".md" || ext == ".rst" || ext == ".readme")
-            {
-                iconName = "text-x-generic";
-            }
-            else if (ext == ".pdf")
-            {
-                iconName = "application-pdf";
-            }
-            else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || 
-                     ext == ".bmp" || ext == ".svg" || ext == ".webp" || ext == ".tiff")
-            {
-                iconName = "image-x-generic";
-            }
-            else if (ext == ".mp3" || ext == ".wav" || ext == ".ogg" || ext == ".flac" || 
-                     ext == ".m4a" || ext == ".aac" || ext == ".wma")
-            {
-                iconName = "audio-x-generic";
-            }
-            else if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".webm" || 
-                     ext == ".mov" || ext == ".wmv" || ext == ".flv" || ext == ".m4v")
-            {
-                iconName = "video-x-generic";
-            }
-            else if (ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".bz2" || 
-                     ext == ".xz" || ext == ".7z" || ext == ".rar")
-            {
-                iconName = "package-x-generic";
-            }
-            else if (ext == ".cpp" || ext == ".hpp" || ext == ".c" || ext == ".h")
-            {
-                iconName = "text-x-c++src";
-            }
-            else if (ext == ".py")
-            {
-                iconName = "text-x-python";
-            }
-            else if (ext == ".js" || ext == ".ts" || ext == ".json")
-            {
-                iconName = "text-x-javascript";
-            }
-            else if (ext == ".html" || ext == ".htm" || ext == ".css")
-            {
-                iconName = "text-html";
-            }
-            else if (ext == ".xml" || ext == ".xsl" || ext == ".xsd")
-            {
-                iconName = "text-xml";
-            }
-            else if (ext == ".sh" || ext == ".bash" || ext == ".zsh")
-            {
-                iconName = "text-x-script";
-            }
-            else if (ext == ".doc" || ext == ".docx" || ext == ".odt")
-            {
-                iconName = "application-vnd.oasis.opendocument.text";
-            }
-            else if (ext == ".xls" || ext == ".xlsx" || ext == ".ods")
-            {
-                iconName = "application-vnd.oasis.opendocument.spreadsheet";
-            }
-            else if (ext == ".ppt" || ext == ".pptx" || ext == ".odp")
-            {
-                iconName = "application-vnd.oasis.opendocument.presentation";
-            }
-            else
-            {
-                iconName = "text-x-generic";  // Default fallback
-            }
-            
-            // Return the theme icon URL that QML can resolve automatically
-            return QUrl(QString("image://theme/%1").arg(iconName));
-        }
 
         // Member variables
         std::vector<std::string> m_searchDirectories;

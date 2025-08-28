@@ -19,7 +19,5 @@ public:
     QString itemType() const override;
 
 private:
-    QUrl resolveIconUrl(const std::string &iconPath) const;
-    
     dmenu::DesktopEntry m_entry;
 };
