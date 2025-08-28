@@ -3,6 +3,7 @@
 #include <QIcon>
 #include <QWindow>
 #include <QStyleHints>
+#include <QSurfaceFormat>
 #include <QtQuickControls2/QQuickStyle>
 #include <LayerShellQt/window.h>
 
@@ -74,6 +75,11 @@ int main(int argc, char *argv[])
         QWindow *window = qobject_cast<QWindow *>(rootObjects.first());
         if (window)
         {
+            // Enable transparency support
+            QSurfaceFormat format = window->format();
+            format.setAlphaBufferSize(8);
+            window->setFormat(format);
+            
             LayerShellQt::Window *layerWindow = LayerShellQt::Window::get(window);
             if (layerWindow)
             {

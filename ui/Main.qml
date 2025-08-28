@@ -14,6 +14,9 @@ ApplicationWindow {
   
   Material.theme: Material.Dark
   
+  // Set window opacity for semi-transparency
+  opacity: 0.95
+  
   Shortcut {
     sequence: "Escape"
     onActivated: Qt.quit()
@@ -75,7 +78,7 @@ ApplicationWindow {
           
           delegate: ItemDelegate {
             width: listView.width
-            height: 40
+            height: 60
             
             Rectangle {
               anchors.fill: parent
@@ -110,11 +113,29 @@ ApplicationWindow {
                 }
               }
               
-              Text {
+              Column {
                 anchors.verticalCenter: parent.verticalCenter
-                text: model.name
-                color: Material.foreground
-                font.pixelSize: 14
+                spacing: 2
+                
+                Text {
+                  text: model.name
+                  color: Material.foreground
+                  font.pixelSize: 14
+                  font.weight: Font.Medium
+                }
+                
+                Text {
+                  text: model.description || ""
+                  color: Material.color(Material.Grey, Material.Shade400)
+                  font.pixelSize: 11
+                  visible: text.length > 0
+                  opacity: 0.8
+                  
+                  // Truncate long descriptions
+                  elide: Text.ElideRight
+                  maximumLineCount: 1
+                  width: Math.min(implicitWidth, listView.width - 60) // Leave space for icon and margins
+                }
               }
             }
             
