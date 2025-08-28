@@ -16,7 +16,8 @@ public:
     enum AppRoles {
         NameRole = Qt::UserRole + 1,
         ExecRole,
-        IdRole
+        IdRole,
+        IconRole
     };
 
     explicit AppListModel(QObject *parent = nullptr);
@@ -36,6 +37,7 @@ signals:
 
 private:
     void updateFilteredApps();
+    QUrl getIconUrl(const dmenu::DesktopEntry &app) const;
 
     dmenu::DEVec m_apps;
     std::vector<int> m_filteredIndexes;

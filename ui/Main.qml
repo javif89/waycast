@@ -89,16 +89,24 @@ ApplicationWindow {
               anchors.margins: 10
               spacing: 10
               
-              Rectangle {
+              Image {
                 width: 24
                 height: 24
-                color: palette.button
-                radius: 4
+                source: model.icon
+                fillMode: Image.PreserveAspectFit
                 
-                Text {
-                  anchors.centerIn: parent
-                  text: "📱"
-                  font.pixelSize: 16
+                // Fallback if icon fails to load
+                Rectangle {
+                  anchors.fill: parent
+                  color: palette.button
+                  radius: 4
+                  visible: parent.status === Image.Error || parent.status === Image.Null
+                  
+                  Text {
+                    anchors.centerIn: parent
+                    text: "📱"
+                    font.pixelSize: 16
+                  }
                 }
               }
               
