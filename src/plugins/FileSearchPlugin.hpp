@@ -8,8 +8,6 @@
 #include <QProcess>
 #include <QDir>
 #include <QStandardPaths>
-#include <QIcon>
-#include <QFile>
 #include <filesystem>
 #include <unordered_set>
 #include <algorithm>
@@ -254,7 +252,7 @@ namespace plugins
             QString ext = QString::fromStdString(filePath.extension().string()).toLower();
             QString iconName;
             
-            // Use freedesktop.org standard icon names that respect user themes
+            // Map file extensions to freedesktop.org standard icon names
             if (ext == ".txt" || ext == ".md" || ext == ".rst" || ext == ".readme")
             {
                 iconName = "text-x-generic";
@@ -321,67 +319,11 @@ namespace plugins
             }
             else
             {
-                iconName = "text-x-generic";
+                iconName = "text-x-generic";  // Default fallback
             }
             
-            // Use Qt's icon theme system to find the actual icon file
-            return resolveThemeIcon(iconName);
-        }
-
-        QUrl resolveThemeIcon(const QString& iconName) const
-        {
-            // First try Qt's theme system
-            QIcon icon = QIcon::fromTheme(iconName);
-            if (!icon.isNull()) {
-                // Try to find the actual file path by searching standard locations
-                QStringList dataDirs = QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
-                
-                // Icon subdirectories in order of preference
-                QStringList iconSubDirs = {
-                    "icons/hicolor/scalable/mimetypes",
-                    "icons/hicolor/48x48/mimetypes",
-                    "icons/hicolor/32x32/mimetypes", 
-                    "icons/hicolor/24x24/mimetypes",
-                    "icons/hicolor/16x16/mimetypes",
-                    "icons/Adwaita/scalable/mimetypes",
-                    "icons/Adwaita/48x48/mimetypes",
-                    "icons/Adwaita/32x32/mimetypes",
-                    "icons/breeze/mimetypes/22",  // KDE Plasma
-                    "icons/breeze-dark/mimetypes/22",
-                    "icons/Papirus/48x48/mimetypes",  // Popular icon theme
-                    "icons/elementary/mimetypes/48",  // Elementary OS
-                };
-                
-                QStringList extensions = {".svg", ".png", ".xpm"};
-                
-                for (const QString& dataDir : dataDirs) {
-                    for (const QString& iconSubDir : iconSubDirs) {
-                        QString basePath = dataDir + "/" + iconSubDir + "/";
-                        for (const QString& ext : extensions) {
-                            QString fullPath = basePath + iconName + ext;
-                            if (QFile::exists(fullPath)) {
-                                return QUrl::fromLocalFile(fullPath);
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Fallback to a generic file icon if nothing found
-            QIcon fallbackIcon = QIcon::fromTheme("text-x-generic");
-            if (!fallbackIcon.isNull()) {
-                // Try to resolve the fallback icon the same way
-                QStringList dataDirs = QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
-                for (const QString& dataDir : dataDirs) {
-                    QString path = dataDir + "/icons/hicolor/48x48/mimetypes/text-x-generic.png";
-                    if (QFile::exists(path)) {
-                        return QUrl::fromLocalFile(path);
-                    }
-                }
-            }
-            
-            // Ultimate fallback - return empty URL and let QML handle with default
-            return QUrl();
+            // Return the theme icon URL that QML can resolve automatically
+            return QUrl(QString("image://theme/%1").arg(iconName));
         }
 
         // Member variables
