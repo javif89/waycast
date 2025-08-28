@@ -14,7 +14,7 @@
 #include "ui/AppListModel.hpp"
 #include "plugins/PluginManager.hpp"
 #include "plugins/DesktopAppPlugin.hpp"
-#include "plugins/FileSearch/FileSearchPlugin.hpp"
+#include "plugins/FileSearchPlugin.hpp"
 #include <cstdlib>
 #include <string>
 #include <iostream>
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 
     // Initialize plugin system
     auto &pluginManager = plugins::PluginManager::instance();
-    // pluginManager.registerPlugin(std::make_unique<plugins::DesktopAppPlugin>());
+    pluginManager.registerPlugin(std::make_unique<plugins::DesktopAppPlugin>());
     pluginManager.registerPlugin(std::make_unique<plugins::FileSearchPlugin>());
 
     // Enable system theme support

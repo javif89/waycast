@@ -23,6 +23,7 @@ namespace fuzzy
 
     class FuzzyFinder
     {
+        void addDesktopApps(); // Deprecated - use PluginManager instead
     public:
         // Find method for string candidates
         std::vector<FuzzyMatch> find(const std::vector<std::string> &candidates,

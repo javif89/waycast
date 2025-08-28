@@ -8,6 +8,8 @@
 #include <QProcess>
 #include <QDir>
 #include <QStandardPaths>
+#include <QIcon>
+#include <QFile>
 #include <filesystem>
 #include <unordered_set>
 #include <algorithm>
@@ -250,34 +252,136 @@ namespace plugins
         QUrl getFileIcon(const std::filesystem::path &filePath) const
         {
             QString ext = QString::fromStdString(filePath.extension().string()).toLower();
-
-            // Return basic icon URLs - you could expand this with a proper icon system
-            if (ext == ".txt" || ext == ".md" || ext == ".rst")
+            QString iconName;
+            
+            // Use freedesktop.org standard icon names that respect user themes
+            if (ext == ".txt" || ext == ".md" || ext == ".rst" || ext == ".readme")
             {
-                return QUrl("qrc:/icons/text-file.svg");
+                iconName = "text-x-generic";
             }
             else if (ext == ".pdf")
             {
-                return QUrl("qrc:/icons/pdf-file.svg");
+                iconName = "application-pdf";
             }
-            else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp")
+            else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || 
+                     ext == ".bmp" || ext == ".svg" || ext == ".webp" || ext == ".tiff")
             {
-                return QUrl("qrc:/icons/image-file.svg");
+                iconName = "image-x-generic";
             }
-            else if (ext == ".mp3" || ext == ".wav" || ext == ".ogg" || ext == ".flac")
+            else if (ext == ".mp3" || ext == ".wav" || ext == ".ogg" || ext == ".flac" || 
+                     ext == ".m4a" || ext == ".aac" || ext == ".wma")
             {
-                return QUrl("qrc:/icons/audio-file.svg");
+                iconName = "audio-x-generic";
             }
-            else if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".webm")
+            else if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".webm" || 
+                     ext == ".mov" || ext == ".wmv" || ext == ".flv" || ext == ".m4v")
             {
-                return QUrl("qrc:/icons/video-file.svg");
+                iconName = "video-x-generic";
             }
-            else if (ext == ".cpp" || ext == ".hpp" || ext == ".c" || ext == ".h" || ext == ".py" || ext == ".js")
+            else if (ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".bz2" || 
+                     ext == ".xz" || ext == ".7z" || ext == ".rar")
             {
-                return QUrl("qrc:/icons/code-file.svg");
+                iconName = "package-x-generic";
             }
+            else if (ext == ".cpp" || ext == ".hpp" || ext == ".c" || ext == ".h")
+            {
+                iconName = "text-x-c++src";
+            }
+            else if (ext == ".py")
+            {
+                iconName = "text-x-python";
+            }
+            else if (ext == ".js" || ext == ".ts" || ext == ".json")
+            {
+                iconName = "text-x-javascript";
+            }
+            else if (ext == ".html" || ext == ".htm" || ext == ".css")
+            {
+                iconName = "text-html";
+            }
+            else if (ext == ".xml" || ext == ".xsl" || ext == ".xsd")
+            {
+                iconName = "text-xml";
+            }
+            else if (ext == ".sh" || ext == ".bash" || ext == ".zsh")
+            {
+                iconName = "text-x-script";
+            }
+            else if (ext == ".doc" || ext == ".docx" || ext == ".odt")
+            {
+                iconName = "application-vnd.oasis.opendocument.text";
+            }
+            else if (ext == ".xls" || ext == ".xlsx" || ext == ".ods")
+            {
+                iconName = "application-vnd.oasis.opendocument.spreadsheet";
+            }
+            else if (ext == ".ppt" || ext == ".pptx" || ext == ".odp")
+            {
+                iconName = "application-vnd.oasis.opendocument.presentation";
+            }
+            else
+            {
+                iconName = "text-x-generic";
+            }
+            
+            // Use Qt's icon theme system to find the actual icon file
+            return resolveThemeIcon(iconName);
+        }
 
-            return QUrl("qrc:/icons/file.svg");
+        QUrl resolveThemeIcon(const QString& iconName) const
+        {
+            // First try Qt's theme system
+            QIcon icon = QIcon::fromTheme(iconName);
+            if (!icon.isNull()) {
+                // Try to find the actual file path by searching standard locations
+                QStringList dataDirs = QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
+                
+                // Icon subdirectories in order of preference
+                QStringList iconSubDirs = {
+                    "icons/hicolor/scalable/mimetypes",
+                    "icons/hicolor/48x48/mimetypes",
+                    "icons/hicolor/32x32/mimetypes", 
+                    "icons/hicolor/24x24/mimetypes",
+                    "icons/hicolor/16x16/mimetypes",
+                    "icons/Adwaita/scalable/mimetypes",
+                    "icons/Adwaita/48x48/mimetypes",
+                    "icons/Adwaita/32x32/mimetypes",
+                    "icons/breeze/mimetypes/22",  // KDE Plasma
+                    "icons/breeze-dark/mimetypes/22",
+                    "icons/Papirus/48x48/mimetypes",  // Popular icon theme
+                    "icons/elementary/mimetypes/48",  // Elementary OS
+                };
+                
+                QStringList extensions = {".svg", ".png", ".xpm"};
+                
+                for (const QString& dataDir : dataDirs) {
+                    for (const QString& iconSubDir : iconSubDirs) {
+                        QString basePath = dataDir + "/" + iconSubDir + "/";
+                        for (const QString& ext : extensions) {
+                            QString fullPath = basePath + iconName + ext;
+                            if (QFile::exists(fullPath)) {
+                                return QUrl::fromLocalFile(fullPath);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Fallback to a generic file icon if nothing found
+            QIcon fallbackIcon = QIcon::fromTheme("text-x-generic");
+            if (!fallbackIcon.isNull()) {
+                // Try to resolve the fallback icon the same way
+                QStringList dataDirs = QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
+                for (const QString& dataDir : dataDirs) {
+                    QString path = dataDir + "/icons/hicolor/48x48/mimetypes/text-x-generic.png";
+                    if (QFile::exists(path)) {
+                        return QUrl::fromLocalFile(path);
+                    }
+                }
+            }
+            
+            // Ultimate fallback - return empty URL and let QML handle with default
+            return QUrl();
         }
 
         // Member variables
