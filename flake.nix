@@ -38,7 +38,7 @@
             qt6.qtwayland
 
             # Layer Shell Qt for Wayland
-            layer-shell-qt
+            kdePackages.layer-shell-qt
 
             # GLib/GIO dependencies
             glib
@@ -50,14 +50,21 @@
 
           # Set Qt6 module path and other environment variables
           qtWrapperArgs = [
-            "--prefix QML2_IMPORT_PATH : ${qt6.qtdeclarative}/${qt6.qtbase.qtQmlPrefix}"
-            "--prefix QT_PLUGIN_PATH : ${qt6.qtbase.qtPluginPrefix}"
+            "--prefix QML2_IMPORT_PATH : ${pkgs.qt6.qtdeclarative}/${pkgs.qt6.qtbase.qtQmlPrefix}"
+            "--prefix QT_PLUGIN_PATH : ${pkgs.qt6.qtbase.qtPluginPrefix}"
           ];
 
           cmakeFlags = [
             "-GNinja"
             "-DCMAKE_BUILD_TYPE=Release"
           ];
+
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin
+            cp waycast $out/bin/
+            runHook postInstall
+          '';
 
           # Enable Qt6 and Wayland features
           postPatch = ''
@@ -101,7 +108,7 @@
             qt6.qttools # For Qt development tools
 
             # Layer Shell Qt
-            layer-shell-qt
+            kdePackages.layer-shell-qt
 
             # GLib/GIO
             glib.dev
