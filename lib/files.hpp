@@ -12,7 +12,7 @@ namespace files
 {
     namespace fs = std::filesystem;
 
-    std::vector<fs::path> findFilesWithExtension(const std::string path, const std::string ext)
+    inline std::vector<fs::path> findFilesWithExtension(const std::string path, const std::string ext)
     {
         std::vector<fs::path> out;
         std::unordered_set<std::string> seen; // canonicalized paths to dedupe
@@ -40,7 +40,7 @@ namespace files
         return out;
     }
 
-    std::string readFile(const std::string &filename)
+    inline std::string readFile(const std::string &filename)
     {
         std::ifstream in(filename);
         if (!in)

@@ -27,9 +27,10 @@ qt_standard_project_setup()
 qt_add_executable(waycast)
 
 include_directories("${CMAKE_SOURCE_DIR}/lib")
-include_directories("${CMAKE_SOURCE_DIR}/lib")
+include_directories("${CMAKE_SOURCE_DIR}/lib/ui")
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
-target_sources(waycast PRIVATE ${SRC_FILES} src/main.cpp)
+file(GLOB_RECURSE LIB_UI_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/lib/ui/*.cpp")
+target_sources(waycast PRIVATE ${SRC_FILES} ${LIB_UI_FILES} src/main.cpp)
 target_include_directories(waycast PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 # target_include_directories(waycast PRIVATE ${CMAKE_SOURCE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}) 
 

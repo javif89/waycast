@@ -1,10 +1,11 @@
-#include "dmenu.hpp"
-#include "files.hpp"
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QIcon>
 #include <QWindow>
 #include <LayerShellQt/window.h>
+#include "ui/AppListModel.hpp"
+#include "dmenu.hpp"
+#include "files.hpp"
 #include <cstdlib>
 #include <string>
 #include <iostream>
@@ -37,11 +38,14 @@ int main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
     QCoreApplication::setApplicationName("waycast");
-    
+
     // Enable system theme support
     app.setDesktopSettingsAware(true);
 
     QQmlApplicationEngine engine;
+
+    // Register the AppListModel type with QML
+    qmlRegisterType<AppListModel>("WayCast", 1, 0, "AppListModel");
 
     // Set up layer shell before creating any windows
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, []()

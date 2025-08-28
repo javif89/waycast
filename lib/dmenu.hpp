@@ -62,7 +62,7 @@ namespace dmenu
         }
     };
 
-    std::vector<std::string> split(std::string s, char delimiter)
+    inline std::vector<std::string> split(std::string s, char delimiter)
     {
         std::vector<std::string> items;
         std::string line;
@@ -77,7 +77,7 @@ namespace dmenu
     }
 
     using DEVec = std::unique_ptr<std::vector<DesktopEntry>>;
-    DEVec get_dmenu_app_data()
+    inline DEVec get_dmenu_app_data()
     {
         DEVec out = std::make_unique<std::vector<DesktopEntry>>();
         const char* env_dirs = std::getenv("XDG_DATA_DIRS");
@@ -96,7 +96,10 @@ namespace dmenu
 
             for (const auto &dfile : desktopFiles)
             {
-                out->emplace_back(dfile.string());
+                DesktopEntry entry(dfile.string());
+                if (entry.display) {
+                    out->push_back(std::move(entry));
+                }
             }
         }
 

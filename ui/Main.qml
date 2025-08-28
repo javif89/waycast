@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Window
 import QtQuick.Controls.Material
 import QtQuick.Controls.Universal
+import WayCast
 
 ApplicationWindow {
   id: win
@@ -44,7 +45,7 @@ ApplicationWindow {
         Keys.onUpPressed: listView.decrementCurrentIndex()
         Keys.onReturnPressed: {
           if (listView.currentItem) {
-            console.log("Selected:", listModel.get(listView.currentIndex).name)
+            console.log("Selected:", appModel.data(appModel.index(listView.currentIndex, 0), Qt.UserRole + 1))
           }
         }
       }
@@ -56,7 +57,7 @@ ApplicationWindow {
         
         ListView {
           id: listView
-          model: listModel
+          model: appModel
           currentIndex: 0
           highlightFollowsCurrentItem: true
           
@@ -112,12 +113,7 @@ ApplicationWindow {
     }
   }
   
-  ListModel {
-    id: listModel
-    ListElement { name: "Firefox"; exec: "firefox" }
-    ListElement { name: "Terminal"; exec: "gnome-terminal" }
-    ListElement { name: "File Manager"; exec: "nautilus" }
-    ListElement { name: "Text Editor"; exec: "gedit" }
-    ListElement { name: "Calculator"; exec: "gnome-calculator" }
+  AppListModel {
+    id: appModel
   }
 }
