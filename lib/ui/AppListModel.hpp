@@ -10,6 +10,7 @@
 class AppListModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(QString searchText READ searchText WRITE setSearchText NOTIFY searchTextChanged)
 
 public:
     enum AppRoles {
@@ -25,7 +26,18 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void loadApps();
+    Q_INVOKABLE void launchApp(int index);
+
+    QString searchText() const;
+    void setSearchText(const QString &searchText);
+
+signals:
+    void searchTextChanged();
 
 private:
+    void updateFilteredApps();
+
     dmenu::DEVec m_apps;
+    std::vector<int> m_filteredIndexes;
+    QString m_searchText;
 };

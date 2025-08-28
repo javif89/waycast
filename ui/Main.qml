@@ -40,12 +40,19 @@ ApplicationWindow {
         placeholderText: "Type to search applications..."
         selectByMouse: true
         focus: true
+        text: appModel.searchText
+        
+        onTextChanged: {
+          appModel.searchText = text
+          listView.currentIndex = 0
+        }
         
         Keys.onDownPressed: listView.incrementCurrentIndex()
         Keys.onUpPressed: listView.decrementCurrentIndex()
         Keys.onReturnPressed: {
           if (listView.currentItem) {
-            console.log("Selected:", appModel.data(appModel.index(listView.currentIndex, 0), Qt.UserRole + 2))
+            appModel.launchApp(listView.currentIndex)
+            Qt.quit()
           }
         }
       }
@@ -105,7 +112,8 @@ ApplicationWindow {
             
             onClicked: {
               listView.currentIndex = index
-              console.log("Clicked:", model.exec)
+              appModel.launchApp(index)
+              Qt.quit()
             }
           }
         }
