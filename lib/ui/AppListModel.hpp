@@ -2,10 +2,8 @@
 
 #include <QAbstractListModel>
 #include <QQmlEngine>
-
-#undef signals
-#include "../dmenu.hpp"
-#define signals public
+#include "ListItem.hpp"
+#include <vector>
 
 class AppListModel : public QAbstractListModel
 {
@@ -13,11 +11,11 @@ class AppListModel : public QAbstractListModel
     Q_PROPERTY(QString searchText READ searchText WRITE setSearchText NOTIFY searchTextChanged)
 
 public:
-    enum AppRoles {
+    enum ItemRoles {
         NameRole = Qt::UserRole + 1,
-        ExecRole,
-        IdRole,
-        IconRole
+        DescriptionRole,
+        IconRole,
+        ItemTypeRole
     };
 
     explicit AppListModel(QObject *parent = nullptr);
@@ -26,8 +24,12 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    Q_INVOKABLE void loadApps();
-    Q_INVOKABLE void launchApp(int index);
+    Q_INVOKABLE void loadItems();
+    Q_INVOKABLE void executeItem(int index);
+    
+    // Add items from different sources
+    void addDesktopApps();
+    void addItems(const std::vector<ListItemPtr> &items);
 
     QString searchText() const;
     void setSearchText(const QString &searchText);
@@ -36,10 +38,9 @@ signals:
     void searchTextChanged();
 
 private:
-    void updateFilteredApps();
-    QUrl getIconUrl(const dmenu::DesktopEntry &app) const;
+    void updateFilteredItems();
 
-    dmenu::DEVec m_apps;
+    std::vector<ListItemPtr> m_items;
     std::vector<int> m_filteredIndexes;
     QString m_searchText;
 };

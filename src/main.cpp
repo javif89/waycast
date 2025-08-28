@@ -3,9 +3,13 @@
 #include <QIcon>
 #include <QWindow>
 #include <LayerShellQt/window.h>
-#include "ui/AppListModel.hpp"
+
+#undef signals
 #include "dmenu.hpp"
 #include "files.hpp"
+#define signals public
+
+#include "ui/AppListModel.hpp"
 #include <cstdlib>
 #include <string>
 #include <iostream>

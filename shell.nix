@@ -20,14 +20,19 @@ pkgs.mkShell {
     pkgs.kdePackages.layer-shell-qt # <- provides layer shell support
     pkgs.kdePackages.layer-shell-qt.dev # <- provides headers
     pkgs.pkg-config
-    # qt.qttools
-    # qt.qtshadertools
+
+    # THEMING
+    pkgs.qt6ct
+    pkgs.kdePackages.qqc2-desktop-style
+    pkgs.kdePackages.breeze-icons
+    pkgs.hicolor-icon-theme
   ];
 
   shellHook = ''
     export QT_PLUGIN_PATH='${qt.full}'
     export QML2_IMPORT_PATH='${qt.full}:${pkgs.kdePackages.layer-shell-qt}/lib/qt-6/qml'
     export QT_QPA_PLATFORM=wayland
+    export QT_QPA_PLATFORMTHEME=qt6ct
     echo "--------------------------------------------"
     echo "QT_PLUGIN_PATH: $QT_PLUGIN_PATH"
     echo "QML2_IMPORT_PATH: $QML2_IMPORT_PATH"

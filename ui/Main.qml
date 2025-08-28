@@ -50,7 +50,7 @@ ApplicationWindow {
         Keys.onUpPressed: listView.decrementCurrentIndex()
         Keys.onReturnPressed: {
           if (listView.currentItem) {
-            appModel.launchApp(listView.currentIndex)
+            appModel.executeItem(listView.currentIndex)
             Qt.quit()
           }
         }
@@ -119,7 +119,7 @@ ApplicationWindow {
             
             onClicked: {
               listView.currentIndex = index
-              appModel.launchApp(index)
+              appModel.executeItem(index)
               Qt.quit()
             }
           }
