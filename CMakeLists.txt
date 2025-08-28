@@ -24,6 +24,10 @@ pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0)
 
 qt_standard_project_setup()
 
+# Set Qt policies for proper QML module bundling
+qt_policy(SET QTP0001 NEW)  # Use :/qt/qml/ as default resource prefix
+qt_policy(SET QTP0004 NEW)  # Require qmldir files
+
 qt_add_executable(waycast)
 
 include_directories("${CMAKE_SOURCE_DIR}/lib")
