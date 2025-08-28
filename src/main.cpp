@@ -46,6 +46,9 @@ int main(int argc, char *argv[])
 
     // Enable system theme support
     app.setDesktopSettingsAware(true);
+    
+    // Ensure we follow system color scheme
+    app.setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
 
     QQmlApplicationEngine engine;
 
