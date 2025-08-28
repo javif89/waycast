@@ -11,7 +11,8 @@ class AppListModel : public QAbstractListModel
     Q_PROPERTY(QString searchText READ searchText WRITE setSearchText NOTIFY searchTextChanged)
 
 public:
-    enum ItemRoles {
+    enum ItemRoles
+    {
         NameRole = Qt::UserRole + 1,
         DescriptionRole,
         IconRole,
@@ -26,9 +27,8 @@ public:
 
     Q_INVOKABLE void loadItems();
     Q_INVOKABLE void executeItem(int index);
-    
+
     // Add items from different sources
-    void addDesktopApps(); // Deprecated - use PluginManager instead
     void addItems(const std::vector<ListItemPtr> &items);
 
     QString searchText() const;

@@ -58,8 +58,9 @@ namespace ListItems {
         return std::make_shared<GenericListItem>(
             name, exec, icon, "app",
             [exec]() {
-                // Basic app execution - plugins can override for complex logic
-                QProcess::startDetached("/bin/sh", QStringList() << "-c" << exec);
+                // Use nohup and redirect output to /dev/null for proper detachment
+                QString detachedCommand = QString("nohup %1 >/dev/null 2>&1 &").arg(exec);
+                QProcess::startDetached("/bin/sh", QStringList() << "-c" << detachedCommand);
             }
         );
     }
@@ -72,7 +73,9 @@ namespace ListItems {
         return std::make_shared<GenericListItem>(
             filename, path, icon, "file",
             [path]() {
-                QProcess::startDetached("xdg-open", QStringList() << path);
+                // Use nohup and redirect output to /dev/null for proper detachment
+                QString detachedCommand = QString("nohup xdg-open \"%1\" >/dev/null 2>&1 &").arg(path);
+                QProcess::startDetached("/bin/sh", QStringList() << "-c" << detachedCommand);
             }
         );
     }

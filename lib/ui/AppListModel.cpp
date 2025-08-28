@@ -29,7 +29,8 @@ QVariant AppListModel::data(const QModelIndex &index, int role) const
 
     const ListItemPtr &item = m_items[itemIndex];
 
-    switch (role) {
+    switch (role)
+    {
     case NameRole:
         return item->name();
     case DescriptionRole:
@@ -57,11 +58,11 @@ void AppListModel::loadItems()
 {
     beginResetModel();
     m_items.clear();
-    
+
     // Get items from all registered plugins
-    auto& pluginManager = plugins::PluginManager::instance();
+    auto &pluginManager = plugins::PluginManager::instance();
     m_items = pluginManager.getAllItems();
-    
+
     updateFilteredItems();
     endResetModel();
 }
@@ -70,7 +71,7 @@ void AppListModel::executeItem(int index)
 {
     if (index < 0 || index >= static_cast<int>(m_filteredIndexes.size()))
         return;
-        
+
     int itemIndex = m_filteredIndexes[index];
     if (itemIndex >= static_cast<int>(m_items.size()))
         return;
@@ -90,26 +91,21 @@ void AppListModel::setSearchText(const QString &searchText)
 
     m_searchText = searchText;
     emit searchTextChanged();
-    
+
     beginResetModel();
-    
+
     // Use plugin manager for search
-    auto& pluginManager = plugins::PluginManager::instance();
+    auto &pluginManager = plugins::PluginManager::instance();
     m_items = pluginManager.search(searchText);
     updateFilteredItems();
-    
-    endResetModel();
-}
 
-void AppListModel::addDesktopApps()
-{
-    // This method is deprecated - plugins now handle data loading
-    // Kept for backward compatibility but does nothing
+    endResetModel();
 }
 
 void AppListModel::addItems(const std::vector<ListItemPtr> &items)
 {
-    for (const auto &item : items) {
+    for (const auto &item : items)
+    {
         m_items.push_back(item);
     }
 }
@@ -117,9 +113,10 @@ void AppListModel::addItems(const std::vector<ListItemPtr> &items)
 void AppListModel::updateFilteredItems()
 {
     m_filteredIndexes.clear();
-    
+
     // Since PluginManager now handles filtering, just show all items
-    for (size_t i = 0; i < m_items.size(); ++i) {
+    for (size_t i = 0; i < m_items.size(); ++i)
+    {
         m_filteredIndexes.push_back(static_cast<int>(i));
     }
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../lib/plugins/PluginInterface.hpp"
-#include "../../lib/dmenu.hpp"
+#include "PluginInterface.hpp"
+#include "dmenu.hpp"
 #include "DesktopAppPlugin/DesktopAppListItem.hpp"
 #include <algorithm>
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../../lib/ui/ListItem.hpp"
+#include "ListItem.hpp"
 
 #undef signals
-#include "../../../lib/dmenu.hpp"
+#include "dmenu.hpp"
 #define signals public
 
 class DesktopAppListItem : public ListItem
