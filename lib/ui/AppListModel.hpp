@@ -28,7 +28,7 @@ public:
     Q_INVOKABLE void executeItem(int index);
     
     // Add items from different sources
-    void addDesktopApps();
+    void addDesktopApps(); // Deprecated - use PluginManager instead
     void addItems(const std::vector<ListItemPtr> &items);
 
     QString searchText() const;

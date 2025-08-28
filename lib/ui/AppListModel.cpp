@@ -1,5 +1,5 @@
 #include "AppListModel.hpp"
-#include "DesktopAppListItem.hpp"
+#include "../plugins/PluginManager.hpp"
 #include <QDebug>
 
 #undef signals
@@ -58,8 +58,9 @@ void AppListModel::loadItems()
     beginResetModel();
     m_items.clear();
     
-    // Add desktop applications
-    addDesktopApps();
+    // Get items from all registered plugins
+    auto& pluginManager = plugins::PluginManager::instance();
+    m_items = pluginManager.getAllItems();
     
     updateFilteredItems();
     endResetModel();
@@ -91,20 +92,19 @@ void AppListModel::setSearchText(const QString &searchText)
     emit searchTextChanged();
     
     beginResetModel();
+    
+    // Use plugin manager for search
+    auto& pluginManager = plugins::PluginManager::instance();
+    m_items = pluginManager.search(searchText);
     updateFilteredItems();
+    
     endResetModel();
 }
 
 void AppListModel::addDesktopApps()
 {
-    dmenu::DEVec apps = dmenu::get_dmenu_app_data();
-    if (!apps)
-        return;
-        
-    for (const auto &entry : *apps) {
-        auto item = std::make_shared<DesktopAppListItem>(entry);
-        m_items.push_back(item);
-    }
+    // This method is deprecated - plugins now handle data loading
+    // Kept for backward compatibility but does nothing
 }
 
 void AppListModel::addItems(const std::vector<ListItemPtr> &items)
@@ -118,11 +118,8 @@ void AppListModel::updateFilteredItems()
 {
     m_filteredIndexes.clear();
     
+    // Since PluginManager now handles filtering, just show all items
     for (size_t i = 0; i < m_items.size(); ++i) {
-        const ListItemPtr &item = m_items[i];
-        
-        if (item->matches(m_searchText)) {
-            m_filteredIndexes.push_back(static_cast<int>(i));
-        }
+        m_filteredIndexes.push_back(static_cast<int>(i));
     }
 }
