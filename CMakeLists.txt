@@ -17,6 +17,7 @@ find_package(Qt6 REQUIRED COMPONENTS
   Qml
   Quick
   QuickControls2
+  Widgets
 )
 find_package(LayerShellQt REQUIRED)
 
@@ -53,6 +54,8 @@ target_link_libraries(waycast PRIVATE
   Qt6::Gui
   Qt6::Qml
   Qt6::Quick
+  Qt6::QuickControls2
+  Qt6::Widgets
   PkgConfig::GIO
   LayerShellQt::Interface
 )

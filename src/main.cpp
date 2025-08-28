@@ -2,6 +2,8 @@
 #include <QQmlApplicationEngine>
 #include <QIcon>
 #include <QWindow>
+#include <QStyleHints>
+#include <QtQuickControls2/QQuickStyle>
 #include <LayerShellQt/window.h>
 
 #undef signals
@@ -50,11 +52,9 @@ int main(int argc, char *argv[])
     pluginManager.registerPlugin(std::make_unique<plugins::DesktopAppPlugin>());
     pluginManager.registerPlugin(std::make_unique<plugins::FileSearchPlugin>());
 
-    // Enable system theme support
-    app.setDesktopSettingsAware(true);
-
-    // Ensure we follow system color scheme
-    app.setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
+    // Set dark theme
+    QQuickStyle::setStyle("Material");
+    qputenv("QT_QUICK_CONTROLS_MATERIAL_THEME", "Dark");
 
     QQmlApplicationEngine engine;
 

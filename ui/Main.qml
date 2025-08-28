@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
 import QtQuick.Controls.Material
-import QtQuick.Controls.Universal
 import WayCast
 
 ApplicationWindow {
@@ -12,6 +11,8 @@ ApplicationWindow {
   height: 400
   flags: Qt.FramelessWindowHint
   property int timeoutInterval: 5000
+  
+  Material.theme: Material.Dark
   
   Shortcut {
     sequence: "Escape"
@@ -25,8 +26,8 @@ ApplicationWindow {
   Rectangle {
     anchors.fill: parent
     border.width: 1
-    border.color: palette.mid
-    color: palette.window
+    border.color: Material.frameColor
+    color: Material.backgroundColor
     
     Column {
       anchors.fill: parent
@@ -68,7 +69,7 @@ ApplicationWindow {
           highlightFollowsCurrentItem: true
           
           highlight: Rectangle {
-            color: palette.highlight
+            color: Material.accent
             radius: 4
           }
           
@@ -78,7 +79,7 @@ ApplicationWindow {
             
             Rectangle {
               anchors.fill: parent
-              color: parent.hovered ? palette.alternateBase : "transparent"
+              color: parent.hovered ? Material.listHighlightColor : "transparent"
               radius: 4
             }
             
@@ -97,7 +98,7 @@ ApplicationWindow {
                 // Fallback if icon fails to load
                 Rectangle {
                   anchors.fill: parent
-                  color: palette.button
+                  color: Material.color(Material.Grey, Material.Shade600)
                   radius: 4
                   visible: parent.status === Image.Error || parent.status === Image.Null
                   
@@ -112,7 +113,7 @@ ApplicationWindow {
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: model.name
-                color: palette.text
+                color: Material.foreground
                 font.pixelSize: 14
               }
             }
