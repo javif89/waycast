@@ -1,16 +1,14 @@
 use gio::prelude::*;
-use gio::{File, FileIcon, Icon as GioIcon, ThemedIcon};
 use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
+use gtk::prelude::*;
 use gtk::{
-    Application, ApplicationWindow, Box as GtkBox, Entry, Image, Label, ListBox, Orientation,
-    ScrolledWindow,
+    Application, ApplicationWindow, Box as GtkBox, Entry, IconTheme, Image, Label, ListBox,
+    Orientation, ScrolledWindow,
 };
-use gtk::{IconLookupFlags, prelude::*};
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
-use std::fmt::format;
 use std::path::PathBuf;
 use std::rc::Rc;
 use waycast::{LauncherListItem, drun};
@@ -26,8 +24,6 @@ struct ListItem {
     icon: String,
 }
 
-// TODO: I figured out what causes the stack overflow. Now to figure out
-// why the icons for discord, solaar, and kvantum are not being found
 impl ListItem {
     fn new(text: String, icon: String) -> Self {
         Self { text, icon }
@@ -35,18 +31,12 @@ impl ListItem {
 
     fn create_widget(&self) -> GtkBox {
         let container = GtkBox::new(Orientation::Horizontal, 10);
-        // let display = gtk::gdk::Display::default().unwrap();
-        // let icon_theme = gtk::IconTheme::for_display(&display);
-
-        // Get current paths and filter out problematic ones
-        // TODO: Use this in the find_icon_file function
-        // let current_paths = icon_theme.search_path();
+        let display = gtk::gdk::Display::default().unwrap();
+        let icon_theme = gtk::IconTheme::for_display(&display);
 
         let icon_size = 48;
         let image: gtk::Image;
-        if let Some(icon_path) = find_icon_file(&self.icon, "48", "Papirus") {
-            println!("Found icon: {}", icon_path.to_string_lossy());
-            // let file = gio::File::for_path(&icon_path);
+        if let Some(icon_path) = find_icon_file(&self.icon, "48", &icon_theme) {
             image = match Pixbuf::from_file_at_scale(icon_path, icon_size, icon_size, true) {
                 Ok(pb) => {
                     let tex = Texture::for_pixbuf(&pb);
@@ -57,15 +47,8 @@ impl ListItem {
                     Image::from_icon_name("application-x-executable")
                 }
             }
-            // image = match gtk::gdk::Texture::from_file(&file) {
-            //     Ok(tex) => gtk::Image::from_paintable(Some(&tex)),
-            //     Err(e) => {
-            //         eprintln!("err: {}", e);
-            //         Image::from_icon_name("application-x-executable")
-            //     }
-            // }
         } else {
-            let default = find_icon_file("vscode", "48", "hicolor").unwrap();
+            let default = find_icon_file("vscode", "48", &icon_theme).unwrap();
             image = gtk::Image::from_file(default);
         }
         image.set_pixel_size(icon_size);
@@ -76,7 +59,6 @@ impl ListItem {
 
         container.append(&image);
         container.append(&label);
-        println!("Icon: {}", self.icon);
         container
     }
 }
@@ -178,59 +160,57 @@ impl AppModel {
     }
 }
 
-fn find_icon_file(icon_name: &str, size: &str, theme_name: &str) -> Option<std::path::PathBuf> {
-    let search_paths = [
-        "/home/javi/.local/share/icons",
-        "/home/javi/.icons",
-        "/home/javi/.local/share/flatpak/exports/share/icons",
-        "/var/lib/flatpak/exports/share/icons",
-        "/home/javi/.nix-profile/share/icons",
-        "/nix/profile/share/icons",
-        "/home/javi/.local/state/nix/profile/share/icons",
-        "/etc/profiles/per-user/javi/share/icons",
-        "/nix/var/nix/profiles/default/share/icons",
-        "/run/current-system/sw/share/icons",
-    ];
+fn find_icon_file(
+    icon_name: &str,
+    size: &str,
+    icon_theme: &IconTheme,
+) -> Option<std::path::PathBuf> {
+    let pixmap_paths: Vec<PathBuf> = icon_theme
+        .search_path()
+        .into_iter()
+        .filter(|p| p.to_string_lossy().contains("pixmap"))
+        .collect();
+    let search_paths: Vec<PathBuf> = icon_theme
+        .search_path()
+        .into_iter()
+        .filter(|p| p.to_string_lossy().contains("icons"))
+        .collect();
+    // let search_paths = [
+    //     "/home/javi/.local/share/icons",
+    //     "/home/javi/.icons",
+    //     "/home/javi/.local/share/flatpak/exports/share/icons",
+    //     "/var/lib/flatpak/exports/share/icons",
+    //     "/home/javi/.nix-profile/share/icons",
+    //     "/nix/profile/share/icons",
+    //     "/home/javi/.local/state/nix/profile/share/icons",
+    //     "/etc/profiles/per-user/javi/share/icons",
+    //     "/nix/var/nix/profiles/default/share/icons",
+    //     "/run/current-system/sw/share/icons",
+    // ];
 
-    let pixmap_paths = [
-        "/home/javi/.local/share/flatpak/exports/share/pixmaps",
-        "/var/lib/flatpak/exports/share/pixmaps",
-        "/home/javi/.nix-profile/share/pixmaps",
-        "/nix/profile/share/pixmaps",
-        "/home/javi/.local/state/nix/profile/share/pixmaps",
-        "/etc/profiles/per-user/javi/share/pixmaps",
-        "/nix/var/nix/profiles/default/share/pixmaps",
-        "/run/current-system/sw/share/pixmaps",
-    ];
+    // let pixmap_paths = [
+    //     "/home/javi/.local/share/flatpak/exports/share/pixmaps",
+    //     "/var/lib/flatpak/exports/share/pixmaps",
+    //     "/home/javi/.nix-profile/share/pixmaps",
+    //     "/nix/profile/share/pixmaps",
+    //     "/home/javi/.local/state/nix/profile/share/pixmaps",
+    //     "/etc/profiles/per-user/javi/share/pixmaps",
+    //     "/nix/var/nix/profiles/default/share/pixmaps",
+    //     "/run/current-system/sw/share/pixmaps",
+    // ];
 
     let sizes = [size, "scalable"];
     let categories = ["apps", "applications", "mimetypes"];
     let extensions = ["svg", "png", "xpm"];
 
-    // First, search pixmaps directly (no subdirectories)
-    for pixmap_path in &pixmap_paths {
-        let base = std::path::Path::new(pixmap_path);
-        if !base.exists() {
-            continue;
-        }
-
-        for ext in &extensions {
-            let direct_icon = base.join(format!("{}.{}", icon_name, ext));
-            if direct_icon.exists() {
-                return Some(direct_icon);
-            }
-        }
-    }
-
     // Build the search paths
     let mut search_in: Vec<PathBuf> = Vec::new();
     // Do all the theme directories first and high color second
-    for path in &search_paths {
-        let base = std::path::Path::new(path);
+    for base in &search_paths {
         for size in sizes {
             for cat in &categories {
                 let path = base
-                    .join(theme_name)
+                    .join(icon_theme.theme_name())
                     .join(if !(size == "scalable".to_string()) {
                         format!("{}x{}", size, size)
                     } else {
@@ -244,8 +224,7 @@ fn find_icon_file(icon_name: &str, size: &str, theme_name: &str) -> Option<std::
             }
         }
     }
-    for path in &search_paths {
-        let base = std::path::Path::new(path);
+    for base in &search_paths {
         for size in sizes {
             for cat in &categories {
                 let path = base
@@ -263,11 +242,23 @@ fn find_icon_file(icon_name: &str, size: &str, theme_name: &str) -> Option<std::
             }
         }
     }
+    // Last resort, search pixmaps directly (no subdirectories)
+    for base in &pixmap_paths {
+        if !base.exists() {
+            continue;
+        }
+
+        for ext in &extensions {
+            let direct_icon = base.join(format!("{}.{}", icon_name, ext));
+            if direct_icon.exists() {
+                return Some(direct_icon);
+            }
+        }
+    }
 
     for s in &search_in {
         for ext in &extensions {
             let icon_path = s.join(format!("{}.{}", icon_name, ext));
-            println!("- {}", format!("{}.{}", icon_name, ext));
             if icon_path.exists() {
                 return Some(icon_path);
             }
@@ -278,23 +269,23 @@ fn find_icon_file(icon_name: &str, size: &str, theme_name: &str) -> Option<std::
 }
 
 fn main() {
-    // let app = Application::builder()
-    //     .application_id("dev.thegrind.waycast")
-    //     .build();
+    let app = Application::builder()
+        .application_id("dev.thegrind.waycast")
+        .build();
 
-    // app.connect_activate(|app| {
-    //     let model = AppModel::new(app);
-    //     model.borrow().show();
-    // });
+    app.connect_activate(|app| {
+        let model = AppModel::new(app);
+        model.borrow().show();
+    });
 
-    // app.run();
+    app.run();
 
-    gtk::init().expect("Failed to init GTK");
-    let display = gtk::gdk::Display::default().unwrap();
-    let icon_theme = gtk::IconTheme::for_display(&display);
-    println!("Current icon theme: {:?}", icon_theme.theme_name());
+    // gtk::init().expect("Failed to init GTK");
+    // let display = gtk::gdk::Display::default().unwrap();
+    // let icon_theme = gtk::IconTheme::for_display(&display);
+    // println!("Current icon theme: {:?}", icon_theme.theme_name());
 
-    for p in icon_theme.search_path() {
-        println!("{}", p.to_string_lossy());
-    }
+    // for p in icon_theme.search_path() {
+    //     println!("{}", p.to_string_lossy());
+    // }
 }
