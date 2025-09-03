@@ -15,6 +15,7 @@ pkgs.mkShell {
     pkgs.pango
     pkgs.cairo
     pkgs.harfbuzz
+    pkgs.librsvg
 
     # Wayland + layer shell (GTK4 variant)
     pkgs.wayland
