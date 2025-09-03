@@ -5,7 +5,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-struct DesktopEntry {
+pub struct DesktopEntry {
     id: String,
     name: String,
     generic_name: Option<glib::GString>,
@@ -15,6 +15,12 @@ struct DesktopEntry {
     path: PathBuf,
     no_display: bool,
     is_terminal_app: bool,
+}
+
+impl DesktopEntry {
+    pub fn path(&self) -> PathBuf {
+        self.path.clone()
+    }
 }
 
 impl LauncherListItem for DesktopEntry {
@@ -89,8 +95,8 @@ fn get_desktop_files() -> Vec<PathBuf> {
     return files;
 }
 
-pub fn all() -> Vec<Box<dyn LauncherListItem>> {
-    let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
+pub fn get_desktop_entries() -> Vec<DesktopEntry> {
+    let mut entries = Vec::new();
 
     for f in get_desktop_files() {
         if let Some(info) = DesktopAppInfo::from_filename(&f) {
@@ -110,8 +116,18 @@ pub fn all() -> Vec<Box<dyn LauncherListItem>> {
                 is_terminal_app: info.boolean("Terminal"),
             };
 
-            entries.push(Box::new(de));
+            entries.push(de);
         }
+    }
+
+    entries
+}
+
+pub fn all() -> Vec<Box<dyn LauncherListItem>> {
+    let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
+
+    for e in get_desktop_entries() {
+        entries.push(Box::new(e));
     }
 
     entries

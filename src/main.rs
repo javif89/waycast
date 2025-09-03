@@ -29,16 +29,33 @@ impl ListItem {
     fn create_widget(&self) -> GtkBox {
         let container = GtkBox::new(Orientation::Horizontal, 10);
 
-        let image = Image::new();
-        image.set_pixel_size(50);
-        image.set_icon_name(Some(&self.icon));
+        // let icon = if self.icon.eq("com.discordapp.Discord")
+        //     || self.icon.eq("preferences-desktop-theme")
+        //     || self.icon.eq("solaar")
+        //     || self.icon.eq("kvantum")
+        // {
+        //     println!("Failed: {}", self.icon);
+        //     gio::Icon::for_string("vscode")
+        // } else {
+        //     let x = String::from(self.icon.clone());
+        //     gio::Icon::for_string(&x)
+        // };
+        // // let icon = gio::Icon::for_string("kvantum");
+        // let image: Image = match icon {
+        //     Ok(ic) => Image::from_gicon(&ic),
+        //     Err(_) => Image::from_icon_name("vscode"),
+        // };
+        // let image = Image::from_icon_name("vscode");
+        let image = gtk::Image::from_icon_name(&self.icon);
+        image.set_pixel_size(32);
+        // image.set_icon_name(Some("application-x-executable")); // Safe fallback
 
         let label = Label::new(Some(&self.text));
         label.set_xalign(0.0);
 
-        // container.append(&image);
+        container.append(&image);
         container.append(&label);
-
+        println!("Icon: {}", self.icon);
         container
     }
 }
@@ -154,4 +171,10 @@ fn main() {
     });
 
     app.run();
+    // for e in drun::get_desktop_entries() {
+    //     println!("---");
+    //     println!("Icon: {}", e.icon());
+    //     println!("Path: {}", e.path().to_string_lossy());
+    //     println!("---");
+    // }
 }
