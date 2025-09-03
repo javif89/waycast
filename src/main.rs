@@ -1,9 +1,9 @@
 use gio::prelude::*;
-use gtk::prelude::*;
 use gtk::{
     Application, ApplicationWindow, Box as GtkBox, Entry, Image, Label, ListBox, Orientation,
     ScrolledWindow,
 };
+use gtk::{IconLookupFlags, prelude::*};
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
@@ -21,6 +21,8 @@ struct ListItem {
     icon: String,
 }
 
+// TODO: I figured out what causes the stack overflow. Now to figure out
+// why the icons for discord, solaar, and kvantum are not being found
 impl ListItem {
     fn new(text: String, icon: String) -> Self {
         Self { text, icon }
@@ -46,8 +48,28 @@ impl ListItem {
         //     Err(_) => Image::from_icon_name("vscode"),
         // };
         // let image = Image::from_icon_name("vscode");
-        let image = gtk::Image::from_icon_name(&self.icon);
-        image.set_pixel_size(32);
+        // Use IconTheme for safe validation like Wofi does
+        let display = gtk::gdk::Display::default().unwrap();
+        let icon_theme = gtk::IconTheme::for_display(&display);
+
+        let scale = container.scale_factor();
+        let icon_size = 48;
+        let image = if icon_theme.has_icon(&self.icon) {
+            println!("Has icon: {}", self.icon);
+            let paintable = icon_theme.lookup_icon(
+                &self.icon,
+                &["vscode"],
+                icon_size,
+                scale,
+                gtk::TextDirection::None,
+                IconLookupFlags::empty(),
+            );
+            gtk::Image::from_paintable(Some(&paintable))
+        } else {
+            println!("No icon: {}", self.icon);
+            gtk::Image::from_icon_name("application-x-executable")
+        };
+        image.set_pixel_size(icon_size);
         // image.set_icon_name(Some("application-x-executable")); // Safe fallback
 
         let label = Label::new(Some(&self.text));
@@ -136,6 +158,13 @@ impl AppModel {
             let widget = list_item.create_widget();
             self.list_box.append(&widget);
         }
+
+        // let display = gtk::gdk::Display::default().unwrap();
+        // let icon_theme = gtk::IconTheme::for_display(&display);
+
+        // for p in icon_theme.search_path() {
+        //     println!("{}", p.to_string_lossy());
+        // }
     }
 
     fn filter_list(&self, query: &str) {
