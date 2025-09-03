@@ -278,51 +278,23 @@ fn find_icon_file(icon_name: &str, size: &str, theme_name: &str) -> Option<std::
 }
 
 fn main() {
-    let app = Application::builder()
-        .application_id("dev.thegrind.waycast")
-        .build();
+    // let app = Application::builder()
+    //     .application_id("dev.thegrind.waycast")
+    //     .build();
 
-    app.connect_activate(|app| {
-        let model = AppModel::new(app);
-        model.borrow().show();
-    });
+    // app.connect_activate(|app| {
+    //     let model = AppModel::new(app);
+    //     model.borrow().show();
+    // });
 
-    app.run();
+    // app.run();
 
-    // gtk::init().expect("Failed to init GTK");
-    // let display = gtk::gdk::Display::default().unwrap();
-    // let icon_theme = gtk::IconTheme::for_display(&display);
-    // println!("Current icon theme: {:?}", icon_theme.theme_name());
-    // for info in gio::AppInfo::all() {
-    //     if !info.should_show() {
-    //         continue;
-    //     }
+    gtk::init().expect("Failed to init GTK");
+    let display = gtk::gdk::Display::default().unwrap();
+    let icon_theme = gtk::IconTheme::for_display(&display);
+    println!("Current icon theme: {:?}", icon_theme.theme_name());
 
-    //     println!("App: {}", info.display_name());
-    //     if let Some(icon) = info.icon() {
-    //         if let Some(x) = icon.to_string() {
-    //             println!("Icon: {}", x.to_string());
-    //             if let Some(path) = find_icon_file(&x, "48", icon_theme.theme_name().as_str()) {
-    //                 println!("Found at: {}", path.to_string_lossy());
-    //             } else {
-    //                 println!("Not found");
-    //             }
-    //         }
-    //         // if let Ok(ti) = icon.clone().downcast::<gio::ThemedIcon>() {
-    //         //     // ThemedIcon may have multiple names, we take the first
-    //         //     if let Some(name) = ti.names().first() {
-    //         //         println!("Themed: {}", name.to_string());
-    //         //     }
-    //         // }
-
-    //         // if let Ok(fi) = icon.clone().downcast::<gio::FileIcon>() {
-    //         //     if let Some(path) = fi.file().path() {
-    //         //         println!("File: {}", path.to_string_lossy().to_string());
-    //         //     }
-    //         // }
-    //     }
-    //     println!("\n");
-    // }
-
-    // let appinfo = gio::AppInfo::all();
+    for p in icon_theme.search_path() {
+        println!("{}", p.to_string_lossy());
+    }
 }

@@ -1,26 +1,12 @@
-use crate::util::files;
 use crate::{LaunchError, LauncherListItem};
 use gio::{AppInfo, DesktopAppInfo, Icon, prelude::*};
-use std::env;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct DesktopEntry {
     id: String,
     name: String,
-    generic_name: Option<glib::GString>,
     description: Option<glib::GString>,
     icon: Option<Icon>,
-    exec: Option<glib::GString>,
-    path: PathBuf,
-    no_display: bool,
-    is_terminal_app: bool,
-}
-
-impl DesktopEntry {
-    pub fn path(&self) -> PathBuf {
-        self.path.clone()
-    }
 }
 
 impl LauncherListItem for DesktopEntry {
@@ -37,7 +23,7 @@ impl LauncherListItem for DesktopEntry {
     }
 
     fn execute(&self) -> Result<(), LaunchError> {
-        if let Some(di) = DesktopAppInfo::from_filename(&self.path) {
+        if let Some(di) = DesktopAppInfo::new(&self.id) {
             let app: AppInfo = di.upcast();
             let ctx = gio::AppLaunchContext::new();
             if app.launch(&[], Some(&ctx)).ok().is_none() {
@@ -69,55 +55,27 @@ impl LauncherListItem for DesktopEntry {
     }
 }
 
-fn get_desktop_files() -> Vec<PathBuf> {
-    let dir_envs =
-        env::var("XDG_DATA_DIRS").expect("XDG_DATA_DIRS not set. Please fix your environment");
-    let dir_string = String::from(dir_envs);
-    let dirs = dir_string.split(":");
-
-    let mut files = Vec::new();
-    for dir in dirs {
-        // println!("Data dir: {}", dir);
-        let apps_path = Path::new(dir).join("applications");
-        let desktop_files = match files::get_files_with_extension(&apps_path, "desktop") {
-            Ok(files) => files,
-            Err(_) => {
-                // eprintln!("Error reading {dir}: {err}");
-                continue;
-            }
-        };
-
-        for f in desktop_files {
-            files.push(f);
-        }
-    }
-
-    return files;
-}
-
 pub fn get_desktop_entries() -> Vec<DesktopEntry> {
     let mut entries = Vec::new();
 
-    for f in get_desktop_files() {
-        if let Some(info) = DesktopAppInfo::from_filename(&f) {
-            if info.is_nodisplay() {
-                continue;
-            }
-
-            let de = DesktopEntry {
-                id: info.id().unwrap_or_default().to_string(),
-                name: info.name().to_string(),
-                generic_name: info.generic_name(),
-                description: info.description(),
-                icon: info.icon(),
-                exec: info.string("Exec"),
-                no_display: info.is_nodisplay(),
-                path: f.clone(),
-                is_terminal_app: info.boolean("Terminal"),
-            };
-
-            entries.push(de);
+    for i in gio::AppInfo::all() {
+        let info: gio::DesktopAppInfo;
+        match i.downcast_ref::<gio::DesktopAppInfo>() {
+            Some(inf) => info = inf.to_owned(),
+            None => continue,
         }
+        if !info.should_show() {
+            continue;
+        }
+
+        let de = DesktopEntry {
+            id: info.id().unwrap_or_default().to_string(),
+            name: info.display_name().to_string(),
+            description: info.description(),
+            icon: info.icon(),
+        };
+
+        entries.push(de);
     }
 
     entries
