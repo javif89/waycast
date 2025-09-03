@@ -1,129 +1,76 @@
-use gio::{Icon, prelude::*};
+use gio::prelude::*;
+use gtk::prelude::*;
 use gtk::{
-    Box as GtkBox, CssProvider, Entry, IconLookupFlags, IconTheme, Image, Label, ListBox, ListView,
-    NoSelection, Orientation, STYLE_PROVIDER_PRIORITY_APPLICATION, ScrolledWindow,
-    SignalListItemFactory, StringList, StringObject, Window,
+    Application, ApplicationWindow, Box as GtkBox, Entry, Image, Label, ListBox, Orientation,
+    ScrolledWindow,
 };
-use gtk::{Button, prelude::*};
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
-use relm4::factory::{FactoryComponent, FactorySender, FactoryVecDeque};
-use relm4::{Component, ComponentParts, RelmApp, RelmWidgetExt, SimpleComponent, component};
-use waycast::{LaunchError, LauncherListItem, drun};
+use std::cell::RefCell;
+use std::rc::Rc;
+use waycast::{LauncherListItem, drun};
 
 struct AppModel {
-    list_items: FactoryVecDeque<ListItem>,
+    window: ApplicationWindow,
+    list_box: ListBox,
+    entries: Vec<Box<dyn LauncherListItem>>,
 }
 
-#[derive(Debug)]
-enum AppMsg {
-    TextEntered(String),
-    ListItemSelected(String),
-    None,
-}
-
-#[derive(Debug)]
 struct ListItem {
     text: String,
     icon: String,
 }
 
-#[relm4::factory]
-impl FactoryComponent for ListItem {
-    type Init = (String, String);
-    type Input = ();
-    type Output = ();
-    type CommandOutput = ();
-    type ParentWidget = gtk::ListBox;
-
-    view! {
-        #[root]
-        GtkBox {
-            set_orientation: Orientation::Horizontal,
-            set_spacing: 10,
-
-            Image {
-                set_pixel_size: 50,
-                set_icon_name: Some(self.icon.as_str()),
-            },
-
-            Label {
-                set_xalign: 0.0,
-                set_label: &self.text
-            },
-        }
+impl ListItem {
+    fn new(text: String, icon: String) -> Self {
+        Self { text, icon }
     }
 
-    fn init_model(
-        (text, icon): Self::Init,
-        _index: &Self::Index,
-        _sender: FactorySender<Self>,
-    ) -> Self {
-        Self { text, icon }
+    fn create_widget(&self) -> GtkBox {
+        let container = GtkBox::new(Orientation::Horizontal, 10);
+
+        let image = Image::new();
+        image.set_pixel_size(50);
+        image.set_icon_name(Some(&self.icon));
+
+        let label = Label::new(Some(&self.text));
+        label.set_xalign(0.0);
+
+        // container.append(&image);
+        container.append(&label);
+
+        container
     }
 }
 
-#[relm4::component]
-impl SimpleComponent for AppModel {
-    type Init = StringList;
-    type Input = AppMsg;
-    type Output = ();
+impl AppModel {
+    fn new(app: &Application) -> Rc<RefCell<Self>> {
+        let window = ApplicationWindow::builder()
+            .application(app)
+            .title("Waycast")
+            .default_width(800)
+            .default_height(500)
+            .resizable(false)
+            .build();
 
-    view! {
-        #[name = "launcher_window"]
-        Window {
-            set_title: Some("Waycast"),
-            set_default_width: 800,
-            set_default_height: 500,
-            set_resizable: false,
+        let main_box = GtkBox::new(Orientation::Vertical, 0);
 
-            GtkBox {
-                set_orientation: Orientation::Vertical,
+        let search_input = Entry::new();
+        search_input.set_placeholder_text(Some("Search..."));
 
-                #[name = "search_input"]
-                Entry {
-                    set_placeholder_text: Some("Search..."),
-                    connect_changed[sender] => move |e| {
-                        sender.input(AppMsg::TextEntered(e.text().to_string()));
-                    }
-                },
+        let scrolled_window = ScrolledWindow::new();
+        scrolled_window.set_min_content_height(300);
 
-                ScrolledWindow {
-                    set_min_content_height: 300,
+        let list_box = ListBox::new();
+        list_box.set_vexpand(true);
 
-                    #[local_ref]
-                    items -> ListBox {
-                        set_vexpand: true,
-                    }
-                }
-            }
-        }
-    }
+        scrolled_window.set_child(Some(&list_box));
+        main_box.append(&search_input);
+        main_box.append(&scrolled_window);
+        window.set_child(Some(&main_box));
 
-    fn init(
-        _list_items: Self::Init,
-        root: Self::Root,
-        sender: relm4::ComponentSender<Self>,
-    ) -> relm4::ComponentParts<Self> {
-        let mut list_items: FactoryVecDeque<ListItem> = FactoryVecDeque::builder()
-            .launch(ListBox::default())
-            .forward(sender.input_sender(), |_| AppMsg::None);
-        {
-            let mut guard = list_items.guard();
-            println!("Starting to load desktop entries...");
-            let entries = drun::all();
-            println!("Found {} entries", entries.len());
-            for p in entries {
-                guard.push_back((p.title(), p.icon()));
-            }
-            println!("Finished loading entries");
-        }
-        let model = AppModel { list_items };
-        let items = model.list_items.widget();
-        let widgets = view_output!();
         // Set up layer shell so the launcher can float
-        // like it's supposed to.
-        widgets.launcher_window.init_layer_shell();
+        window.init_layer_shell();
         let edges = [
             layerShell::Edge::Top,
             layerShell::Edge::Bottom,
@@ -131,38 +78,80 @@ impl SimpleComponent for AppModel {
             layerShell::Edge::Right,
         ];
         for edge in edges {
-            widgets.launcher_window.set_anchor(edge, false);
+            window.set_anchor(edge, false);
         }
-        widgets
-            .launcher_window
-            .set_keyboard_mode(layerShell::KeyboardMode::OnDemand);
-        widgets.launcher_window.set_layer(layerShell::Layer::Top);
-        ComponentParts { model, widgets }
+        window.set_keyboard_mode(layerShell::KeyboardMode::OnDemand);
+        window.set_layer(layerShell::Layer::Top);
+
+        println!("Starting to load desktop entries...");
+        let entries = drun::all();
+        println!("Found {} entries", entries.len());
+
+        let model = Rc::new(RefCell::new(AppModel {
+            window,
+            list_box: list_box.clone(),
+            entries,
+        }));
+
+        // Populate the list
+        model.borrow().populate_list();
+
+        // Connect search input signal
+        let model_clone = model.clone();
+        search_input.connect_changed(move |entry| {
+            let query = entry.text().to_string();
+            println!("query: {query}");
+            model_clone.borrow().filter_list(&query);
+        });
+
+        println!("Finished loading entries");
+        model
     }
 
-    fn update(&mut self, message: Self::Input, _sender: relm4::ComponentSender<Self>) {
-        match message {
-            AppMsg::TextEntered(query) => {
-                println!("query: {query}");
+    fn populate_list(&self) {
+        // Clear existing items
+        while let Some(child) = self.list_box.first_child() {
+            self.list_box.remove(&child);
+        }
+
+        for entry in &self.entries {
+            let list_item = ListItem::new(entry.title(), entry.icon());
+            let widget = list_item.create_widget();
+            self.list_box.append(&widget);
+        }
+    }
+
+    fn filter_list(&self, query: &str) {
+        // Clear existing items
+        while let Some(child) = self.list_box.first_child() {
+            self.list_box.remove(&child);
+        }
+
+        let query_lower = query.to_lowercase();
+        for entry in &self.entries {
+            let title_lower = entry.title().to_lowercase();
+            if query.is_empty() || title_lower.contains(&query_lower) {
+                let list_item = ListItem::new(entry.title(), entry.icon());
+                let widget = list_item.create_widget();
+                self.list_box.append(&widget);
             }
-            _ => unimplemented!(),
         }
     }
-}
 
-macro_rules! yesno {
-    ($var:expr) => {
-        if $var { "Yes" } else { "No" }
-    };
+    fn show(&self) {
+        self.window.present();
+    }
 }
 
 fn main() {
-    let app = RelmApp::new("dev.thegrind.waycast");
-    app.run::<AppModel>(StringList::new(&[]));
-    // let entries = drun::all();
-    // for e in &entries {
-    //     println!("---------------------");
-    //     println!("App: {}", e.title());
-    //     println!("Icon: {}", e.icon().unwrap_or("<NONE>".into()));
-    // }
+    let app = Application::builder()
+        .application_id("dev.thegrind.waycast")
+        .build();
+
+    app.connect_activate(|app| {
+        let model = AppModel::new(app);
+        model.borrow().show();
+    });
+
+    app.run();
 }
