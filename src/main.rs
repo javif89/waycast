@@ -11,6 +11,7 @@ fn main() {
     app.connect_activate(|app| {
         let launcher = WaycastLauncher::new()
             .add_plugin(plugins::drun::DrunPlugin {})
+            .add_plugin(plugins::file_search::FileSearchPlugin {})
             .initialize(app);
 
         launcher.borrow().show();

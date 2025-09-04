@@ -128,6 +128,7 @@ impl WaycastLauncher {
         for p in init_plugins {
             plugins.push(Arc::from(p));
         }
+        plugins.sort_by(|a, b| b.priority().cmp(&a.priority()));
         // Organize plugins for faster querying
         let mut plugins_show_always: Vec<Arc<dyn LauncherPlugin>> = Vec::new();
         for p in &plugins {
