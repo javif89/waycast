@@ -129,6 +129,29 @@ impl AppModel {
             model_clone.borrow_mut().filter_list(&query);
         });
 
+        // Connect Enter key activation for search input
+        let list_box_clone_for_activate = list_box.clone();
+        let model_clone_for_activate = model.clone();
+        search_input.connect_activate(move |_| {
+            println!("Search entry activated!");
+            if let Some(selected_row) = list_box_clone_for_activate.selected_row() {
+                let index = selected_row.index() as usize;
+                let model_ref = model_clone_for_activate.borrow();
+                if let Some(entry) = model_ref.entries.get(index) {
+                    println!("Launching app: {}", entry.title());
+                    match entry.execute() {
+                        Ok(_) => {
+                            println!("App launched successfully, closing launcher");
+                            model_ref.window.close();
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to launch app: {:?}", e);
+                        }
+                    }
+                }
+            }
+        });
+
         // Add key handler for launcher-style navigation
         let search_key_controller = EventControllerKey::new();
         let list_box_clone_for_search = list_box.clone();
@@ -159,50 +182,20 @@ impl AppModel {
                     }
                     gtk::glib::Propagation::Stop
                 }
-                gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter => {
-                    // Activate selected row directly
-                    if let Some(selected_row) = list_box_clone_for_search.selected_row() {
-                        let index = selected_row.index() as usize;
-                        let model_ref = model_clone_for_enter.borrow();
-                        if let Some(entry) = model_ref.entries.get(index) {
-                            println!("Launching app: {}", entry.title());
-                            match entry.execute() {
-                                Ok(_) => {
-                                    println!("App launched successfully, closing launcher");
-                                    model_ref.window.close();
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to launch app: {:?}", e);
-                                }
-                            }
-                        }
-                    }
-                    gtk::glib::Propagation::Stop
-                }
                 _ => gtk::glib::Propagation::Proceed
             }
         });
         search_input.add_controller(search_key_controller);
 
-        // Add window-level key handler for global navigation and typing
+        // Add simple ESC key handler at window level
         let window_key_controller = EventControllerKey::new();
         let window_clone = model.borrow().window.clone();
-        let search_input_clone_for_window = search_input.clone();
         window_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
-            match keyval {
-                gtk::gdk::Key::Escape => {
-                    window_clone.close();
-                    gtk::glib::Propagation::Stop
-                }
-                _ => {
-                    // If it's a printable character and search input doesn't have focus, focus it
-                    if keyval.to_unicode().is_some() && !search_input_clone_for_window.has_focus() {
-                        search_input_clone_for_window.grab_focus();
-                        gtk::glib::Propagation::Proceed // Let the character get typed
-                    } else {
-                        gtk::glib::Propagation::Proceed
-                    }
-                }
+            if keyval == gtk::gdk::Key::Escape {
+                window_clone.close();
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
             }
         });
         model.borrow().window.add_controller(window_key_controller);
