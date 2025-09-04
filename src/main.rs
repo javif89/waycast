@@ -4,14 +4,14 @@ use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
     Application, ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image,
-    Label, ListBox, Orientation, ScrolledWindow, SearchEntry,
+    Label, ListBox, Orientation, ScrolledWindow,
 };
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use waycast::{LauncherListItem, LauncherPlugin, drun, plugins};
+use waycast::{LauncherListItem, LauncherPlugin, plugins};
 
 struct AppModel {
     window: ApplicationWindow,
@@ -76,7 +76,7 @@ impl AppModel {
 
         let main_box = GtkBox::new(Orientation::Vertical, 0);
 
-        let search_input = SearchEntry::new();
+        let search_input = Entry::new();
         search_input.set_placeholder_text(Some("Search..."));
 
         let scrolled_window = ScrolledWindow::new();
@@ -120,8 +120,6 @@ impl AppModel {
 
         // Set initial focus to search input so user can start typing immediately
         search_input.grab_focus();
-        // Set up SearchEntry to capture keys from the window for proper navigation
-        search_input.set_key_capture_widget(Some(&model.borrow().window));
 
         // Connect search input signal
         let model_clone = model.clone();
@@ -131,44 +129,83 @@ impl AppModel {
             model_clone.borrow_mut().filter_list(&query);
         });
 
-        // Connect search navigation signals
-        let list_box_clone_for_next = list_box.clone();
-        let list_box_clone_for_prev = list_box.clone();
-
-        search_input.connect_next_match(move |_| {
-            if let Some(selected_row) = list_box_clone_for_next.selected_row() {
-                let index = selected_row.index();
-                if let Some(next_row) = list_box_clone_for_next.row_at_index(index + 1) {
-                    list_box_clone_for_next.select_row(Some(&next_row));
+        // Add key handler for launcher-style navigation
+        let search_key_controller = EventControllerKey::new();
+        let list_box_clone_for_search = list_box.clone();
+        let model_clone_for_enter = model.clone();
+        search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
+            match keyval {
+                gtk::gdk::Key::Down => {
+                    // Move to next item in list
+                    if let Some(selected_row) = list_box_clone_for_search.selected_row() {
+                        let index = selected_row.index();
+                        if let Some(next_row) = list_box_clone_for_search.row_at_index(index + 1) {
+                            list_box_clone_for_search.select_row(Some(&next_row));
+                        }
+                    } else if let Some(first_row) = list_box_clone_for_search.row_at_index(0) {
+                        list_box_clone_for_search.select_row(Some(&first_row));
+                    }
+                    gtk::glib::Propagation::Stop
                 }
-            } else if let Some(first_row) = list_box_clone_for_next.row_at_index(0) {
-                list_box_clone_for_next.select_row(Some(&first_row));
+                gtk::gdk::Key::Up => {
+                    // Move to previous item in list
+                    if let Some(selected_row) = list_box_clone_for_search.selected_row() {
+                        let index = selected_row.index();
+                        if index > 0 {
+                            if let Some(prev_row) = list_box_clone_for_search.row_at_index(index - 1) {
+                                list_box_clone_for_search.select_row(Some(&prev_row));
+                            }
+                        }
+                    }
+                    gtk::glib::Propagation::Stop
+                }
+                gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter => {
+                    // Activate selected row directly
+                    if let Some(selected_row) = list_box_clone_for_search.selected_row() {
+                        let index = selected_row.index() as usize;
+                        let model_ref = model_clone_for_enter.borrow();
+                        if let Some(entry) = model_ref.entries.get(index) {
+                            println!("Launching app: {}", entry.title());
+                            match entry.execute() {
+                                Ok(_) => {
+                                    println!("App launched successfully, closing launcher");
+                                    model_ref.window.close();
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to launch app: {:?}", e);
+                                }
+                            }
+                        }
+                    }
+                    gtk::glib::Propagation::Stop
+                }
+                _ => gtk::glib::Propagation::Proceed
             }
         });
+        search_input.add_controller(search_key_controller);
 
-        search_input.connect_previous_match(move |_| {
-            if let Some(selected_row) = list_box_clone_for_prev.selected_row() {
-                let index = selected_row.index();
-                if index > 0 {
-                    if let Some(prev_row) = list_box_clone_for_prev.row_at_index(index - 1) {
-                        list_box_clone_for_prev.select_row(Some(&prev_row));
+        // Add window-level key handler for global navigation and typing
+        let window_key_controller = EventControllerKey::new();
+        let window_clone = model.borrow().window.clone();
+        let search_input_clone_for_window = search_input.clone();
+        window_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
+            match keyval {
+                gtk::gdk::Key::Escape => {
+                    window_clone.close();
+                    gtk::glib::Propagation::Stop
+                }
+                _ => {
+                    // If it's a printable character and search input doesn't have focus, focus it
+                    if keyval.to_unicode().is_some() && !search_input_clone_for_window.has_focus() {
+                        search_input_clone_for_window.grab_focus();
+                        gtk::glib::Propagation::Proceed // Let the character get typed
+                    } else {
+                        gtk::glib::Propagation::Proceed
                     }
                 }
             }
         });
-
-        // Add ESC key handler to close window
-        let key_controller = EventControllerKey::new();
-        let window_clone = model.borrow().window.clone();
-        key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
-            if keyval == gtk::gdk::Key::Escape {
-                window_clone.close();
-                gtk::glib::Propagation::Stop
-            } else {
-                gtk::glib::Propagation::Proceed
-            }
-        });
-        model.borrow().window.add_controller(key_controller);
+        model.borrow().window.add_controller(window_key_controller);
 
         // Connect row activation signal to launch app and close launcher
         let model_clone_2 = model.clone();
