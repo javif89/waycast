@@ -4,22 +4,80 @@ use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
     Application, ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image,
-    Label, ListBox, Orientation, ScrolledWindow,
+    Label, ListView, Orientation, ScrolledWindow, SignalListItemFactory, SingleSelection,
 };
+use gio::ListStore;
+use gtk::subclass::prelude::ObjectSubclassIsExt;
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 mod launcher_builder;
 use launcher_builder::WaycastLauncherBuilder;
 use std::sync::Arc;
 
+// GObject wrapper to store LauncherListItem in GTK's model system
+mod imp {
+    use gtk::glib;
+    use gtk::subclass::prelude::*;
+    use std::cell::RefCell;
+
+    #[derive(Default)]
+    pub struct LauncherItemObject {
+        pub title: RefCell<String>,
+        pub description: RefCell<Option<String>>,
+        pub icon: RefCell<String>,
+        pub index: RefCell<usize>, // Store index to access original entry
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for LauncherItemObject {
+        const NAME: &'static str = "WaycastLauncherItemObject";
+        type Type = super::LauncherItemObject;
+        type ParentType = glib::Object;
+    }
+
+    impl ObjectImpl for LauncherItemObject {}
+}
+
+glib::wrapper! {
+    pub struct LauncherItemObject(ObjectSubclass<imp::LauncherItemObject>);
+}
+
+impl LauncherItemObject {
+    pub fn new(title: String, description: Option<String>, icon: String, index: usize) -> Self {
+        let obj: Self = glib::Object::new();
+        let imp = obj.imp();
+        
+        // Store the data
+        *imp.title.borrow_mut() = title;
+        *imp.description.borrow_mut() = description;
+        *imp.icon.borrow_mut() = icon;
+        *imp.index.borrow_mut() = index;
+        
+        obj
+    }
+    
+    pub fn title(&self) -> String {
+        self.imp().title.borrow().clone()
+    }
+    
+    pub fn icon(&self) -> String {
+        self.imp().icon.borrow().clone()
+    }
+    
+    pub fn index(&self) -> usize {
+        *self.imp().index.borrow()
+    }
+}
+
 pub struct WaycastLauncher {
     pub window: ApplicationWindow,
-    pub list_box: ListBox,
+    pub list_view: ListView,
+    pub list_store: ListStore,
+    pub selection: SingleSelection,
     pub entries: Vec<Box<dyn LauncherListItem>>,
     // All plugins
     pub plugins: Vec<Arc<dyn LauncherPlugin>>,
@@ -37,48 +95,6 @@ impl WaycastLauncher {
     }
 }
 
-pub struct ListItem {
-    text: String,
-    icon: String,
-}
-
-impl ListItem {
-    pub fn new(text: String, icon: String) -> Self {
-        Self { text, icon }
-    }
-
-    pub fn create_widget(&self) -> GtkBox {
-        let container = GtkBox::new(Orientation::Horizontal, 10);
-        let display = gtk::gdk::Display::default().unwrap();
-        let icon_theme = gtk::IconTheme::for_display(&display);
-
-        let icon_size = 48;
-        let image: gtk::Image;
-        if let Some(icon_path) = find_icon_file(&self.icon, "48", &icon_theme) {
-            image = match Pixbuf::from_file_at_scale(icon_path, icon_size, icon_size, true) {
-                Ok(pb) => {
-                    let tex = Texture::for_pixbuf(&pb);
-                    gtk::Image::from_paintable(Some(&tex))
-                }
-                Err(e) => {
-                    eprintln!("err: {}", e);
-                    Image::from_icon_name("application-x-executable")
-                }
-            }
-        } else {
-            let default = find_icon_file("vscode", "48", &icon_theme).unwrap();
-            image = gtk::Image::from_file(default);
-        }
-        image.set_pixel_size(icon_size);
-
-        let label = Label::new(Some(&self.text));
-        label.set_xalign(0.0);
-
-        container.append(&image);
-        container.append(&label);
-        container
-    }
-}
 
 impl WaycastLauncher {
     fn create_with_plugins(
@@ -101,12 +117,69 @@ impl WaycastLauncher {
         let scrolled_window = ScrolledWindow::new();
         scrolled_window.set_min_content_height(300);
 
-        let list_box = ListBox::new();
-        list_box.set_vexpand(true);
-        list_box.set_can_focus(true);
-        list_box.set_activate_on_single_click(false);
+        // Create the list store and selection model
+        let list_store = ListStore::new::<LauncherItemObject>();
+        let selection = SingleSelection::new(Some(list_store.clone()));
 
-        scrolled_window.set_child(Some(&list_box));
+        // Create factory for rendering list items
+        let factory = SignalListItemFactory::new();
+        
+        // Setup factory to create widgets
+        factory.connect_setup(move |_, list_item| {
+            let container = GtkBox::new(Orientation::Horizontal, 10);
+            list_item.set_child(Some(&container));
+        });
+        
+        // Setup factory to bind data to widgets
+        factory.connect_bind(move |_, list_item| {
+            let child = list_item.child().and_downcast::<GtkBox>().unwrap();
+            
+            // Clear existing children
+            while let Some(first_child) = child.first_child() {
+                child.remove(&first_child);
+            }
+            
+            if let Some(item_obj) = list_item.item().and_downcast::<LauncherItemObject>() {
+                let display = gtk::gdk::Display::default().unwrap();
+                let icon_theme = gtk::IconTheme::for_display(&display);
+                let icon_size = 48;
+                
+                // Create icon
+                let image: gtk::Image;
+                if let Some(icon_path) = find_icon_file(&item_obj.icon(), "48", &icon_theme) {
+                    image = match Pixbuf::from_file_at_scale(icon_path, icon_size, icon_size, true) {
+                        Ok(pb) => {
+                            let tex = Texture::for_pixbuf(&pb);
+                            gtk::Image::from_paintable(Some(&tex))
+                        }
+                        Err(e) => {
+                            eprintln!("err: {}", e);
+                            Image::from_icon_name("application-x-executable")
+                        }
+                    }
+                } else {
+                    if let Some(default) = find_icon_file("vscode", "48", &icon_theme) {
+                        image = gtk::Image::from_file(default);
+                    } else {
+                        image = Image::from_icon_name("application-x-executable");
+                    }
+                }
+                image.set_pixel_size(icon_size);
+                
+                // Create label
+                let label = Label::new(Some(&item_obj.title()));
+                label.set_xalign(0.0);
+                
+                child.append(&image);
+                child.append(&label);
+            }
+        });
+        
+        let list_view = ListView::new(Some(selection.clone()), Some(factory));
+        list_view.set_vexpand(true);
+        list_view.set_can_focus(true);
+
+        scrolled_window.set_child(Some(&list_view));
         main_box.append(&search_input);
         main_box.append(&scrolled_window);
         window.set_child(Some(&main_box));
@@ -149,7 +222,9 @@ impl WaycastLauncher {
         let entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
         let model: Rc<RefCell<WaycastLauncher>> = Rc::new(RefCell::new(WaycastLauncher {
             window,
-            list_box: list_box.clone(),
+            list_view: list_view.clone(),
+            list_store: list_store.clone(),
+            selection: selection.clone(),
             entries,
             plugins,
             plugins_show_always,
@@ -171,22 +246,24 @@ impl WaycastLauncher {
         });
 
         // Connect Enter key activation for search input
-        let list_box_clone_for_activate = list_box.clone();
+        let selection_clone_for_activate = selection.clone();
         let model_clone_for_activate = model.clone();
         search_input.connect_activate(move |_| {
             println!("Search entry activated!");
-            if let Some(selected_row) = list_box_clone_for_activate.selected_row() {
-                let index = selected_row.index() as usize;
-                let model_ref = model_clone_for_activate.borrow();
-                if let Some(entry) = model_ref.entries.get(index) {
-                    println!("Launching app: {}", entry.title());
-                    match entry.execute() {
-                        Ok(_) => {
-                            println!("App launched successfully, closing launcher");
-                            model_ref.window.close();
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to launch app: {:?}", e);
+            if let Some(selected_item) = selection_clone_for_activate.selected_item() {
+                if let Some(item_obj) = selected_item.downcast_ref::<LauncherItemObject>() {
+                    let model_ref = model_clone_for_activate.borrow();
+                    let index = item_obj.index();
+                    if let Some(entry) = model_ref.entries.get(index) {
+                        println!("Launching app: {}", entry.title());
+                        match entry.execute() {
+                            Ok(_) => {
+                                println!("App launched successfully, closing launcher");
+                                model_ref.window.close();
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to launch app: {:?}", e);
+                            }
                         }
                     }
                 }
@@ -195,32 +272,23 @@ impl WaycastLauncher {
 
         // Add key handler for launcher-style navigation
         let search_key_controller = EventControllerKey::new();
-        let list_box_clone_for_search = list_box.clone();
+        let selection_clone_for_search = selection.clone();
         search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
             match keyval {
                 gtk::gdk::Key::Down => {
-                    // Move to next item in list
-                    if let Some(selected_row) = list_box_clone_for_search.selected_row() {
-                        let index = selected_row.index();
-                        if let Some(next_row) = list_box_clone_for_search.row_at_index(index + 1) {
-                            list_box_clone_for_search.select_row(Some(&next_row));
-                        }
-                    } else if let Some(first_row) = list_box_clone_for_search.row_at_index(0) {
-                        list_box_clone_for_search.select_row(Some(&first_row));
+                    let current_pos = selection_clone_for_search.selected();
+                    let n_items = selection_clone_for_search.model().unwrap().n_items();
+                    if current_pos < n_items - 1 {
+                        selection_clone_for_search.set_selected(current_pos + 1);
+                    } else if n_items > 0 && current_pos == gtk::INVALID_LIST_POSITION {
+                        selection_clone_for_search.set_selected(0);
                     }
                     gtk::glib::Propagation::Stop
                 }
                 gtk::gdk::Key::Up => {
-                    // Move to previous item in list
-                    if let Some(selected_row) = list_box_clone_for_search.selected_row() {
-                        let index = selected_row.index();
-                        if index > 0 {
-                            if let Some(prev_row) =
-                                list_box_clone_for_search.row_at_index(index - 1)
-                            {
-                                list_box_clone_for_search.select_row(Some(&prev_row));
-                            }
-                        }
+                    let current_pos = selection_clone_for_search.selected();
+                    if current_pos > 0 {
+                        selection_clone_for_search.set_selected(current_pos - 1);
                     }
                     gtk::glib::Propagation::Stop
                 }
@@ -242,20 +310,24 @@ impl WaycastLauncher {
         });
         model.borrow().window.add_controller(window_key_controller);
 
-        // Connect row activation signal to launch app and close launcher
+        // Connect list activation signal to launch app and close launcher
         let model_clone_2 = model.clone();
-        list_box.connect_row_activated(move |_, row| {
-            let index = row.index() as usize;
+        list_view.connect_activate(move |_, position| {
             let model_ref = model_clone_2.borrow();
-            if let Some(entry) = model_ref.entries.get(index) {
-                println!("Launching app: {}", entry.title());
-                match entry.execute() {
-                    Ok(_) => {
-                        println!("App launched successfully, closing launcher");
-                        model_ref.window.close();
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to launch app: {:?}", e);
+            if let Some(item) = model_ref.list_store.item(position) {
+                if let Some(item_obj) = item.downcast_ref::<LauncherItemObject>() {
+                    let index = item_obj.index();
+                    if let Some(entry) = model_ref.entries.get(index) {
+                        println!("Launching app: {}", entry.title());
+                        match entry.execute() {
+                            Ok(_) => {
+                                println!("App launched successfully, closing launcher");
+                                model_ref.window.close();
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to launch app: {:?}", e);
+                            }
+                        }
                     }
                 }
             }
@@ -270,25 +342,31 @@ impl WaycastLauncher {
         }
     }
 
-    pub fn clear_list_ui(&self) {
-        while let Some(child) = self.list_box.first_child() {
-            self.list_box.remove(&child);
+    pub fn clear_list_ui(&mut self) {
+        self.list_store.remove_all();
+    }
+
+    pub fn render_list(&mut self) {
+        // Clear the list store
+        self.list_store.remove_all();
+        
+        // Add all entries to the store
+        for (index, entry) in self.entries.iter().enumerate() {
+            let item_obj = LauncherItemObject::new(
+                entry.title(),
+                entry.description(),
+                entry.icon(),
+                index
+            );
+            self.list_store.append(&item_obj);
+        }
+
+        // Select the first item if available
+        if self.list_store.n_items() > 0 {
+            self.selection.set_selected(0);
         }
     }
 
-    pub fn render_list(&self) {
-        self.clear_list_ui();
-        for entry in &self.entries {
-            let list_item = ListItem::new(entry.title(), entry.icon());
-            let widget = list_item.create_widget();
-            self.list_box.append(&widget);
-        }
-
-        // Always select the first item if available
-        if let Some(first_row) = self.list_box.row_at_index(0) {
-            self.list_box.select_row(Some(&first_row));
-        }
-    }
 
     pub fn populate_list(&mut self) {
         self.entries.clear();
