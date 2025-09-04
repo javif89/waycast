@@ -11,7 +11,7 @@ use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use waycast::{LauncherListItem, LauncherPlugin, drun};
+use waycast::{LauncherListItem, LauncherPlugin, drun, plugins};
 
 struct AppModel {
     window: ApplicationWindow,
@@ -65,7 +65,7 @@ impl ListItem {
 }
 
 impl AppModel {
-    fn new(app: &Application) -> Rc<RefCell<Self>> {
+    fn new(app: &Application) -> Rc<RefCell<AppModel>> {
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -106,14 +106,19 @@ impl AppModel {
 
         let entries = drun::all();
 
-        let model = Rc::new(RefCell::new(AppModel {
+        let plugins: Vec<Box<dyn LauncherPlugin>> = vec![Box::from(plugins::drun::DrunPlugin {})];
+        let model: Rc<RefCell<AppModel>> = Rc::new(RefCell::new(AppModel {
             window,
             list_box: list_box.clone(),
             entries,
+            plugins,
         }));
 
         // Populate the list
-        model.borrow().populate_list();
+        {
+            let model_ref = model.borrow();
+            model_ref.populate_list();
+        }
 
         // Connect search input signal
         let model_clone = model.clone();
@@ -139,29 +144,29 @@ impl AppModel {
         model
     }
 
-    fn populate_list(&self) {
-        // Clear existing items
+    fn clear_list_ui(&self) {
         while let Some(child) = self.list_box.first_child() {
             self.list_box.remove(&child);
         }
+    }
 
-        for entry in &self.entries {
-            let list_item = ListItem::new(entry.title(), entry.icon());
-            let widget = list_item.create_widget();
-            self.list_box.append(&widget);
+    fn populate_list(&self) {
+        self.clear_list_ui();
+
+        for plugin in &self.plugins {
+            for entry in plugin.default_list() {
+                let list_item = ListItem::new(entry.title(), entry.icon());
+                let widget = list_item.create_widget();
+                self.list_box.append(&widget);
+            }
         }
     }
 
     fn filter_list(&self, query: &str) {
-        // Clear existing items
-        while let Some(child) = self.list_box.first_child() {
-            self.list_box.remove(&child);
-        }
+        self.clear_list_ui();
 
-        let query_lower = query.to_lowercase();
-        for entry in &self.entries {
-            let title_lower = entry.title().to_lowercase();
-            if query.is_empty() || title_lower.contains(&query_lower) {
+        for plugin in &self.plugins {
+            for entry in plugin.filter(query) {
                 let list_item = ListItem::new(entry.title(), entry.icon());
                 let widget = list_item.create_widget();
                 self.list_box.append(&widget);

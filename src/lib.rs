@@ -13,14 +13,14 @@ pub trait LauncherListItem {
 }
 
 pub trait LauncherPlugin {
-    fn name() -> String;
-    fn priority() -> i32;
-    fn description() -> Option<String>;
+    fn name(&self) -> String;
+    fn priority(&self) -> i32;
+    fn description(&self) -> Option<String>;
     // Prefix to isolate results to only use this plugin
-    fn prefix() -> Option<String>;
+    fn prefix(&self) -> Option<String>;
     // Only search/use this plugin if the prefix was typed
-    fn by_prefix_only() -> bool;
+    fn by_prefix_only(&self) -> bool;
     // Actual item searching functions
-    fn default_list() -> Vec<Box<dyn LauncherListItem>>;
-    fn filter(query: &str) -> Vec<Box<dyn LauncherListItem>>;
+    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>>;
+    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>>;
 }
