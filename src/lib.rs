@@ -1,5 +1,6 @@
 pub mod drun;
 pub mod plugins;
+pub mod ui;
 pub mod util;
 #[derive(Debug)]
 pub enum LaunchError {
