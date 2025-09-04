@@ -3,20 +3,21 @@ use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
-    Application, ApplicationWindow, Box as GtkBox, Entry, IconTheme, Image, Label, ListBox,
-    Orientation, ScrolledWindow,
+    Application, ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image,
+    Label, ListBox, Orientation, ScrolledWindow,
 };
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use waycast::{LauncherListItem, drun};
+use waycast::{LauncherListItem, LauncherPlugin, drun};
 
 struct AppModel {
     window: ApplicationWindow,
     list_box: ListBox,
     entries: Vec<Box<dyn LauncherListItem>>,
+    plugins: Vec<Box<dyn LauncherPlugin>>,
 }
 
 struct ListItem {
@@ -121,6 +122,19 @@ impl AppModel {
             println!("query: {query}");
             model_clone.borrow().filter_list(&query);
         });
+
+        // Add ESC key handler to close window
+        let key_controller = EventControllerKey::new();
+        let window_clone = model.borrow().window.clone();
+        key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
+            if keyval == gtk::gdk::Key::Escape {
+                window_clone.close();
+                gtk::glib::Propagation::Stop
+            } else {
+                gtk::glib::Propagation::Proceed
+            }
+        });
+        model.borrow().window.add_controller(key_controller);
 
         model
     }
