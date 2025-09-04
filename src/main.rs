@@ -194,29 +194,6 @@ fn find_icon_file(
         .into_iter()
         .filter(|p| p.to_string_lossy().contains("icons"))
         .collect();
-    // let search_paths = [
-    //     "/home/javi/.local/share/icons",
-    //     "/home/javi/.icons",
-    //     "/home/javi/.local/share/flatpak/exports/share/icons",
-    //     "/var/lib/flatpak/exports/share/icons",
-    //     "/home/javi/.nix-profile/share/icons",
-    //     "/nix/profile/share/icons",
-    //     "/home/javi/.local/state/nix/profile/share/icons",
-    //     "/etc/profiles/per-user/javi/share/icons",
-    //     "/nix/var/nix/profiles/default/share/icons",
-    //     "/run/current-system/sw/share/icons",
-    // ];
-
-    // let pixmap_paths = [
-    //     "/home/javi/.local/share/flatpak/exports/share/pixmaps",
-    //     "/var/lib/flatpak/exports/share/pixmaps",
-    //     "/home/javi/.nix-profile/share/pixmaps",
-    //     "/nix/profile/share/pixmaps",
-    //     "/home/javi/.local/state/nix/profile/share/pixmaps",
-    //     "/etc/profiles/per-user/javi/share/pixmaps",
-    //     "/nix/var/nix/profiles/default/share/pixmaps",
-    //     "/run/current-system/sw/share/pixmaps",
-    // ];
 
     let sizes = [size, "scalable"];
     let categories = ["apps", "applications", "mimetypes"];
