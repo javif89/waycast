@@ -1,3 +1,4 @@
+use crate::{LauncherListItem, LauncherPlugin};
 use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
@@ -8,15 +9,23 @@ use gtk::{
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
-use crate::{LauncherListItem, LauncherPlugin};
+mod launcher_builder;
+use launcher_builder::WaycastLauncherBuilder;
+use std::sync::Arc;
 
 pub struct WaycastLauncher {
     pub window: ApplicationWindow,
     pub list_box: ListBox,
     pub entries: Vec<Box<dyn LauncherListItem>>,
-    pub plugins: Vec<Box<dyn LauncherPlugin>>,
+    // All plugins
+    pub plugins: Vec<Arc<dyn LauncherPlugin>>,
+    // Plugins with by_prefix_only()->false
+    pub plugins_show_always: Vec<Arc<dyn LauncherPlugin>>,
+    // Prefix hash map
+    pub plugins_by_prefix: HashMap<String, Arc<dyn LauncherPlugin>>,
 }
 
 impl WaycastLauncher {
@@ -24,21 +33,6 @@ impl WaycastLauncher {
         WaycastLauncherBuilder {
             plugins: Vec::new(),
         }
-    }
-}
-
-pub struct WaycastLauncherBuilder {
-    plugins: Vec<Box<dyn LauncherPlugin>>,
-}
-
-impl WaycastLauncherBuilder {
-    pub fn add_plugin<T: LauncherPlugin + 'static>(mut self, plugin: T) -> Self {
-        self.plugins.push(Box::new(plugin));
-        self
-    }
-
-    pub fn initialize(self, app: &Application) -> Rc<RefCell<WaycastLauncher>> {
-        WaycastLauncher::create_with_plugins(app, self.plugins)
     }
 }
 
@@ -86,7 +80,10 @@ impl ListItem {
 }
 
 impl WaycastLauncher {
-    fn create_with_plugins(app: &Application, plugins: Vec<Box<dyn LauncherPlugin>>) -> Rc<RefCell<Self>> {
+    fn create_with_plugins(
+        app: &Application,
+        init_plugins: Vec<Box<dyn LauncherPlugin>>,
+    ) -> Rc<RefCell<Self>> {
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -127,12 +124,34 @@ impl WaycastLauncher {
         window.set_keyboard_mode(layerShell::KeyboardMode::OnDemand);
         window.set_layer(layerShell::Layer::Top);
 
+        let mut plugins: Vec<Arc<dyn LauncherPlugin>> = Vec::new();
+        for p in init_plugins {
+            plugins.push(Arc::from(p));
+        }
+        // Organize plugins for faster querying
+        let mut plugins_show_always: Vec<Arc<dyn LauncherPlugin>> = Vec::new();
+        for p in &plugins {
+            if !p.by_prefix_only() {
+                plugins_show_always.push(Arc::clone(p));
+            }
+        }
+
+        let mut plugins_by_prefix: HashMap<String, Arc<dyn LauncherPlugin>> = HashMap::new();
+        for p in &plugins {
+            if let Some(prefix) = p.prefix() {
+                plugins_by_prefix.insert(prefix, Arc::clone(p));
+            }
+        }
+
+        // Init the launcher model
         let entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
         let model: Rc<RefCell<WaycastLauncher>> = Rc::new(RefCell::new(WaycastLauncher {
             window,
             list_box: list_box.clone(),
             entries,
             plugins,
+            plugins_show_always,
+            plugins_by_prefix,
         }));
 
         // Populate the list
@@ -194,14 +213,16 @@ impl WaycastLauncher {
                     if let Some(selected_row) = list_box_clone_for_search.selected_row() {
                         let index = selected_row.index();
                         if index > 0 {
-                            if let Some(prev_row) = list_box_clone_for_search.row_at_index(index - 1) {
+                            if let Some(prev_row) =
+                                list_box_clone_for_search.row_at_index(index - 1)
+                            {
                                 list_box_clone_for_search.select_row(Some(&prev_row));
                             }
                         }
                     }
                     gtk::glib::Propagation::Stop
                 }
-                _ => gtk::glib::Propagation::Proceed
+                _ => gtk::glib::Propagation::Proceed,
             }
         });
         search_input.add_controller(search_key_controller);
@@ -254,7 +275,7 @@ impl WaycastLauncher {
             let widget = list_item.create_widget();
             self.list_box.append(&widget);
         }
-        
+
         // Always select the first item if available
         if let Some(first_row) = self.list_box.row_at_index(0) {
             self.list_box.select_row(Some(&first_row));
@@ -263,7 +284,7 @@ impl WaycastLauncher {
 
     pub fn populate_list(&mut self) {
         self.entries.clear();
-        for plugin in &self.plugins {
+        for plugin in &self.plugins_show_always {
             for entry in plugin.default_list() {
                 self.entries.push(entry);
             }
