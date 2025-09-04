@@ -104,8 +104,7 @@ impl AppModel {
         window.set_keyboard_mode(layerShell::KeyboardMode::OnDemand);
         window.set_layer(layerShell::Layer::Top);
 
-        let entries = drun::all();
-
+        let entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
         let plugins: Vec<Box<dyn LauncherPlugin>> = vec![Box::from(plugins::drun::DrunPlugin {})];
         let model: Rc<RefCell<AppModel>> = Rc::new(RefCell::new(AppModel {
             window,
@@ -115,17 +114,13 @@ impl AppModel {
         }));
 
         // Populate the list
-        {
-            let model_ref = model.borrow();
-            model_ref.populate_list();
-        }
-
+        model.borrow_mut().populate_list();
         // Connect search input signal
         let model_clone = model.clone();
         search_input.connect_changed(move |entry| {
             let query = entry.text().to_string();
             println!("query: {query}");
-            model_clone.borrow().filter_list(&query);
+            model_clone.borrow_mut().filter_list(&query);
         });
 
         // Add ESC key handler to close window
@@ -141,6 +136,16 @@ impl AppModel {
         });
         model.borrow().window.add_controller(key_controller);
 
+        // Connect row activation signal to print app names
+        let model_clone_2 = model.clone();
+        list_box.connect_row_activated(move |_, row| {
+            let index = row.index() as usize;
+            let model_ref = model_clone_2.borrow();
+            if let Some(entry) = model_ref.entries.get(index) {
+                println!("Selected app: {}", entry.title());
+            }
+        });
+
         model
     }
 
@@ -150,28 +155,36 @@ impl AppModel {
         }
     }
 
-    fn populate_list(&self) {
+    fn render_list(&self) {
         self.clear_list_ui();
-
-        for plugin in &self.plugins {
-            for entry in plugin.default_list() {
-                let list_item = ListItem::new(entry.title(), entry.icon());
-                let widget = list_item.create_widget();
-                self.list_box.append(&widget);
-            }
+        for entry in &self.entries {
+            let list_item = ListItem::new(entry.title(), entry.icon());
+            let widget = list_item.create_widget();
+            self.list_box.append(&widget);
         }
     }
 
-    fn filter_list(&self, query: &str) {
-        self.clear_list_ui();
+    fn populate_list(&mut self) {
+        self.entries.clear();
+        for plugin in &self.plugins {
+            for entry in plugin.default_list() {
+                self.entries.push(entry);
+            }
+        }
+
+        self.render_list();
+    }
+
+    fn filter_list(&mut self, query: &str) {
+        self.entries.clear();
 
         for plugin in &self.plugins {
             for entry in plugin.filter(query) {
-                let list_item = ListItem::new(entry.title(), entry.icon());
-                let widget = list_item.create_widget();
-                self.list_box.append(&widget);
+                self.entries.push(entry);
             }
         }
+
+        self.render_list();
     }
 
     fn show(&self) {
