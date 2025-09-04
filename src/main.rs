@@ -4,7 +4,7 @@ use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
     Application, ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image,
-    Label, ListBox, Orientation, ScrolledWindow,
+    Label, ListBox, Orientation, ScrolledWindow, SearchEntry,
 };
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
@@ -76,7 +76,7 @@ impl AppModel {
 
         let main_box = GtkBox::new(Orientation::Vertical, 0);
 
-        let search_input = Entry::new();
+        let search_input = SearchEntry::new();
         search_input.set_placeholder_text(Some("Search..."));
 
         let scrolled_window = ScrolledWindow::new();
@@ -84,6 +84,8 @@ impl AppModel {
 
         let list_box = ListBox::new();
         list_box.set_vexpand(true);
+        list_box.set_can_focus(true);
+        list_box.set_activate_on_single_click(false);
 
         scrolled_window.set_child(Some(&list_box));
         main_box.append(&search_input);
@@ -115,12 +117,44 @@ impl AppModel {
 
         // Populate the list
         model.borrow_mut().populate_list();
+
+        // Set initial focus to search input so user can start typing immediately
+        search_input.grab_focus();
+        // Set up SearchEntry to capture keys from the window for proper navigation
+        search_input.set_key_capture_widget(Some(&model.borrow().window));
+
         // Connect search input signal
         let model_clone = model.clone();
         search_input.connect_changed(move |entry| {
             let query = entry.text().to_string();
             println!("query: {query}");
             model_clone.borrow_mut().filter_list(&query);
+        });
+
+        // Connect search navigation signals
+        let list_box_clone_for_next = list_box.clone();
+        let list_box_clone_for_prev = list_box.clone();
+
+        search_input.connect_next_match(move |_| {
+            if let Some(selected_row) = list_box_clone_for_next.selected_row() {
+                let index = selected_row.index();
+                if let Some(next_row) = list_box_clone_for_next.row_at_index(index + 1) {
+                    list_box_clone_for_next.select_row(Some(&next_row));
+                }
+            } else if let Some(first_row) = list_box_clone_for_next.row_at_index(0) {
+                list_box_clone_for_next.select_row(Some(&first_row));
+            }
+        });
+
+        search_input.connect_previous_match(move |_| {
+            if let Some(selected_row) = list_box_clone_for_prev.selected_row() {
+                let index = selected_row.index();
+                if index > 0 {
+                    if let Some(prev_row) = list_box_clone_for_prev.row_at_index(index - 1) {
+                        list_box_clone_for_prev.select_row(Some(&prev_row));
+                    }
+                }
+            }
         });
 
         // Add ESC key handler to close window
@@ -136,13 +170,23 @@ impl AppModel {
         });
         model.borrow().window.add_controller(key_controller);
 
-        // Connect row activation signal to print app names
+        // Connect row activation signal to launch app and close launcher
         let model_clone_2 = model.clone();
         list_box.connect_row_activated(move |_, row| {
             let index = row.index() as usize;
             let model_ref = model_clone_2.borrow();
             if let Some(entry) = model_ref.entries.get(index) {
-                println!("Selected app: {}", entry.title());
+                println!("Launching app: {}", entry.title());
+                match entry.execute() {
+                    Ok(_) => {
+                        println!("App launched successfully, closing launcher");
+                        // Close the launcher window after successful launch
+                        model_ref.window.close();
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to launch app: {:?}", e);
+                    }
+                }
             }
         });
 
@@ -161,6 +205,11 @@ impl AppModel {
             let list_item = ListItem::new(entry.title(), entry.icon());
             let widget = list_item.create_widget();
             self.list_box.append(&widget);
+        }
+
+        // Always select the first item if available
+        if let Some(first_row) = self.list_box.row_at_index(0) {
+            self.list_box.select_row(Some(&first_row));
         }
     }
 

@@ -1,6 +1,7 @@
 pub mod drun;
 pub mod plugins;
 pub mod util;
+#[derive(Debug)]
 pub enum LaunchError {
     CouldNotLaunch(String),
 }
