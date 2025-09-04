@@ -85,6 +85,10 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
 pub struct DrunPlugin {}
 
 impl LauncherPlugin for DrunPlugin {
+    fn init(&self) {
+        // TODO: Load apps into memory
+        // TODO: Find and cache Icons
+    }
     fn name(&self) -> String {
         return String::from("drun");
     }

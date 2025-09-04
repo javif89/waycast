@@ -10,6 +10,7 @@ use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 mod launcher_builder;
@@ -155,6 +156,7 @@ impl WaycastLauncher {
             plugins_by_prefix,
         }));
 
+        model.borrow().init_plugins();
         // Populate the list
         model.borrow_mut().populate_list();
 
@@ -165,7 +167,6 @@ impl WaycastLauncher {
         let model_clone = model.clone();
         search_input.connect_changed(move |entry| {
             let query = entry.text().to_string();
-            println!("query: {query}");
             model_clone.borrow_mut().filter_list(&query);
         });
 
@@ -261,6 +262,12 @@ impl WaycastLauncher {
         });
 
         model
+    }
+
+    fn init_plugins(&self) {
+        for plugin in &self.plugins {
+            plugin.init();
+        }
     }
 
     pub fn clear_list_ui(&self) {

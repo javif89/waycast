@@ -15,6 +15,7 @@ pub trait LauncherListItem {
 }
 
 pub trait LauncherPlugin {
+    fn init(&self);
     fn name(&self) -> String;
     fn priority(&self) -> i32;
     fn description(&self) -> Option<String>;
