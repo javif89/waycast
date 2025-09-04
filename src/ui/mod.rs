@@ -10,13 +10,36 @@ use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use crate::{LauncherListItem, LauncherPlugin, plugins};
+use crate::{LauncherListItem, LauncherPlugin};
 
-pub struct AppModel {
+pub struct WaycastLauncher {
     pub window: ApplicationWindow,
     pub list_box: ListBox,
     pub entries: Vec<Box<dyn LauncherListItem>>,
     pub plugins: Vec<Box<dyn LauncherPlugin>>,
+}
+
+impl WaycastLauncher {
+    pub fn new() -> WaycastLauncherBuilder {
+        WaycastLauncherBuilder {
+            plugins: Vec::new(),
+        }
+    }
+}
+
+pub struct WaycastLauncherBuilder {
+    plugins: Vec<Box<dyn LauncherPlugin>>,
+}
+
+impl WaycastLauncherBuilder {
+    pub fn add_plugin<T: LauncherPlugin + 'static>(mut self, plugin: T) -> Self {
+        self.plugins.push(Box::new(plugin));
+        self
+    }
+
+    pub fn initialize(self, app: &Application) -> Rc<RefCell<WaycastLauncher>> {
+        WaycastLauncher::create_with_plugins(app, self.plugins)
+    }
 }
 
 pub struct ListItem {
@@ -62,8 +85,8 @@ impl ListItem {
     }
 }
 
-impl AppModel {
-    pub fn new(app: &Application) -> Rc<RefCell<Self>> {
+impl WaycastLauncher {
+    fn create_with_plugins(app: &Application, plugins: Vec<Box<dyn LauncherPlugin>>) -> Rc<RefCell<Self>> {
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -105,8 +128,7 @@ impl AppModel {
         window.set_layer(layerShell::Layer::Top);
 
         let entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-        let plugins: Vec<Box<dyn LauncherPlugin>> = vec![Box::from(plugins::drun::DrunPlugin {})];
-        let model: Rc<RefCell<AppModel>> = Rc::new(RefCell::new(AppModel {
+        let model: Rc<RefCell<WaycastLauncher>> = Rc::new(RefCell::new(WaycastLauncher {
             window,
             list_box: list_box.clone(),
             entries,

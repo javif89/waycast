@@ -1,6 +1,7 @@
-use gtk::prelude::*;
 use gtk::Application;
-use waycast::ui::AppModel;
+use gtk::prelude::*;
+use waycast::plugins;
+use waycast::ui::WaycastLauncher;
 
 fn main() {
     let app = Application::builder()
@@ -8,8 +9,11 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
-        let model = AppModel::new(app);
-        model.borrow().show();
+        let launcher = WaycastLauncher::new()
+            .add_plugin(plugins::drun::DrunPlugin {})
+            .initialize(app);
+
+        launcher.borrow().show();
     });
 
     app.run();
