@@ -1,8 +1,10 @@
 use directories::UserDirs;
 use gio::prelude::FileExt;
 use glib::object::Cast;
-use std::cell::RefCell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{LaunchError, LauncherListItem, LauncherPlugin};
@@ -66,25 +68,97 @@ impl LauncherListItem for FileEntry {
 // $HOME/Documents/wallpapers
 // Then we should just keep $HOME/Documents since wallpapers
 // will be included in it anyways
+
+pub fn default_search_list() -> Vec<PathBuf> {
+    if let Some(ud) = UserDirs::new() {
+        let mut paths: Vec<PathBuf> = Vec::new();
+        let user_dirs = [
+            ud.document_dir(),
+            ud.picture_dir(),
+            ud.audio_dir(),
+            ud.video_dir(),
+        ];
+
+        for d in user_dirs {
+            if let Some(path) = d {
+                paths.push(path.to_path_buf());
+            }
+        }
+
+        return paths;
+    }
+
+    Vec::new()
+}
 pub struct FileSearchPlugin {
     search_paths: Vec<PathBuf>,
     skip_dirs: Vec<String>,
     // Running list of files in memory
-    files: RefCell<Vec<FileEntry>>,
+    files: Arc<Mutex<Vec<FileEntry>>>,
 }
 
 impl FileSearchPlugin {
     pub fn new() -> Self {
         return FileSearchPlugin {
-            search_paths: Vec::new(),
+            search_paths: default_search_list(),
             skip_dirs: vec![
                 String::from("vendor"),
                 String::from("node_modules"),
                 String::from("cache"),
                 String::from("zig-cache"),
             ],
-            files: RefCell::new(Vec::new()),
+            files: Arc::new(Mutex::new(Vec::new())),
         };
+    }
+
+    pub fn add_search_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
+        let p = path.as_ref();
+
+        if !p.exists() {
+            return Err(format!("Path does not exist: {}", p.display()));
+        }
+
+        if !p.is_dir() {
+            return Err(format!("Path is not a directory: {}", p.display()));
+        }
+
+        self.search_paths.push(p.to_path_buf());
+        Ok(())
+    }
+
+    async fn init_with_timeout(&self, timeout: Duration) {
+        let files_clone = Arc::clone(&self.files);
+        let skip_dirs_clone = self.skip_dirs.clone();
+
+        let scan_task = async move {
+            let mut local_files = Vec::new();
+
+            for path in &self.search_paths {
+                let walker = WalkDir::new(path).into_iter();
+                for entry in walker
+                    .filter_entry(|e| !skip_hidden(e) && !skip_dir(e, &skip_dirs_clone))
+                    .filter_map(|e| e.ok())
+                {
+                    if entry.path().is_file() {
+                        local_files.push(FileEntry::from(entry));
+                    }
+
+                    // Yield control periodically to check for timeout
+                    if local_files.len() % 1000 == 0 {
+                        tokio::task::yield_now().await;
+                    }
+                }
+            }
+
+            // Update the shared files collection
+            let mut files_guard = files_clone.lock().await;
+            *files_guard = local_files;
+        };
+
+        // Run the scan with a timeout
+        if let Err(_) = tokio::time::timeout(timeout, scan_task).await {
+            eprintln!("File indexing timed out after {:?}", timeout);
+        }
     }
 }
 
@@ -106,32 +180,21 @@ fn skip_dir(entry: &DirEntry, dirs: &Vec<String>) -> bool {
 
 impl LauncherPlugin for FileSearchPlugin {
     fn init(&self) {
-        // let home = env::home_dir().unwrap();
-        if let Some(ud) = UserDirs::new() {
-            let scan = [
-                ud.document_dir(),
-                ud.picture_dir(),
-                ud.audio_dir(),
-                ud.video_dir(),
-            ];
+        // Start async file scanning with 500ms timeout
+        let self_clone = FileSearchPlugin {
+            search_paths: self.search_paths.clone(),
+            skip_dirs: self.skip_dirs.clone(),
+            files: Arc::clone(&self.files),
+        };
 
-            for p in scan {
-                match p {
-                    Some(path) => {
-                        let walker = WalkDir::new(path).into_iter();
-                        for entry in walker
-                            .filter_entry(|e| !skip_hidden(e) && !skip_dir(e, &self.skip_dirs))
-                            .filter_map(|e| e.ok())
-                        {
-                            if entry.path().is_file() {
-                                self.files.borrow_mut().push(FileEntry::from(entry));
-                            }
-                        }
-                    }
-                    None => continue,
-                }
-            }
-        }
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                self_clone
+                    .init_with_timeout(Duration::from_millis(2000))
+                    .await;
+            });
+        });
     }
     fn name(&self) -> String {
         return String::from("File search");
@@ -163,12 +226,15 @@ impl LauncherPlugin for FileSearchPlugin {
         }
 
         let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-        let files = self.files.borrow();
-        for f in files.iter() {
-            if let Some(file_name) = f.path.file_name() {
-                let cmp = file_name.to_string_lossy().to_lowercase();
-                if cmp.contains(&query.to_lowercase()) {
-                    entries.push(Box::new(f.clone()));
+
+        // Try to get files without blocking - if indexing is still in progress, return empty
+        if let Ok(files) = self.files.try_lock() {
+            for f in files.iter() {
+                if let Some(file_name) = f.path.file_name() {
+                    let cmp = file_name.to_string_lossy().to_lowercase();
+                    if cmp.contains(&query.to_lowercase()) {
+                        entries.push(Box::new(f.clone()));
+                    }
                 }
             }
         }

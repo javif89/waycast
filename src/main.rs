@@ -10,10 +10,17 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
+        let mut file_search_plugin = plugins::file_search::FileSearchPlugin::new();
+
+        match file_search_plugin.add_search_path("/home/javi/working-files/DJ Music/") {
+            Err(e) => eprintln!("{}", e),
+            _ => (),
+        }
+
         // Create the core launcher
         let launcher = WaycastLauncher::new()
             .add_plugin(Box::new(plugins::drun::DrunPlugin {}))
-            .add_plugin(Box::new(plugins::file_search::FileSearchPlugin::new()))
+            .add_plugin(Box::new(file_search_plugin))
             .init();
 
         // Create and show the GTK UI
