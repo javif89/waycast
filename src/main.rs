@@ -21,7 +21,7 @@ fn main() {
         let ui = GtkLauncherUI::new(app);
 
         // Create and run the controller
-        let controller = LauncherController::new(launcher, ui);
+        let controller = LauncherController::new(launcher, ui, app.clone());
         controller.run();
     });
 

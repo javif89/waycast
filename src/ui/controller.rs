@@ -1,6 +1,7 @@
 use super::gtk::GtkLauncherUI;
 use super::traits::{LauncherUI, UIEvent};
 use crate::{LaunchError, launcher::WaycastLauncher};
+use gio::prelude::ApplicationExt;
 use gtk::glib;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,10 +12,11 @@ pub struct LauncherController {
     launcher: Rc<RefCell<WaycastLauncher>>,
     ui: GtkLauncherUI,
     event_receiver: Receiver<UIEvent>,
+    app: gtk::Application,
 }
 
 impl LauncherController {
-    pub fn new(launcher: WaycastLauncher, mut ui: GtkLauncherUI) -> Self {
+    pub fn new(launcher: WaycastLauncher, mut ui: GtkLauncherUI, app: gtk::Application) -> Self {
         let (event_sender, event_receiver) = mpsc::channel();
 
         // Set up the event sender in the UI
@@ -24,6 +26,7 @@ impl LauncherController {
             launcher: Rc::new(RefCell::new(launcher)),
             ui,
             event_receiver,
+            app,
         }
     }
 
@@ -52,7 +55,8 @@ impl LauncherController {
 
             UIEvent::ItemActivated(index) => match self.launcher.borrow().execute_item(index) {
                 Ok(_) => {
-                    self.ui.hide();
+                    // Exit the application completely instead of just hiding
+                    self.app.quit();
                 }
                 Err(e) => {
                     eprintln!("Failed to launch item: {:?}", e);
@@ -66,7 +70,8 @@ impl LauncherController {
             }
 
             UIEvent::CloseRequested => {
-                self.ui.hide();
+                // Exit the application completely instead of just hiding
+                self.app.quit();
             }
         }
 

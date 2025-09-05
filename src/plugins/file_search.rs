@@ -30,9 +30,10 @@ impl LauncherListItem for FileEntry {
 
     fn execute(&self) -> Result<(), LaunchError> {
         let file_uri = gio::File::for_path(&self.path);
+        let ctx = gio::AppLaunchContext::new();
         match gio::AppInfo::launch_default_for_uri(
             file_uri.uri().as_str(),
-            None::<&gio::AppLaunchContext>,
+            Some(&ctx),
         ) {
             Err(_) => Err(LaunchError::CouldNotLaunch(
                 "Error opening file".to_string(),
