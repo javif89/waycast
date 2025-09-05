@@ -1,25 +1,28 @@
 use gtk::Application;
 use gtk::prelude::*;
-use std::env;
+use waycast::launcher::WaycastLauncher;
 use waycast::plugins;
-use waycast::ui::WaycastLauncher;
+use waycast::ui::controller::LauncherController;
+use waycast::ui::gtk::GtkLauncherUI;
 
-// TODO: Add an init() function to the launcher plugin spec
-// that will get called when loaded. That way plugins like
-// file search can index the file system on init instead
-// of on the fly
 fn main() {
     let app = Application::builder()
         .application_id("dev.thegrind.waycast")
         .build();
 
     app.connect_activate(|app| {
+        // Create the core launcher
         let launcher = WaycastLauncher::new()
-            .add_plugin(plugins::drun::DrunPlugin {})
-            .add_plugin(plugins::file_search::FileSearchPlugin::new())
-            .initialize(app);
+            .add_plugin(Box::new(plugins::drun::DrunPlugin {}))
+            .add_plugin(Box::new(plugins::file_search::FileSearchPlugin::new()))
+            .init();
 
-        launcher.borrow().show();
+        // Create the GTK UI
+        let ui = GtkLauncherUI::new(app);
+
+        // Create and run the controller
+        let controller = LauncherController::new(launcher, ui);
+        controller.run();
     });
 
     app.run();

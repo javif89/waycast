@@ -1,4 +1,5 @@
 pub mod drun;
+pub mod launcher;
 pub mod plugins;
 pub mod ui;
 pub mod util;
