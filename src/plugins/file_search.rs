@@ -1,7 +1,8 @@
 use directories::UserDirs;
-use gio::prelude::FileExt;
+use gio::prelude::{AppInfoExt, FileExt};
 use glib::object::Cast;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -35,14 +36,35 @@ impl LauncherListItem for FileEntry {
     }
 
     fn execute(&self) -> Result<(), LaunchError> {
-        let file_uri = gio::File::for_path(&self.path);
-        let ctx = gio::AppLaunchContext::new();
-        match gio::AppInfo::launch_default_for_uri(file_uri.uri().as_str(), Some(&ctx)) {
-            Err(_) => Err(LaunchError::CouldNotLaunch(
-                "Error opening file".to_string(),
-            )),
-            Ok(()) => Ok(()),
-        }
+        println!("Executing: {}", self.path.display());
+        
+        // Use xdg-open directly since it works properly with music files
+        match Command::new("xdg-open")
+            .arg(&self.path)
+            .spawn() {
+                Ok(_) => {
+                    println!("Successfully launched with xdg-open");
+                    Ok(())
+                }
+                Err(e) => {
+                    println!("xdg-open failed: {}", e);
+                    // Fallback to GIO method
+                    let file_gio = gio::File::for_path(&self.path);
+                    let ctx = gio::AppLaunchContext::new();
+                    match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
+                        Ok(()) => {
+                            println!("Successfully launched with GIO fallback");
+                            Ok(())
+                        }
+                        Err(e2) => {
+                            println!("GIO fallback also failed: {}", e2);
+                            Err(LaunchError::CouldNotLaunch(
+                                format!("Both xdg-open and GIO failed: {} / {}", e, e2)
+                            ))
+                        }
+                    }
+                }
+            }
     }
 
     fn icon(&self) -> String {
