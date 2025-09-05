@@ -2,7 +2,6 @@ use gtk::Application;
 use gtk::prelude::*;
 use waycast::launcher::WaycastLauncher;
 use waycast::plugins;
-use waycast::ui::controller::LauncherController;
 use waycast::ui::gtk::GtkLauncherUI;
 
 fn main() {
@@ -17,12 +16,9 @@ fn main() {
             .add_plugin(Box::new(plugins::file_search::FileSearchPlugin::new()))
             .init();
 
-        // Create the GTK UI
-        let ui = GtkLauncherUI::new(app);
-
-        // Create and run the controller
-        let controller = LauncherController::new(launcher, ui, app.clone());
-        controller.run();
+        // Create and show the GTK UI
+        let ui = GtkLauncherUI::new(app, launcher);
+        ui.show();
     });
 
     app.run();

@@ -1,10 +1,9 @@
-use crate::LauncherListItem;
-use super::traits::{LauncherUI, UIEvent};
+use crate::launcher::WaycastLauncher;
 use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
-    Application, ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image,
+    ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image,
     Label, ListView, Orientation, ScrolledWindow, SignalListItemFactory, SingleSelection,
 };
 use gio::ListStore;
@@ -12,7 +11,9 @@ use gtk::subclass::prelude::ObjectSubclassIsExt;
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::path::PathBuf;
-use std::sync::mpsc::Sender;
+use std::rc::Rc;
+use std::cell::RefCell;
+use gio::prelude::ApplicationExt;
 
 // GObject wrapper to store LauncherListItem in GTK's model system
 mod imp {
@@ -75,12 +76,13 @@ pub struct GtkLauncherUI {
     list_store: ListStore,
     selection: SingleSelection,
     search_input: Entry,
-    event_sender: Option<Sender<UIEvent>>,
-    current_results: Vec<Box<dyn LauncherListItem>>, // Keep reference for indexing
+    launcher: Rc<RefCell<WaycastLauncher>>,
+    app: gtk::Application,
 }
 
 impl GtkLauncherUI {
-    pub fn new(app: &Application) -> Self {
+    pub fn new(app: &gtk::Application, launcher: WaycastLauncher) -> Self {
+        let launcher = Rc::new(RefCell::new(launcher));
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -181,115 +183,100 @@ impl GtkLauncherUI {
         // Set initial focus to search input so user can start typing immediately
         search_input.grab_focus();
 
-        Self {
-            window,
-            list_view,
-            list_store,
-            selection,
-            search_input,
-            event_sender: None,
-            current_results: Vec::new(),
-        }
-    }
-
-    pub fn set_event_sender(&mut self, sender: Sender<UIEvent>) {
-        self.event_sender = Some(sender.clone());
-
-        // Connect search input signal
-        let sender_clone = sender.clone();
-        self.search_input.connect_changed(move |entry| {
+        // Set up event handlers directly
+        let launcher_for_search = launcher.clone();
+        let list_store_for_search = list_store.clone();
+        search_input.connect_changed(move |entry| {
             let query = entry.text().to_string();
-            let _ = sender_clone.send(UIEvent::SearchChanged(query));
+            let mut launcher_ref = launcher_for_search.borrow_mut();
+            let results = if query.trim().is_empty() {
+                launcher_ref.get_default_results()
+            } else {
+                launcher_ref.search(&query)
+            };
+            
+            // Update the list store
+            list_store_for_search.remove_all();
+            for (index, entry) in results.iter().enumerate() {
+                let item_obj = LauncherItemObject::new(
+                    entry.title(),
+                    entry.description(),
+                    entry.icon(),
+                    index
+                );
+                list_store_for_search.append(&item_obj);
+            }
         });
 
         // Connect Enter key activation for search input
-        let sender_clone = sender.clone();
-        let selection_clone = self.selection.clone();
-        self.search_input.connect_activate(move |_| {
-            if let Some(selected_item) = selection_clone.selected_item() {
+        let launcher_for_enter = launcher.clone();
+        let selection_for_enter = selection.clone();
+        let app_for_enter = app.clone();
+        search_input.connect_activate(move |_| {
+            if let Some(selected_item) = selection_for_enter.selected_item() {
                 if let Some(item_obj) = selected_item.downcast_ref::<LauncherItemObject>() {
                     let index = item_obj.index();
-                    let _ = sender_clone.send(UIEvent::ItemActivated(index));
+                    match launcher_for_enter.borrow().execute_item(index) {
+                        Ok(_) => app_for_enter.quit(),
+                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
+                    }
                 }
             }
         });
 
         // Add key handler for launcher-style navigation
         let search_key_controller = EventControllerKey::new();
-        let selection_clone = self.selection.clone();
+        let selection_for_keys = selection.clone();
         search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
             match keyval {
                 gtk::gdk::Key::Down => {
-                    let current_pos = selection_clone.selected();
-                    let n_items = selection_clone.model().unwrap().n_items();
+                    let current_pos = selection_for_keys.selected();
+                    let n_items = selection_for_keys.model().unwrap().n_items();
                     if current_pos < n_items - 1 {
-                        selection_clone.set_selected(current_pos + 1);
+                        selection_for_keys.set_selected(current_pos + 1);
                     } else if n_items > 0 && current_pos == gtk::INVALID_LIST_POSITION {
-                        selection_clone.set_selected(0);
+                        selection_for_keys.set_selected(0);
                     }
                     gtk::glib::Propagation::Stop
                 }
                 gtk::gdk::Key::Up => {
-                    let current_pos = selection_clone.selected();
+                    let current_pos = selection_for_keys.selected();
                     if current_pos > 0 {
-                        selection_clone.set_selected(current_pos - 1);
+                        selection_for_keys.set_selected(current_pos - 1);
                     }
                     gtk::glib::Propagation::Stop
                 }
                 _ => gtk::glib::Propagation::Proceed,
             }
         });
-        self.search_input.add_controller(search_key_controller);
+        search_input.add_controller(search_key_controller);
 
         // Add ESC key handler at window level
         let window_key_controller = EventControllerKey::new();
-        let sender_clone = sender.clone();
+        let app_for_esc = app.clone();
         window_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
             if keyval == gtk::gdk::Key::Escape {
-                let _ = sender_clone.send(UIEvent::CloseRequested);
+                app_for_esc.quit();
                 gtk::glib::Propagation::Stop
             } else {
                 gtk::glib::Propagation::Proceed
             }
         });
-        self.window.add_controller(window_key_controller);
+        window.add_controller(window_key_controller);
 
         // Connect list activation signal
-        let sender_clone = sender;
-        self.list_view.connect_activate(move |_, position| {
-            let _ = sender_clone.send(UIEvent::ItemActivated(position as usize));
+        let launcher_for_activate = launcher.clone();
+        let app_for_activate = app.clone();
+        list_view.connect_activate(move |_, position| {
+            match launcher_for_activate.borrow().execute_item(position as usize) {
+                Ok(_) => app_for_activate.quit(),
+                Err(e) => eprintln!("Failed to launch app: {:?}", e),
+            }
         });
-    }
-}
 
-impl LauncherUI for GtkLauncherUI {
-    fn show(&self) {
-        self.window.present();
-    }
-
-    fn hide(&self) {
-        self.window.close();
-    }
-
-    fn set_results(&mut self, results: &[Box<dyn LauncherListItem>]) {
-        // Clear the list store
-        self.list_store.remove_all();
-        
-        // Store results for indexing
-        self.current_results = results.iter()
-            .map(|item| {
-                // Create a simple wrapper that implements the trait
-                // This is a workaround since we can't clone trait objects
-                Box::new(SimpleListItem {
-                    title: item.title(),
-                    description: item.description(),
-                    icon: item.icon(),
-                    original_ptr: 0, // Not used for execution
-                }) as Box<dyn LauncherListItem>
-            })
-            .collect();
-        
-        // Add all entries to the store
+        // Initialize with default results
+        let mut launcher_ref = launcher.borrow_mut();
+        let results = launcher_ref.get_default_results();
         for (index, entry) in results.iter().enumerate() {
             let item_obj = LauncherItemObject::new(
                 entry.title(),
@@ -297,45 +284,30 @@ impl LauncherUI for GtkLauncherUI {
                 entry.icon(),
                 index
             );
-            self.list_store.append(&item_obj);
+            list_store.append(&item_obj);
         }
-
+        
         // Select the first item if available
-        if self.list_store.n_items() > 0 {
-            self.selection.set_selected(0);
+        if list_store.n_items() > 0 {
+            selection.set_selected(0);
+        }
+        drop(launcher_ref); // Release the borrow
+
+        Self {
+            window,
+            list_view,
+            list_store,
+            selection,
+            search_input,
+            launcher,
+            app: app.clone(),
         }
     }
-
-    fn is_visible(&self) -> bool {
-        self.window.is_visible()
-    }
 }
 
-// Helper struct to store launcher item data
-struct SimpleListItem {
-    title: String,
-    description: Option<String>,
-    icon: String,
-    original_ptr: usize, // Not used for execution, just for storage
-}
-
-impl LauncherListItem for SimpleListItem {
-    fn title(&self) -> String {
-        self.title.clone()
-    }
-
-    fn description(&self) -> Option<String> {
-        self.description.clone()
-    }
-
-    fn icon(&self) -> String {
-        self.icon.clone()
-    }
-
-    fn execute(&self) -> Result<(), crate::LaunchError> {
-        // This should never be called - the controller handles execution
-        // using the original items
-        Err(crate::LaunchError::CouldNotLaunch("Cannot execute from UI wrapper".into()))
+impl GtkLauncherUI {
+    pub fn show(&self) {
+        self.window.present();
     }
 }
 
