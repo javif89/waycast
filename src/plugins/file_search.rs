@@ -25,7 +25,7 @@ impl LauncherListItem for FileEntry {
         return String::from(self.path.file_name().unwrap().to_string_lossy());
     }
     fn description(&self) -> Option<String> {
-        return None;
+        Some(self.path.to_string_lossy().to_string())
     }
 
     fn execute(&self) -> Result<(), LaunchError> {

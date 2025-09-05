@@ -65,6 +65,10 @@ impl LauncherItemObject {
         self.imp().icon.borrow().clone()
     }
     
+    pub fn description(&self) -> Option<String> {
+        self.imp().description.borrow().clone()
+    }
+    
     pub fn index(&self) -> usize {
         *self.imp().index.borrow()
     }
@@ -148,12 +152,29 @@ impl GtkLauncherUI {
                 }
                 image.set_pixel_size(icon_size);
                 
-                // Create label
-                let label = Label::new(Some(&item_obj.title()));
-                label.set_xalign(0.0);
+                // Create text container (vertical box for title + description)
+                let text_box = GtkBox::new(Orientation::Vertical, 2);
+                text_box.set_hexpand(true);
+                text_box.set_valign(gtk::Align::Center);
+                
+                // Create title label
+                let title_label = Label::new(Some(&item_obj.title()));
+                title_label.set_xalign(0.0);
+                title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                text_box.append(&title_label);
+                
+                // Create description label if description exists
+                if let Some(description) = item_obj.description() {
+                    let desc_label = Label::new(Some(&description));
+                    desc_label.set_xalign(0.0);
+                    desc_label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+                    desc_label.add_css_class("dim-label"); // Make it visually secondary
+                    desc_label.set_opacity(0.7);
+                    text_box.append(&desc_label);
+                }
                 
                 child.append(&image);
-                child.append(&label);
+                child.append(&text_box);
             }
         });
         
