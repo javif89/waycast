@@ -18,6 +18,17 @@ fn main() {
 
         // Create and show the GTK UI
         let ui = GtkLauncherUI::new(app, launcher);
+
+        // Apply built-in default styles
+        if let Err(e) = ui.apply_default_css() {
+            eprintln!("Warning: Could not apply default styles: {}", e);
+        }
+
+        // Optionally apply user CSS overrides
+        // if let Err(_) = ui.apply_css("waycast.css") {
+        //     // Silently ignore if user hasn't provided custom CSS
+        // }
+
         ui.show();
     });
 

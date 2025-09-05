@@ -10,7 +10,7 @@ use gio::ListStore;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::cell::RefCell;
 use gio::prelude::ApplicationExt;
@@ -99,6 +99,8 @@ impl GtkLauncherUI {
 
         let search_input = Entry::new();
         search_input.set_placeholder_text(Some("Search..."));
+        search_input.set_widget_name("search-input");
+        search_input.add_css_class("launcher-search");
 
         let scrolled_window = ScrolledWindow::new();
         scrolled_window.set_min_content_height(300);
@@ -113,6 +115,8 @@ impl GtkLauncherUI {
         // Setup factory to create widgets
         factory.connect_setup(move |_, list_item| {
             let container = GtkBox::new(Orientation::Horizontal, 10);
+            container.set_widget_name("list-item");
+            container.add_css_class("launcher-item");
             list_item.set_child(Some(&container));
         });
         
@@ -151,16 +155,22 @@ impl GtkLauncherUI {
                     }
                 }
                 image.set_pixel_size(icon_size);
+                image.set_widget_name("item-icon");
+                image.add_css_class("launcher-icon");
                 
                 // Create text container (vertical box for title + description)
                 let text_box = GtkBox::new(Orientation::Vertical, 2);
                 text_box.set_hexpand(true);
                 text_box.set_valign(gtk::Align::Center);
+                text_box.set_widget_name("item-text");
+                text_box.add_css_class("launcher-text");
                 
                 // Create title label
                 let title_label = Label::new(Some(&item_obj.title()));
                 title_label.set_xalign(0.0);
                 title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                title_label.set_widget_name("item-title");
+                title_label.add_css_class("launcher-title");
                 text_box.append(&title_label);
                 
                 // Create description label if description exists
@@ -168,7 +178,8 @@ impl GtkLauncherUI {
                     let desc_label = Label::new(Some(&description));
                     desc_label.set_xalign(0.0);
                     desc_label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
-                    desc_label.add_css_class("dim-label"); // Make it visually secondary
+                    desc_label.set_widget_name("item-description");
+                    desc_label.add_css_class("launcher-description");
                     desc_label.set_opacity(0.7);
                     text_box.append(&desc_label);
                 }
@@ -181,11 +192,21 @@ impl GtkLauncherUI {
         let list_view = ListView::new(Some(selection.clone()), Some(factory));
         list_view.set_vexpand(true);
         list_view.set_can_focus(true);
+        list_view.set_widget_name("results-list");
+        list_view.add_css_class("launcher-list");
 
         scrolled_window.set_child(Some(&list_view));
+        scrolled_window.set_widget_name("results-container");
+        scrolled_window.add_css_class("launcher-results-container");
+        
         main_box.append(&search_input);
         main_box.append(&scrolled_window);
+        main_box.set_widget_name("main-container");
+        main_box.add_css_class("launcher-main");
+        
         window.set_child(Some(&main_box));
+        window.set_widget_name("launcher-window");
+        window.add_css_class("launcher-window");
 
         // Set up layer shell so the launcher can float
         window.init_layer_shell();
@@ -329,6 +350,57 @@ impl GtkLauncherUI {
 impl GtkLauncherUI {
     pub fn show(&self) {
         self.window.present();
+    }
+    
+    /// Apply default built-in CSS styles
+    pub fn apply_default_css(&self) -> Result<(), String> {
+        const DEFAULT_CSS: &str = include_str!("default.css");
+        
+        let css_provider = gtk::CssProvider::new();
+        css_provider.load_from_data(DEFAULT_CSS);
+        
+        if let Some(display) = gtk::gdk::Display::default() {
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &css_provider,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+            Ok(())
+        } else {
+            Err("Could not get default display".to_string())
+        }
+    }
+    
+    pub fn apply_css<P: AsRef<Path>>(&self, css_path: P) -> Result<(), String> {
+        let css_provider = gtk::CssProvider::new();
+        
+        // Check if file exists first
+        if !css_path.as_ref().exists() {
+            return Err(format!("CSS file does not exist: {}", css_path.as_ref().display()));
+        }
+        
+        // Try to load the CSS file
+        // Note: load_from_path doesn't return a Result, it panics on error
+        // So we'll use a different approach with error handling
+        use std::fs;
+        match fs::read_to_string(css_path.as_ref()) {
+            Ok(css_content) => {
+                css_provider.load_from_data(&css_content);
+                
+                // Apply the CSS to the display
+                if let Some(display) = gtk::gdk::Display::default() {
+                    gtk::style_context_add_provider_for_display(
+                        &display,
+                        &css_provider,
+                        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                    );
+                    Ok(())
+                } else {
+                    Err("Could not get default display".to_string())
+                }
+            }
+            Err(e) => Err(format!("Failed to read CSS file: {}", e))
+        }
     }
 }
 
