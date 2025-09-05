@@ -10,6 +10,10 @@ pub struct DesktopEntry {
 }
 
 impl LauncherListItem for DesktopEntry {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
     fn title(&self) -> String {
         return self.name.to_owned();
     }

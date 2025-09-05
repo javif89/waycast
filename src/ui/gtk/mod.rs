@@ -26,7 +26,7 @@ mod imp {
         pub title: RefCell<String>,
         pub description: RefCell<Option<String>>,
         pub icon: RefCell<String>,
-        pub index: RefCell<usize>, // Store index to access original entry
+        pub id: RefCell<String>, // Store id to access original entry
     }
 
     #[glib::object_subclass]
@@ -44,7 +44,7 @@ glib::wrapper! {
 }
 
 impl LauncherItemObject {
-    pub fn new(title: String, description: Option<String>, icon: String, index: usize) -> Self {
+    pub fn new(title: String, description: Option<String>, icon: String, id: String) -> Self {
         let obj: Self = glib::Object::new();
         let imp = obj.imp();
 
@@ -52,7 +52,7 @@ impl LauncherItemObject {
         *imp.title.borrow_mut() = title;
         *imp.description.borrow_mut() = description;
         *imp.icon.borrow_mut() = icon;
-        *imp.index.borrow_mut() = index;
+        *imp.id.borrow_mut() = id;
 
         obj
     }
@@ -69,8 +69,8 @@ impl LauncherItemObject {
         self.imp().description.borrow().clone()
     }
 
-    pub fn index(&self) -> usize {
-        *self.imp().index.borrow()
+    pub fn id(&self) -> String {
+        self.imp().id.borrow().clone()
     }
 }
 
@@ -234,12 +234,12 @@ impl GtkLauncherUI {
 
             // Update the list store
             list_store_for_search.remove_all();
-            for (index, entry) in results.iter().enumerate() {
+            for entry in results.iter() {
                 let item_obj = LauncherItemObject::new(
                     entry.title(),
                     entry.description(),
                     entry.icon(),
-                    index,
+                    entry.id(),
                 );
                 list_store_for_search.append(&item_obj);
             }
@@ -252,8 +252,8 @@ impl GtkLauncherUI {
         search_input.connect_activate(move |_| {
             if let Some(selected_item) = selection_for_enter.selected_item() {
                 if let Some(item_obj) = selected_item.downcast_ref::<LauncherItemObject>() {
-                    let index = item_obj.index();
-                    match launcher_for_enter.borrow().execute_item(index) {
+                    let id = item_obj.id();
+                    match launcher_for_enter.borrow().execute_item_by_id(&id) {
                         Ok(_) => app_for_enter.quit(),
                         Err(e) => eprintln!("Failed to launch app: {:?}", e),
                     }
@@ -304,22 +304,25 @@ impl GtkLauncherUI {
         // Connect list activation signal
         let launcher_for_activate = launcher.clone();
         let app_for_activate = app.clone();
+        let list_store_for_activate = list_store.clone();
         list_view.connect_activate(move |_, position| {
-            match launcher_for_activate
-                .borrow()
-                .execute_item(position as usize)
-            {
-                Ok(_) => app_for_activate.quit(),
-                Err(e) => eprintln!("Failed to launch app: {:?}", e),
+            if let Some(obj) = list_store_for_activate.item(position) {
+                if let Some(item_obj) = obj.downcast_ref::<LauncherItemObject>() {
+                    let id = item_obj.id();
+                    match launcher_for_activate.borrow().execute_item_by_id(&id) {
+                        Ok(_) => app_for_activate.quit(),
+                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
+                    }
+                }
             }
         });
 
         // Initialize with default results
         let mut launcher_ref = launcher.borrow_mut();
         let results = launcher_ref.get_default_results();
-        for (index, entry) in results.iter().enumerate() {
+        for entry in results.iter() {
             let item_obj =
-                LauncherItemObject::new(entry.title(), entry.description(), entry.icon(), index);
+                LauncherItemObject::new(entry.title(), entry.description(), entry.icon(), entry.id());
             list_store.append(&item_obj);
         }
 

@@ -7,6 +7,7 @@ pub struct WaycastLauncher {
     plugins_show_always: Vec<Arc<dyn LauncherPlugin>>,
     plugins_by_prefix: HashMap<String, Arc<dyn LauncherPlugin>>,
     current_results: Vec<Box<dyn LauncherListItem>>,
+    current_results_by_id: HashMap<String, usize>,
 }
 
 impl WaycastLauncher {
@@ -16,6 +17,7 @@ impl WaycastLauncher {
             plugins_show_always: Vec::new(),
             plugins_by_prefix: HashMap::new(),
             current_results: Vec::new(),
+            current_results_by_id: HashMap::new(),
         }
     }
 }
@@ -47,23 +49,39 @@ impl WaycastLauncher {
         self
     }
 
-    pub fn get_default_results(&mut self) -> &Vec<Box<dyn LauncherListItem>> {
+    fn add_current_item(&mut self, item: Box<dyn LauncherListItem>) {
+        let id = item.id();
+        let index = self.current_results.len();
+        self.current_results.push(item);
+        self.current_results_by_id.insert(id, index);
+    }
+
+    fn clear_current_results(&mut self) {
         self.current_results.clear();
+        self.current_results_by_id.clear();
+    }
+
+    pub fn get_default_results(&mut self) -> &Vec<Box<dyn LauncherListItem>> {
+        self.clear_current_results();
+        let mut all_entries = Vec::new();
         for plugin in &self.plugins_show_always {
-            for entry in plugin.default_list() {
-                self.current_results.push(entry);
-            }
+            all_entries.extend(plugin.default_list());
+        }
+        for entry in all_entries {
+            self.add_current_item(entry);
         }
         &self.current_results
     }
 
     pub fn search(&mut self, query: &str) -> &Vec<Box<dyn LauncherListItem>> {
-        self.current_results.clear();
+        self.clear_current_results();
 
+        let mut all_entries = Vec::new();
         for plugin in &self.plugins {
-            for entry in plugin.filter(query) {
-                self.current_results.push(entry);
-            }
+            all_entries.extend(plugin.filter(query));
+        }
+        for entry in all_entries {
+            self.add_current_item(entry);
         }
 
         &self.current_results
@@ -74,6 +92,18 @@ impl WaycastLauncher {
             item.execute()
         } else {
             Err(crate::LaunchError::CouldNotLaunch("Invalid index".into()))
+        }
+    }
+
+    pub fn execute_item_by_id(&self, id: &str) -> Result<(), crate::LaunchError> {
+        if let Some(&index) = self.current_results_by_id.get(id) {
+            if let Some(item) = self.current_results.get(index) {
+                item.execute()
+            } else {
+                Err(crate::LaunchError::CouldNotLaunch("Item index out of bounds".into()))
+            }
+        } else {
+            Err(crate::LaunchError::CouldNotLaunch("Item not found".into()))
         }
     }
 

@@ -9,6 +9,7 @@ pub enum LaunchError {
 }
 
 pub trait LauncherListItem {
+    fn id(&self) -> String;
     fn title(&self) -> String;
     fn description(&self) -> Option<String>;
     fn execute(&self) -> Result<(), LaunchError>;

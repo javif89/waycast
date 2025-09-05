@@ -21,6 +21,10 @@ impl FileEntry {
 }
 
 impl LauncherListItem for FileEntry {
+    fn id(&self) -> String {
+        self.path.to_string_lossy().to_string()
+    }
+
     fn title(&self) -> String {
         return String::from(self.path.file_name().unwrap().to_string_lossy());
     }
