@@ -1,19 +1,19 @@
 use crate::launcher::WaycastLauncher;
+use gio::ListStore;
+use gio::prelude::ApplicationExt;
 use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
-use gtk::{
-    ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image,
-    Label, ListView, Orientation, ScrolledWindow, SignalListItemFactory, SingleSelection,
-};
-use gio::ListStore;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
+use gtk::{
+    ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image, Label, ListView,
+    Orientation, ScrolledWindow, SignalListItemFactory, SingleSelection,
+};
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::cell::RefCell;
-use gio::prelude::ApplicationExt;
 
 // GObject wrapper to store LauncherListItem in GTK's model system
 mod imp {
@@ -47,28 +47,28 @@ impl LauncherItemObject {
     pub fn new(title: String, description: Option<String>, icon: String, index: usize) -> Self {
         let obj: Self = glib::Object::new();
         let imp = obj.imp();
-        
+
         // Store the data
         *imp.title.borrow_mut() = title;
         *imp.description.borrow_mut() = description;
         *imp.icon.borrow_mut() = icon;
         *imp.index.borrow_mut() = index;
-        
+
         obj
     }
-    
+
     pub fn title(&self) -> String {
         self.imp().title.borrow().clone()
     }
-    
+
     pub fn icon(&self) -> String {
         self.imp().icon.borrow().clone()
     }
-    
+
     pub fn description(&self) -> Option<String> {
         self.imp().description.borrow().clone()
     }
-    
+
     pub fn index(&self) -> usize {
         *self.imp().index.borrow()
     }
@@ -76,12 +76,6 @@ impl LauncherItemObject {
 
 pub struct GtkLauncherUI {
     window: ApplicationWindow,
-    list_view: ListView,
-    list_store: ListStore,
-    selection: SingleSelection,
-    search_input: Entry,
-    launcher: Rc<RefCell<WaycastLauncher>>,
-    app: gtk::Application,
 }
 
 impl GtkLauncherUI {
@@ -111,7 +105,7 @@ impl GtkLauncherUI {
 
         // Create factory for rendering list items
         let factory = SignalListItemFactory::new();
-        
+
         // Setup factory to create widgets
         factory.connect_setup(move |_, list_item| {
             let container = GtkBox::new(Orientation::Horizontal, 10);
@@ -119,25 +113,26 @@ impl GtkLauncherUI {
             container.add_css_class("launcher-item");
             list_item.set_child(Some(&container));
         });
-        
+
         // Setup factory to bind data to widgets
         factory.connect_bind(move |_, list_item| {
             let child = list_item.child().and_downcast::<GtkBox>().unwrap();
-            
+
             // Clear existing children
             while let Some(first_child) = child.first_child() {
                 child.remove(&first_child);
             }
-            
+
             if let Some(item_obj) = list_item.item().and_downcast::<LauncherItemObject>() {
                 let display = gtk::gdk::Display::default().unwrap();
                 let icon_theme = gtk::IconTheme::for_display(&display);
                 let icon_size = 48;
-                
+
                 // Create icon
                 let image: gtk::Image;
                 if let Some(icon_path) = find_icon_file(&item_obj.icon(), "48", &icon_theme) {
-                    image = match Pixbuf::from_file_at_scale(icon_path, icon_size, icon_size, true) {
+                    image = match Pixbuf::from_file_at_scale(icon_path, icon_size, icon_size, true)
+                    {
                         Ok(pb) => {
                             let tex = Texture::for_pixbuf(&pb);
                             gtk::Image::from_paintable(Some(&tex))
@@ -157,14 +152,14 @@ impl GtkLauncherUI {
                 image.set_pixel_size(icon_size);
                 image.set_widget_name("item-icon");
                 image.add_css_class("launcher-icon");
-                
+
                 // Create text container (vertical box for title + description)
                 let text_box = GtkBox::new(Orientation::Vertical, 2);
                 text_box.set_hexpand(true);
                 text_box.set_valign(gtk::Align::Center);
                 text_box.set_widget_name("item-text");
                 text_box.add_css_class("launcher-text");
-                
+
                 // Create title label
                 let title_label = Label::new(Some(&item_obj.title()));
                 title_label.set_xalign(0.0);
@@ -172,7 +167,7 @@ impl GtkLauncherUI {
                 title_label.set_widget_name("item-title");
                 title_label.add_css_class("launcher-title");
                 text_box.append(&title_label);
-                
+
                 // Create description label if description exists
                 if let Some(description) = item_obj.description() {
                     let desc_label = Label::new(Some(&description));
@@ -183,12 +178,12 @@ impl GtkLauncherUI {
                     desc_label.set_opacity(0.7);
                     text_box.append(&desc_label);
                 }
-                
+
                 child.append(&image);
                 child.append(&text_box);
             }
         });
-        
+
         let list_view = ListView::new(Some(selection.clone()), Some(factory));
         list_view.set_vexpand(true);
         list_view.set_can_focus(true);
@@ -198,12 +193,12 @@ impl GtkLauncherUI {
         scrolled_window.set_child(Some(&list_view));
         scrolled_window.set_widget_name("results-container");
         scrolled_window.add_css_class("launcher-results-container");
-        
+
         main_box.append(&search_input);
         main_box.append(&scrolled_window);
         main_box.set_widget_name("main-container");
         main_box.add_css_class("launcher-main");
-        
+
         window.set_child(Some(&main_box));
         window.set_widget_name("launcher-window");
         window.add_css_class("launcher-window");
@@ -236,7 +231,7 @@ impl GtkLauncherUI {
             } else {
                 launcher_ref.search(&query)
             };
-            
+
             // Update the list store
             list_store_for_search.remove_all();
             for (index, entry) in results.iter().enumerate() {
@@ -244,7 +239,7 @@ impl GtkLauncherUI {
                     entry.title(),
                     entry.description(),
                     entry.icon(),
-                    index
+                    index,
                 );
                 list_store_for_search.append(&item_obj);
             }
@@ -310,7 +305,10 @@ impl GtkLauncherUI {
         let launcher_for_activate = launcher.clone();
         let app_for_activate = app.clone();
         list_view.connect_activate(move |_, position| {
-            match launcher_for_activate.borrow().execute_item(position as usize) {
+            match launcher_for_activate
+                .borrow()
+                .execute_item(position as usize)
+            {
                 Ok(_) => app_for_activate.quit(),
                 Err(e) => eprintln!("Failed to launch app: {:?}", e),
             }
@@ -320,15 +318,11 @@ impl GtkLauncherUI {
         let mut launcher_ref = launcher.borrow_mut();
         let results = launcher_ref.get_default_results();
         for (index, entry) in results.iter().enumerate() {
-            let item_obj = LauncherItemObject::new(
-                entry.title(),
-                entry.description(),
-                entry.icon(),
-                index
-            );
+            let item_obj =
+                LauncherItemObject::new(entry.title(), entry.description(), entry.icon(), index);
             list_store.append(&item_obj);
         }
-        
+
         // Select the first item if available
         if list_store.n_items() > 0 {
             selection.set_selected(0);
@@ -337,12 +331,6 @@ impl GtkLauncherUI {
 
         Self {
             window,
-            list_view,
-            list_store,
-            selection,
-            search_input,
-            launcher,
-            app: app.clone(),
         }
     }
 }
@@ -351,14 +339,14 @@ impl GtkLauncherUI {
     pub fn show(&self) {
         self.window.present();
     }
-    
+
     /// Apply default built-in CSS styles
     pub fn apply_default_css(&self) -> Result<(), String> {
         const DEFAULT_CSS: &str = include_str!("default.css");
-        
+
         let css_provider = gtk::CssProvider::new();
         css_provider.load_from_data(DEFAULT_CSS);
-        
+
         if let Some(display) = gtk::gdk::Display::default() {
             gtk::style_context_add_provider_for_display(
                 &display,
@@ -370,15 +358,18 @@ impl GtkLauncherUI {
             Err("Could not get default display".to_string())
         }
     }
-    
+
     pub fn apply_css<P: AsRef<Path>>(&self, css_path: P) -> Result<(), String> {
         let css_provider = gtk::CssProvider::new();
-        
+
         // Check if file exists first
         if !css_path.as_ref().exists() {
-            return Err(format!("CSS file does not exist: {}", css_path.as_ref().display()));
+            return Err(format!(
+                "CSS file does not exist: {}",
+                css_path.as_ref().display()
+            ));
         }
-        
+
         // Try to load the CSS file
         // Note: load_from_path doesn't return a Result, it panics on error
         // So we'll use a different approach with error handling
@@ -386,7 +377,7 @@ impl GtkLauncherUI {
         match fs::read_to_string(css_path.as_ref()) {
             Ok(css_content) => {
                 css_provider.load_from_data(&css_content);
-                
+
                 // Apply the CSS to the display
                 if let Some(display) = gtk::gdk::Display::default() {
                     gtk::style_context_add_provider_for_display(
@@ -399,7 +390,7 @@ impl GtkLauncherUI {
                     Err("Could not get default display".to_string())
                 }
             }
-            Err(e) => Err(format!("Failed to read CSS file: {}", e))
+            Err(e) => Err(format!("Failed to read CSS file: {}", e)),
         }
     }
 }

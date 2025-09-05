@@ -1,8 +1,8 @@
 use directories::UserDirs;
 use gio::prelude::FileExt;
 use glib::object::Cast;
+use std::cell::RefCell;
 use std::path::PathBuf;
-use std::{cell::RefCell, env};
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{LaunchError, LauncherListItem, LauncherPlugin};
@@ -31,10 +31,7 @@ impl LauncherListItem for FileEntry {
     fn execute(&self) -> Result<(), LaunchError> {
         let file_uri = gio::File::for_path(&self.path);
         let ctx = gio::AppLaunchContext::new();
-        match gio::AppInfo::launch_default_for_uri(
-            file_uri.uri().as_str(),
-            Some(&ctx),
-        ) {
+        match gio::AppInfo::launch_default_for_uri(file_uri.uri().as_str(), Some(&ctx)) {
             Err(_) => Err(LaunchError::CouldNotLaunch(
                 "Error opening file".to_string(),
             )),
@@ -57,6 +54,14 @@ impl LauncherListItem for FileEntry {
     }
 }
 
+// TODO: There should be a method add_search_path to add new paths
+// when the plugin is getting initialized. After all paths are
+// added I should get the lowest common denominator. So for example
+// if we have:
+// $HOME/Documents
+// $HOME/Documents/wallpapers
+// Then we should just keep $HOME/Documents since wallpapers
+// will be included in it anyways
 pub struct FileSearchPlugin {
     search_paths: Vec<PathBuf>,
     skip_dirs: Vec<String>,
