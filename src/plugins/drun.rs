@@ -86,6 +86,10 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
     entries
 }
 
+pub fn new() -> DrunPlugin {
+    DrunPlugin {}
+}
+
 pub struct DrunPlugin {}
 
 impl LauncherPlugin for DrunPlugin {

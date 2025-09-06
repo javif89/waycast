@@ -10,7 +10,7 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
-        let mut file_search_plugin = plugins::file_search::FileSearchPlugin::new();
+        let mut file_search_plugin = plugins::file_search::new();
 
         match file_search_plugin.add_search_path("/home/javi/working-files/DJ Music/") {
             Err(e) => eprintln!("{}", e),
@@ -19,7 +19,7 @@ fn main() {
 
         // Create the core launcher
         let launcher = WaycastLauncher::new()
-            .add_plugin(Box::new(plugins::drun::DrunPlugin {}))
+            .add_plugin(Box::new(plugins::drun::new()))
             .add_plugin(Box::new(file_search_plugin))
             .init();
 

@@ -37,34 +37,33 @@ impl LauncherListItem for FileEntry {
 
     fn execute(&self) -> Result<(), LaunchError> {
         println!("Executing: {}", self.path.display());
-        
+
         // Use xdg-open directly since it works properly with music files
-        match Command::new("xdg-open")
-            .arg(&self.path)
-            .spawn() {
-                Ok(_) => {
-                    println!("Successfully launched with xdg-open");
-                    Ok(())
-                }
-                Err(e) => {
-                    println!("xdg-open failed: {}", e);
-                    // Fallback to GIO method
-                    let file_gio = gio::File::for_path(&self.path);
-                    let ctx = gio::AppLaunchContext::new();
-                    match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
-                        Ok(()) => {
-                            println!("Successfully launched with GIO fallback");
-                            Ok(())
-                        }
-                        Err(e2) => {
-                            println!("GIO fallback also failed: {}", e2);
-                            Err(LaunchError::CouldNotLaunch(
-                                format!("Both xdg-open and GIO failed: {} / {}", e, e2)
-                            ))
-                        }
+        match Command::new("xdg-open").arg(&self.path).spawn() {
+            Ok(_) => {
+                println!("Successfully launched with xdg-open");
+                Ok(())
+            }
+            Err(e) => {
+                println!("xdg-open failed: {}", e);
+                // Fallback to GIO method
+                let file_gio = gio::File::for_path(&self.path);
+                let ctx = gio::AppLaunchContext::new();
+                match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
+                    Ok(()) => {
+                        println!("Successfully launched with GIO fallback");
+                        Ok(())
+                    }
+                    Err(e2) => {
+                        println!("GIO fallback also failed: {}", e2);
+                        Err(LaunchError::CouldNotLaunch(format!(
+                            "Both xdg-open and GIO failed: {} / {}",
+                            e, e2
+                        )))
                     }
                 }
             }
+        }
     }
 
     fn icon(&self) -> String {
@@ -112,6 +111,19 @@ pub fn default_search_list() -> Vec<PathBuf> {
 
     Vec::new()
 }
+
+pub fn new() -> FileSearchPlugin {
+    return FileSearchPlugin {
+        search_paths: default_search_list(),
+        skip_dirs: vec![
+            String::from("vendor"),
+            String::from("node_modules"),
+            String::from("cache"),
+            String::from("zig-cache"),
+        ],
+        files: Arc::new(Mutex::new(Vec::new())),
+    };
+}
 pub struct FileSearchPlugin {
     search_paths: Vec<PathBuf>,
     skip_dirs: Vec<String>,
@@ -120,19 +132,6 @@ pub struct FileSearchPlugin {
 }
 
 impl FileSearchPlugin {
-    pub fn new() -> Self {
-        return FileSearchPlugin {
-            search_paths: default_search_list(),
-            skip_dirs: vec![
-                String::from("vendor"),
-                String::from("node_modules"),
-                String::from("cache"),
-                String::from("zig-cache"),
-            ],
-            files: Arc::new(Mutex::new(Vec::new())),
-        };
-    }
-
     pub fn add_search_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         let p = path.as_ref();
 
@@ -145,6 +144,11 @@ impl FileSearchPlugin {
         }
 
         self.search_paths.push(p.to_path_buf());
+        Ok(())
+    }
+
+    pub fn add_skip_dir(&mut self, directory_name: String) -> Result<(), String> {
+        self.skip_dirs.push(directory_name);
         Ok(())
     }
 
