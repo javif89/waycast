@@ -82,9 +82,56 @@ impl LauncherPlugin for ProjectsPlugin {
         priority: 800,
         description: "Search and open code projects",
         prefix: "proj",
-        init: projects_init,
         default_list: projects_default_list,
         filter: projects_filter
+    }
+    
+    fn init(&self) {
+        let files_clone = Arc::clone(&self.files);
+        let search_paths = self.search_paths.clone();
+        let skip_dirs = self.skip_dirs.clone();
+        
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                let mut project_entries = Vec::new();
+                
+                for search_path in &search_paths {
+                    if let Ok(entries) = fs::read_dir(search_path) {
+                        for entry in entries.flatten() {
+                            if let Ok(file_type) = entry.file_type() {
+                                if file_type.is_dir() {
+                                    let path = entry.path();
+                                    
+                                    // Skip hidden directories (starting with .)
+                                    if let Some(file_name) = path.file_name() {
+                                        if let Some(name_str) = file_name.to_str() {
+                                            // Skip hidden directories
+                                            if name_str.starts_with('.') {
+                                                continue;
+                                            }
+                                            
+                                            // Skip directories in skip list
+                                            if should_skip_dir(name_str, &skip_dirs) {
+                                                continue;
+                                            }
+                                            
+                                            project_entries.push(ProjectEntry { path });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Update the shared files collection
+                let mut files_guard = files_clone.lock().await;
+                *files_guard = project_entries;
+                
+                println!("Projects plugin: Found {} projects", files_guard.len());
+            });
+        });
     }
 }
 
@@ -114,55 +161,6 @@ fn projects_filter(plugin: &ProjectsPlugin, query: &str) -> Vec<Box<dyn Launcher
     entries
 }
 
-fn projects_init(plugin: &ProjectsPlugin) {
-    let files_clone = Arc::clone(&plugin.files);
-    let search_paths = plugin.search_paths.clone();
-    let skip_dirs = plugin.skip_dirs.clone();
-
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let mut project_entries = Vec::new();
-
-            for search_path in &search_paths {
-                if let Ok(entries) = fs::read_dir(search_path) {
-                    for entry in entries.flatten() {
-                        if let Ok(file_type) = entry.file_type() {
-                            if file_type.is_dir() {
-                                let path = entry.path();
-
-                                // Skip hidden directories (starting with .)
-                                if let Some(file_name) = path.file_name() {
-                                    if let Some(name_str) = file_name.to_str() {
-                                        // Skip hidden directories
-                                        if name_str.starts_with('.') {
-                                            continue;
-                                        }
-
-                                        // Skip directories in skip list
-                                        if should_skip_dir(name_str, &skip_dirs) {
-                                            continue;
-                                        }
-
-                                        println!("{}", path.display());
-
-                                        project_entries.push(ProjectEntry { path });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Update the shared files collection
-            let mut files_guard = files_clone.lock().await;
-            *files_guard = project_entries;
-
-            println!("Projects plugin: Found {} projects", files_guard.len());
-        });
-    });
-}
 
 pub fn new() -> ProjectsPlugin {
     ProjectsPlugin {

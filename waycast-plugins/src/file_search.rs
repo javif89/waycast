@@ -193,9 +193,26 @@ impl LauncherPlugin for FileSearchPlugin {
         priority: 500,
         description: "Search and open files",
         prefix: "f",
-        init: file_search_init,
         default_list: file_search_default_list,
         filter: file_search_filter
+    }
+    
+    fn init(&self) {
+        // Start async file scanning with 2000ms timeout
+        let self_clone = FileSearchPlugin {
+            search_paths: self.search_paths.clone(),
+            skip_dirs: self.skip_dirs.clone(),
+            files: Arc::clone(&self.files),
+        };
+
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                self_clone
+                    .init_with_timeout(Duration::from_millis(2000))
+                    .await;
+            });
+        });
     }
 }
 
@@ -225,23 +242,6 @@ fn file_search_filter(plugin: &FileSearchPlugin, query: &str) -> Vec<Box<dyn Lau
     entries
 }
 
-fn file_search_init(plugin: &FileSearchPlugin) {
-    // Start async file scanning with 500ms timeout
-    let self_clone = FileSearchPlugin {
-        search_paths: plugin.search_paths.clone(),
-        skip_dirs: plugin.skip_dirs.clone(),
-        files: Arc::clone(&plugin.files),
-    };
-
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            self_clone
-                .init_with_timeout(Duration::from_millis(2000))
-                .await;
-        });
-    });
-}
 
 pub fn new() -> FileSearchPlugin {
     FileSearchPlugin::new()
