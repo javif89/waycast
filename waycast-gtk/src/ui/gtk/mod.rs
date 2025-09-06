@@ -219,28 +219,88 @@ impl GtkLauncherUI {
         // Set initial focus to search input so user can start typing immediately
         search_input.grab_focus();
 
-        // Set up event handlers directly
+        // Set up async search handlers to prevent UI blocking
         let launcher_for_search = launcher.clone();
         let list_store_for_search = list_store.clone();
+        let selection_for_search = selection.clone();
+        
+        // Add debouncing to avoid excessive searches with generation counter
+        let search_generation = Rc::new(RefCell::new(0u64));
+        
         search_input.connect_changed(move |entry| {
             let query = entry.text().to_string();
-            let mut launcher_ref = launcher_for_search.borrow_mut();
-            let results = if query.trim().is_empty() {
-                launcher_ref.get_default_results()
+            
+            // Increment generation to cancel any pending searches
+            *search_generation.borrow_mut() += 1;
+            
+            if query.trim().is_empty() {
+                // Handle empty query synchronously for immediate response
+                let mut launcher_ref = launcher_for_search.borrow_mut();
+                let results = launcher_ref.get_default_results();
+                
+                list_store_for_search.remove_all();
+                for entry in results.iter() {
+                    let item_obj = LauncherItemObject::new(
+                        entry.title(),
+                        entry.description(),
+                        entry.icon(),
+                        entry.id(),
+                    );
+                    list_store_for_search.append(&item_obj);
+                }
+                
+                // Select first item
+                if list_store_for_search.n_items() > 0 {
+                    selection_for_search.set_selected(0);
+                }
             } else {
-                launcher_ref.search(&query)
-            };
-
-            // Update the list store
-            list_store_for_search.remove_all();
-            for entry in results.iter() {
-                let item_obj = LauncherItemObject::new(
-                    entry.title(),
-                    entry.description(),
-                    entry.icon(),
-                    entry.id(),
-                );
-                list_store_for_search.append(&item_obj);
+                // Debounced async search for non-empty queries
+                let launcher_clone = launcher_for_search.clone();
+                let list_store_clone = list_store_for_search.clone();
+                let selection_clone = selection_for_search.clone();
+                
+                let current_generation = *search_generation.borrow();
+                let generation_check = search_generation.clone();
+                let _timeout_id = glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
+                    // Check if this search is still the current one
+                    if *generation_check.borrow() != current_generation {
+                        return glib::ControlFlow::Break; // This search was superseded
+                    }
+                    
+                    let launcher_clone = launcher_clone.clone();
+                    let list_store_clone = list_store_clone.clone();
+                    let selection_clone = selection_clone.clone();
+                    let query = query.clone();
+                    
+                    glib::spawn_future_local(async move {
+                        // Run search and collect items immediately
+                        let items: Vec<LauncherItemObject> = {
+                            let mut launcher_ref = launcher_clone.borrow_mut();
+                            let results = launcher_ref.search(&query);
+                            results.iter().map(|entry| {
+                                LauncherItemObject::new(
+                                    entry.title(),
+                                    entry.description(),
+                                    entry.icon(),
+                                    entry.id(),
+                                )
+                            }).collect()
+                        };
+                        
+                        // Update UI on main thread
+                        list_store_clone.remove_all();
+                        for item_obj in items {
+                            list_store_clone.append(&item_obj);
+                        }
+                        
+                        // Select first item
+                        if list_store_clone.n_items() > 0 {
+                            selection_clone.set_selected(0);
+                        }
+                    });
+                    
+                    glib::ControlFlow::Break
+                });
             }
         });
 
