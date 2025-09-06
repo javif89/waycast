@@ -13,9 +13,9 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
-        let file_search_plugin = waycast_plugins::file_search::new();
+        let mut file_search_plugin = waycast_plugins::file_search::new();
 
-        match waycast_plugins::file_search::add_search_path("/home/javi/working-files/DJ Music/") {
+        match file_search_plugin.add_search_path("/home/javi/working-files/DJ Music/") {
             Err(e) => eprintln!("{}", e),
             _ => (),
         }

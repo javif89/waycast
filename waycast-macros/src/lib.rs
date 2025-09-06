@@ -9,7 +9,6 @@ use syn::{
 
 /// Plugin configuration parsed from the macro input
 struct PluginConfig {
-    struct_name: Ident,
     name: LitStr,
     priority: Option<LitInt>,
     description: Option<LitStr>,
@@ -22,10 +21,6 @@ struct PluginConfig {
 
 impl Parse for PluginConfig {
     fn parse(input: ParseStream) -> Result<Self> {
-        // Parse "struct StructName;"
-        input.parse::<Token![struct]>()?;
-        let struct_name = input.parse::<Ident>()?;
-        input.parse::<Token![;]>()?;
 
         let mut name = None;
         let mut priority = None;
@@ -98,11 +93,10 @@ impl Parse for PluginConfig {
 
         // Validate required fields
         let name = name.ok_or_else(|| {
-            syn::Error::new_spanned(&struct_name, "Plugin must have a 'name' field")
+            syn::Error::new(input.span(), "Plugin must have a 'name' field")
         })?;
 
         Ok(PluginConfig {
-            struct_name,
             name,
             priority,
             description,
@@ -116,15 +110,8 @@ impl Parse for PluginConfig {
 }
 
 impl PluginConfig {
-    /// Generate the full plugin struct name with "Plugin" suffix
-    fn plugin_struct_name(&self) -> Ident {
-        let name_str = format!("{}Plugin", self.struct_name);
-        Ident::new(&name_str, self.struct_name.span())
-    }
-
-    /// Generate the implementation of LauncherPlugin trait
-    fn generate_plugin_impl(&self) -> proc_macro2::TokenStream {
-        let plugin_struct_name = self.plugin_struct_name();
+    /// Generate the implementation of LauncherPlugin trait methods
+    fn generate(&self) -> proc_macro2::TokenStream {
         let name_str = &self.name;
 
         // Generate priority method
@@ -201,65 +188,46 @@ impl PluginConfig {
         };
 
         quote! {
-            impl waycast_core::LauncherPlugin for #plugin_struct_name {
-                #init_method
+            #init_method
 
-                fn name(&self) -> String {
-                    #name_str.to_string()
-                }
-
-                fn priority(&self) -> i32 {
-                    #priority
-                }
-
-                fn description(&self) -> Option<String> {
-                    #description
-                }
-
-                fn prefix(&self) -> Option<String> {
-                    #prefix
-                }
-
-                fn by_prefix_only(&self) -> bool {
-                    #by_prefix_only
-                }
-
-                #default_list_method
-
-                #filter_method
-            }
-        }
-    }
-
-    /// Generate the complete plugin code
-    fn generate(&self) -> proc_macro2::TokenStream {
-        let plugin_struct_name = self.plugin_struct_name();
-        let plugin_impl = self.generate_plugin_impl();
-
-        quote! {
-            pub struct #plugin_struct_name {}
-
-            impl #plugin_struct_name {
-                pub fn new() -> Self {
-                    #plugin_struct_name {}
-                }
+            fn name(&self) -> String {
+                #name_str.to_string()
             }
 
-            #plugin_impl
+            fn priority(&self) -> i32 {
+                #priority
+            }
+
+            fn description(&self) -> Option<String> {
+                #description
+            }
+
+            fn prefix(&self) -> Option<String> {
+                #prefix
+            }
+
+            fn by_prefix_only(&self) -> bool {
+                #by_prefix_only
+            }
+
+            #default_list_method
+
+            #filter_method
         }
     }
 }
 
 /// The main plugin! proc macro
 /// 
-/// Usage:
+/// Usage inside impl LauncherPlugin block:
 /// ```rust
-/// plugin! {
-///     struct Calculator;
-///     name: "calculator",
-///     priority: 500,
-///     prefix: "calc",
-///     filter: calc_filter,
+/// impl LauncherPlugin for MyPlugin {
+///     plugin! {
+///         name: "calculator",
+///         priority: 500,
+///         prefix: "calc",
+///         filter: calc_filter,
+///     }
 /// }
 /// ```
 #[proc_macro]

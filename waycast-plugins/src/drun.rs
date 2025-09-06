@@ -1,6 +1,6 @@
 use gio::{prelude::*, AppInfo, DesktopAppInfo, Icon};
-use waycast_core::{LaunchError, LauncherListItem};
-use crate::plugin;
+use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
+use waycast_macros::plugin;
 
 #[derive(Debug)]
 pub struct DesktopEntry {
@@ -113,14 +113,23 @@ fn drun_filter(plugin: &DrunPlugin, query: &str) -> Vec<Box<dyn LauncherListItem
     entries
 }
 
-plugin! {
-    struct Drun;
-    name: "drun",
-    priority: 1000,
-    description: "List and launch an installed application",
-    prefix: "app",
-    default_list: drun_default_list,
-    filter: drun_filter,
+pub struct DrunPlugin;
+
+impl DrunPlugin {
+    pub fn new() -> Self {
+        DrunPlugin
+    }
+}
+
+impl LauncherPlugin for DrunPlugin {
+    plugin! {
+        name: "drun",
+        priority: 1000,
+        description: "List and launch an installed application",
+        prefix: "app",
+        default_list: drun_default_list,
+        filter: drun_filter
+    }
 }
 
 pub fn new() -> DrunPlugin {

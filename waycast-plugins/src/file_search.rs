@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
 use waycast_macros::plugin;
 
-use waycast_core::{LaunchError, LauncherListItem};
+use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 
 #[derive(Clone)]
 struct FileEntry {
@@ -104,16 +104,27 @@ pub fn default_search_list() -> Vec<PathBuf> {
     Vec::new()
 }
 
-// Global state for file search
-static mut FILE_SEARCH_DATA: Option<FileSearchData> = None;
-
-struct FileSearchData {
+pub struct FileSearchPlugin {
     search_paths: Vec<PathBuf>,
     skip_dirs: Vec<String>,
+    // Running list of files in memory
     files: Arc<Mutex<Vec<FileEntry>>>,
 }
 
-impl FileSearchData {
+impl FileSearchPlugin {
+    pub fn new() -> Self {
+        FileSearchPlugin {
+            search_paths: default_search_list(),
+            skip_dirs: vec![
+                String::from("vendor"),
+                String::from("node_modules"),
+                String::from("cache"),
+                String::from("zig-cache"),
+            ],
+            files: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
     pub fn add_search_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         let p = path.as_ref();
 
@@ -170,43 +181,6 @@ impl FileSearchData {
     }
 }
 
-fn get_file_search_data() -> &'static FileSearchData {
-    unsafe {
-        FILE_SEARCH_DATA.as_ref().unwrap()
-    }
-}
-
-fn get_file_search_data_mut() -> &'static mut FileSearchData {
-    unsafe {
-        FILE_SEARCH_DATA.as_mut().unwrap()
-    }
-}
-
-pub fn new() -> FileSearchPlugin {
-    unsafe {
-        FILE_SEARCH_DATA = Some(FileSearchData {
-            search_paths: default_search_list(),
-            skip_dirs: vec![
-                String::from("vendor"),
-                String::from("node_modules"),
-                String::from("cache"),
-                String::from("zig-cache"),
-            ],
-            files: Arc::new(Mutex::new(Vec::new())),
-        });
-    }
-    
-    FileSearchPlugin::new()
-}
-
-pub fn add_search_path<P: AsRef<Path>>(path: P) -> Result<(), String> {
-    get_file_search_data_mut().add_search_path(path)
-}
-
-pub fn add_skip_dir(directory_name: String) -> Result<(), String> {
-    get_file_search_data_mut().add_skip_dir(directory_name)
-}
-
 fn skip_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
@@ -223,20 +197,31 @@ fn skip_dir(entry: &DirEntry, dirs: &Vec<String>) -> bool {
         .unwrap_or(false)
 }
 
+impl LauncherPlugin for FileSearchPlugin {
+    plugin! {
+        name: "Files",
+        priority: 500,
+        description: "Search and open files",
+        prefix: "f",
+        init: file_search_init,
+        default_list: file_search_default_list,
+        filter: file_search_filter
+    }
+}
+
 fn file_search_default_list(_plugin: &FileSearchPlugin) -> Vec<Box<dyn LauncherListItem>> {
     Vec::new()
 }
 
-fn file_search_filter(_plugin: &FileSearchPlugin, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+fn file_search_filter(plugin: &FileSearchPlugin, query: &str) -> Vec<Box<dyn LauncherListItem>> {
     if query.is_empty() {
-        return file_search_default_list(_plugin);
+        return file_search_default_list(plugin);
     }
 
     let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-    let data = get_file_search_data();
 
     // Try to get files without blocking - if indexing is still in progress, return empty
-    if let Ok(files) = data.files.try_lock() {
+    if let Ok(files) = plugin.files.try_lock() {
         for f in files.iter() {
             if let Some(file_name) = f.path.file_name() {
                 let cmp = file_name.to_string_lossy().to_lowercase();
@@ -250,31 +235,24 @@ fn file_search_filter(_plugin: &FileSearchPlugin, query: &str) -> Vec<Box<dyn La
     entries
 }
 
-fn file_search_init(_plugin: &FileSearchPlugin) {
-    let data = get_file_search_data();
-    let data_clone = FileSearchData {
-        search_paths: data.search_paths.clone(),
-        skip_dirs: data.skip_dirs.clone(),
-        files: Arc::clone(&data.files),
+fn file_search_init(plugin: &FileSearchPlugin) {
+    // Start async file scanning with 500ms timeout
+    let self_clone = FileSearchPlugin {
+        search_paths: plugin.search_paths.clone(),
+        skip_dirs: plugin.skip_dirs.clone(),
+        files: Arc::clone(&plugin.files),
     };
 
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            data_clone
+            self_clone
                 .init_with_timeout(Duration::from_millis(2000))
                 .await;
         });
     });
 }
 
-plugin! {
-    struct FileSearch;
-    name: "Files",
-    priority: 500,
-    description: "Search and open files",
-    prefix: "f",
-    init: file_search_init,
-    default_list: file_search_default_list,
-    filter: file_search_filter
+pub fn new() -> FileSearchPlugin {
+    FileSearchPlugin::new()
 }
