@@ -31,8 +31,6 @@ impl LauncherListItem for ProjectEntry {
             String::from("vscode")
         },
         execute: {
-            println!("Executing: {}", self.path.display());
-
             // Use xdg-open directly since it works properly with music files
             match Command::new("code").arg("-n").arg(&self.path).spawn() {
                 Ok(_) => {
