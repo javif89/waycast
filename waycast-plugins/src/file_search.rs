@@ -18,9 +18,9 @@ struct FileEntry {
 
 impl FileEntry {
     fn from(entry: DirEntry) -> Self {
-        return FileEntry {
+        FileEntry {
             path: entry.into_path(),
-        };
+        }
     }
 }
 
@@ -82,10 +82,8 @@ pub fn default_search_list() -> Vec<PathBuf> {
             ud.video_dir(),
         ];
 
-        for d in user_dirs {
-            if let Some(path) = d {
-                paths.push(path.to_path_buf());
-            }
+        for path in user_dirs.into_iter().flatten() {
+            paths.push(path.to_path_buf());
         }
 
         return paths;
@@ -99,6 +97,12 @@ pub struct FileSearchPlugin {
     skip_dirs: Vec<String>,
     // Running list of files in memory
     files: Arc<Mutex<Vec<FileEntry>>>,
+}
+
+impl Default for FileSearchPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FileSearchPlugin {

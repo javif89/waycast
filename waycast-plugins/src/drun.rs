@@ -15,11 +15,7 @@ impl LauncherListItem for DesktopEntry {
         id: self.id.clone(),
         title: self.name.to_owned(),
         description: {
-            if let Some(glib_string) = &self.description {
-                Some(glib_string.to_string().to_owned())
-            } else {
-                None
-            }
+            self.description.as_ref().map(|glib_string| glib_string.to_string().to_owned())
         },
         icon: {
             if let Some(icon) = &self.icon {
@@ -57,11 +53,11 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
     let mut entries = Vec::new();
 
     for i in gio::AppInfo::all() {
-        let info: gio::DesktopAppInfo;
-        match i.downcast_ref::<gio::DesktopAppInfo>() {
-            Some(inf) => info = inf.to_owned(),
+        
+        let info: gio::DesktopAppInfo = match i.downcast_ref::<gio::DesktopAppInfo>() {
+            Some(inf) => inf.to_owned(),
             None => continue,
-        }
+        };
         if !info.should_show() {
             continue;
         }
@@ -82,6 +78,12 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
 
 
 pub struct DrunPlugin;
+
+impl Default for DrunPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl DrunPlugin {
     pub fn new() -> Self {
