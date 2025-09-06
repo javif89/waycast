@@ -1,5 +1,6 @@
 use gio::{prelude::*, AppInfo, DesktopAppInfo, Icon};
-use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
+use waycast_core::{LaunchError, LauncherListItem};
+use crate::plugin;
 
 #[derive(Debug)]
 pub struct DesktopEntry {
@@ -85,63 +86,43 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
     entries
 }
 
-pub fn new() -> DrunPlugin {
-    DrunPlugin {}
+fn drun_default_list(_plugin: &DrunPlugin) -> Vec<Box<dyn LauncherListItem>> {
+    let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
+
+    for e in get_desktop_entries() {
+        entries.push(Box::new(e));
+    }
+
+    entries
 }
 
-pub struct DrunPlugin {}
-
-impl LauncherPlugin for DrunPlugin {
-    fn init(&self) {
-        // TODO: Load apps into memory
-        // TODO: Find and cache Icons
-    }
-    fn name(&self) -> String {
-        return String::from("drun");
+fn drun_filter(plugin: &DrunPlugin, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+    if query.is_empty() {
+        return drun_default_list(plugin);
     }
 
-    fn priority(&self) -> i32 {
-        return 1000;
-    }
-
-    fn description(&self) -> Option<String> {
-        return Some(String::from("List and launch an installed application"));
-    }
-
-    // Prefix to isolate results to only use this plugin
-    fn prefix(&self) -> Option<String> {
-        return Some(String::from("app"));
-    }
-    // Only search/use this plugin if the prefix was typed
-    fn by_prefix_only(&self) -> bool {
-        return false;
-    }
-
-    // Actual item searching functions
-    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>> {
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-
-        for e in get_desktop_entries() {
-            entries.push(Box::new(e));
+    let query_lower = query.to_lowercase();
+    let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
+    for entry in drun_default_list(plugin) {
+        let title_lower = entry.title().to_lowercase();
+        if title_lower.contains(&query_lower) {
+            entries.push(entry);
         }
-
-        entries
     }
 
-    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
-        if query.is_empty() {
-            return self.default_list();
-        }
+    entries
+}
 
-        let query_lower = query.to_lowercase();
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-        for entry in self.default_list() {
-            let title_lower = entry.title().to_lowercase();
-            if title_lower.contains(&query_lower) {
-                entries.push(entry);
-            }
-        }
+plugin! {
+    struct Drun;
+    name: "drun",
+    priority: 1000,
+    description: "List and launch an installed application",
+    prefix: "app",
+    default_list: drun_default_list,
+    filter: drun_filter,
+}
 
-        entries
-    }
+pub fn new() -> DrunPlugin {
+    DrunPlugin::new()
 }

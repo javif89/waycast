@@ -7,8 +7,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
+use waycast_macros::plugin;
 
-use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
+use waycast_core::{LaunchError, LauncherListItem};
 
 #[derive(Clone)]
 struct FileEntry {
@@ -103,27 +104,16 @@ pub fn default_search_list() -> Vec<PathBuf> {
     Vec::new()
 }
 
-pub fn new() -> FileSearchPlugin {
-    return FileSearchPlugin {
-        search_paths: default_search_list(),
-        skip_dirs: vec![
-            String::from("vendor"),
-            String::from("node_modules"),
-            String::from("cache"),
-            String::from("zig-cache"),
-        ],
-        files: Arc::new(Mutex::new(Vec::new())),
-    };
-}
+// Global state for file search
+static mut FILE_SEARCH_DATA: Option<FileSearchData> = None;
 
-pub struct FileSearchPlugin {
+struct FileSearchData {
     search_paths: Vec<PathBuf>,
     skip_dirs: Vec<String>,
-    // Running list of files in memory
     files: Arc<Mutex<Vec<FileEntry>>>,
 }
 
-impl FileSearchPlugin {
+impl FileSearchData {
     pub fn add_search_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         let p = path.as_ref();
 
@@ -180,6 +170,43 @@ impl FileSearchPlugin {
     }
 }
 
+fn get_file_search_data() -> &'static FileSearchData {
+    unsafe {
+        FILE_SEARCH_DATA.as_ref().unwrap()
+    }
+}
+
+fn get_file_search_data_mut() -> &'static mut FileSearchData {
+    unsafe {
+        FILE_SEARCH_DATA.as_mut().unwrap()
+    }
+}
+
+pub fn new() -> FileSearchPlugin {
+    unsafe {
+        FILE_SEARCH_DATA = Some(FileSearchData {
+            search_paths: default_search_list(),
+            skip_dirs: vec![
+                String::from("vendor"),
+                String::from("node_modules"),
+                String::from("cache"),
+                String::from("zig-cache"),
+            ],
+            files: Arc::new(Mutex::new(Vec::new())),
+        });
+    }
+    
+    FileSearchPlugin::new()
+}
+
+pub fn add_search_path<P: AsRef<Path>>(path: P) -> Result<(), String> {
+    get_file_search_data_mut().add_search_path(path)
+}
+
+pub fn add_skip_dir(directory_name: String) -> Result<(), String> {
+    get_file_search_data_mut().add_skip_dir(directory_name)
+}
+
 fn skip_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
@@ -196,67 +223,58 @@ fn skip_dir(entry: &DirEntry, dirs: &Vec<String>) -> bool {
         .unwrap_or(false)
 }
 
-impl LauncherPlugin for FileSearchPlugin {
-    fn init(&self) {
-        // Start async file scanning with 500ms timeout
-        let self_clone = FileSearchPlugin {
-            search_paths: self.search_paths.clone(),
-            skip_dirs: self.skip_dirs.clone(),
-            files: Arc::clone(&self.files),
-        };
+fn file_search_default_list(_plugin: &FileSearchPlugin) -> Vec<Box<dyn LauncherListItem>> {
+    Vec::new()
+}
 
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                self_clone
-                    .init_with_timeout(Duration::from_millis(2000))
-                    .await;
-            });
-        });
-    }
-    fn name(&self) -> String {
-        return String::from("File search");
+fn file_search_filter(_plugin: &FileSearchPlugin, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+    if query.is_empty() {
+        return file_search_default_list(_plugin);
     }
 
-    fn priority(&self) -> i32 {
-        return 900;
-    }
+    let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
+    let data = get_file_search_data();
 
-    fn description(&self) -> Option<String> {
-        None
-    }
-
-    fn prefix(&self) -> Option<String> {
-        Some(String::from("f"))
-    }
-
-    fn by_prefix_only(&self) -> bool {
-        false
-    }
-
-    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>> {
-        Vec::new()
-    }
-
-    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
-        if query.is_empty() {
-            return self.default_list();
-        }
-
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-
-        // Try to get files without blocking - if indexing is still in progress, return empty
-        if let Ok(files) = self.files.try_lock() {
-            for f in files.iter() {
-                if let Some(file_name) = f.path.file_name() {
-                    let cmp = file_name.to_string_lossy().to_lowercase();
-                    if cmp.contains(&query.to_lowercase()) {
-                        entries.push(Box::new(f.clone()));
-                    }
+    // Try to get files without blocking - if indexing is still in progress, return empty
+    if let Ok(files) = data.files.try_lock() {
+        for f in files.iter() {
+            if let Some(file_name) = f.path.file_name() {
+                let cmp = file_name.to_string_lossy().to_lowercase();
+                if cmp.contains(&query.to_lowercase()) {
+                    entries.push(Box::new(f.clone()));
                 }
             }
         }
-
-        entries
     }
+
+    entries
+}
+
+fn file_search_init(_plugin: &FileSearchPlugin) {
+    let data = get_file_search_data();
+    let data_clone = FileSearchData {
+        search_paths: data.search_paths.clone(),
+        skip_dirs: data.skip_dirs.clone(),
+        files: Arc::clone(&data.files),
+    };
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            data_clone
+                .init_with_timeout(Duration::from_millis(2000))
+                .await;
+        });
+    });
+}
+
+plugin! {
+    struct FileSearch;
+    name: "Files",
+    priority: 500,
+    description: "Search and open files",
+    prefix: "f",
+    init: file_search_init,
+    default_list: file_search_default_list,
+    filter: file_search_filter
 }

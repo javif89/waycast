@@ -914,6 +914,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "waycast-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "waycast-plugins"
 version = "0.1.0"
 dependencies = [
@@ -923,6 +932,7 @@ dependencies = [
  "tokio",
  "walkdir",
  "waycast-core",
+ "waycast-macros",
 ]
 
 [[package]]
