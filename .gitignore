@@ -1,1 +1,5 @@
+# Rust build artifacts
 /target
+
+# direnv cache (should not be committed)
+.direnv/
