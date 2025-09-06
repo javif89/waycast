@@ -20,10 +20,17 @@ fn main() {
             _ => (),
         }
 
+        let mut project_plugin = waycast_plugins::projects::new();
+        match project_plugin.add_search_path("/home/javi/projects") {
+            Err(e) => eprintln!("{}", e),
+            _ => (),
+        }
+
         // Create the core launcher
         let launcher = WaycastLauncher::new()
             .add_plugin(Box::new(waycast_plugins::drun::new()))
             .add_plugin(Box::new(file_search_plugin))
+            .add_plugin(Box::new(project_plugin))
             .init();
 
         // Create and show the GTK UI
