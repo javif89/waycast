@@ -11,3 +11,6 @@ gio = "0.21.1"
 glib = "0.21.1"
 tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "time", "macros", "sync"] }
 walkdir = "2.5.0"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(rust_analyzer)'] }
