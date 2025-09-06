@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
-use waycast_macros::plugin;
+use waycast_macros::{plugin, launcher_entry};
 
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 
@@ -25,60 +25,50 @@ impl FileEntry {
 }
 
 impl LauncherListItem for FileEntry {
-    fn id(&self) -> String {
-        self.path.to_string_lossy().to_string()
-    }
-
-    fn title(&self) -> String {
-        return String::from(self.path.file_name().unwrap().to_string_lossy());
-    }
-    fn description(&self) -> Option<String> {
-        Some(self.path.to_string_lossy().to_string())
-    }
-
-    fn execute(&self) -> Result<(), LaunchError> {
-        println!("Executing: {}", self.path.display());
-
-        // Use xdg-open directly since it works properly with music files
-        match Command::new("xdg-open").arg(&self.path).spawn() {
-            Ok(_) => {
-                println!("Successfully launched with xdg-open");
-                Ok(())
+    launcher_entry! {
+        id: self.path.to_string_lossy().to_string(),
+        title: String::from(self.path.file_name().unwrap().to_string_lossy()),
+        description: Some(self.path.to_string_lossy().to_string()),
+        icon: {
+            let (content_type, _) = gio::content_type_guess(Some(&self.path), None);
+            let icon = gio::content_type_get_icon(&content_type);
+            if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>() {
+                if let Some(icon_name) = themed_icon.names().first() {
+                    return icon_name.to_string();
+                }
             }
-            Err(e) => {
-                println!("xdg-open failed: {}", e);
-                // Fallback to GIO method
-                let file_gio = gio::File::for_path(&self.path);
-                let ctx = gio::AppLaunchContext::new();
-                match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
-                    Ok(()) => {
-                        println!("Successfully launched with GIO fallback");
-                        Ok(())
-                    }
-                    Err(e2) => {
-                        println!("GIO fallback also failed: {}", e2);
-                        Err(LaunchError::CouldNotLaunch(format!(
-                            "Both xdg-open and GIO failed: {} / {}",
-                            e, e2
-                        )))
+            String::from("text-x-generic")
+        },
+        execute: {
+            println!("Executing: {}", self.path.display());
+
+            // Use xdg-open directly since it works properly with music files
+            match Command::new("xdg-open").arg(&self.path).spawn() {
+                Ok(_) => {
+                    println!("Successfully launched with xdg-open");
+                    Ok(())
+                }
+                Err(e) => {
+                    println!("xdg-open failed: {}", e);
+                    // Fallback to GIO method
+                    let file_gio = gio::File::for_path(&self.path);
+                    let ctx = gio::AppLaunchContext::new();
+                    match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
+                        Ok(()) => {
+                            println!("Successfully launched with GIO fallback");
+                            Ok(())
+                        }
+                        Err(e2) => {
+                            println!("GIO fallback also failed: {}", e2);
+                            Err(LaunchError::CouldNotLaunch(format!(
+                                "Both xdg-open and GIO failed: {} / {}",
+                                e, e2
+                            )))
+                        }
                     }
                 }
             }
         }
-    }
-
-    fn icon(&self) -> String {
-        let (content_type, _) = gio::content_type_guess(Some(&self.path), None);
-
-        let icon = gio::content_type_get_icon(&content_type);
-
-        if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>() {
-            if let Some(icon_name) = themed_icon.names().first() {
-                return icon_name.to_string();
-            }
-        }
-
-        String::from("text-x-generic")
     }
 }
 

@@ -1,6 +1,6 @@
 use gio::{prelude::*, AppInfo, DesktopAppInfo, Icon};
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
-use waycast_macros::plugin;
+use waycast_macros::{plugin, launcher_entry};
 
 #[derive(Debug)]
 pub struct DesktopEntry {
@@ -11,52 +11,45 @@ pub struct DesktopEntry {
 }
 
 impl LauncherListItem for DesktopEntry {
-    fn id(&self) -> String {
-        self.id.clone()
-    }
+    launcher_entry! {
+        id: self.id.clone(),
+        title: self.name.to_owned(),
+        description: {
+            if let Some(glib_string) = &self.description {
+                Some(glib_string.to_string().to_owned())
+            } else {
+                None
+            }
+        },
+        icon: {
+            if let Some(icon) = &self.icon {
+                if let Ok(ti) = icon.clone().downcast::<gio::ThemedIcon>() {
+                    // ThemedIcon may have multiple names, we take the first
+                    if let Some(name) = ti.names().first() {
+                        return name.to_string();
+                    }
+                }
 
-    fn title(&self) -> String {
-        return self.name.to_owned();
-    }
-
-    fn description(&self) -> Option<String> {
-        if let Some(glib_string) = &self.description {
-            return Some(glib_string.to_string().to_owned());
-        }
-
-        return None;
-    }
-
-    fn execute(&self) -> Result<(), LaunchError> {
-        if let Some(di) = DesktopAppInfo::new(&self.id) {
-            let app: AppInfo = di.upcast();
-            let ctx = gio::AppLaunchContext::new();
-            if app.launch(&[], Some(&ctx)).ok().is_none() {
-                return Err(LaunchError::CouldNotLaunch("App failed to launch".into()));
-            };
-            return Ok(());
-        }
-
-        return Err(LaunchError::CouldNotLaunch("Invalid .desktop entry".into()));
-    }
-
-    fn icon(&self) -> String {
-        if let Some(icon) = &self.icon {
-            if let Ok(ti) = icon.clone().downcast::<gio::ThemedIcon>() {
-                // ThemedIcon may have multiple names, we take the first
-                if let Some(name) = ti.names().first() {
-                    return name.to_string();
+                if let Ok(fi) = icon.clone().downcast::<gio::FileIcon>() {
+                    if let Some(path) = fi.file().path() {
+                        return path.to_string_lossy().to_string();
+                    }
                 }
             }
-
-            if let Ok(fi) = icon.clone().downcast::<gio::FileIcon>() {
-                if let Some(path) = fi.file().path() {
-                    return path.to_string_lossy().to_string();
-                }
+            "application-x-executable".into()
+        },
+        execute: {
+            if let Some(di) = DesktopAppInfo::new(&self.id) {
+                let app: AppInfo = di.upcast();
+                let ctx = gio::AppLaunchContext::new();
+                if app.launch(&[], Some(&ctx)).ok().is_none() {
+                    return Err(LaunchError::CouldNotLaunch("App failed to launch".into()));
+                };
+                Ok(())
+            } else {
+                Err(LaunchError::CouldNotLaunch("Invalid .desktop entry".into()))
             }
         }
-
-        return "application-x-executable".into();
     }
 }
 
