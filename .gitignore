@@ -3,3 +3,4 @@
 
 # direnv cache (should not be committed)
 .direnv/
+waycast_cache

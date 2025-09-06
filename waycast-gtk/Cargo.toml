@@ -14,3 +14,6 @@ gio = "0.21.1"
 glib = "0.21.1"
 gtk = { version = "0.10.0", package = "gtk4" }
 gtk4-layer-shell = "0.6.1"
+redb = "3.0.1"
+serde = "1.0.219"
+bincode = "2.0.1"

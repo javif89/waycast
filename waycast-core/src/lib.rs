@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+pub mod cache;
+
 #[derive(Debug)]
 pub enum LaunchError {
     CouldNotLaunch(String),
