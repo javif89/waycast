@@ -2,11 +2,25 @@ pub mod errors;
 use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
+use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
 
 use crate::cache::errors::CacheError;
 
 const CACHE_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("cache");
+static CACHE_SINGLETON: OnceLock<Cache> = OnceLock::new();
+
+pub struct CacheTTL {}
+
+impl CacheTTL {
+    pub fn hours(hours: u64) -> Option<Duration> {
+        return Some(Duration::from_secs(hours * 60 * 60));
+    }
+
+    pub fn minutes(minutes: u64) -> Option<Duration> {
+        return Some(Duration::from_secs(minutes * 60));
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 struct CacheEntry<T> {
@@ -18,7 +32,13 @@ pub struct Cache {
     db: Database,
 }
 
-pub fn new<P: AsRef<Path>>(db_path: P) -> Result<Cache, CacheError> {
+pub fn get() -> &'static Cache {
+    CACHE_SINGLETON.get_or_init(|| new("waycast_cache").expect("Failed to initialize cache :("))
+}
+
+// Get an existing cache at the given path or
+// create it if it doesn't exist
+fn new<P: AsRef<Path>>(db_path: P) -> Result<Cache, CacheError> {
     let db = Database::create(db_path)?;
 
     // Initialize the table if it doesn't exist
@@ -47,7 +67,6 @@ impl Cache {
             // Check if entry has expired
             if let Some(expires_at) = entry.expires_at {
                 if SystemTime::now() < expires_at {
-                    println!("Cache hit");
                     return Ok(entry.data);
                 }
                 // Entry has expired, continue to recompute
@@ -56,8 +75,6 @@ impl Cache {
                 return Ok(entry.data);
             }
         }
-
-        println!("Cache miss");
 
         // Not in cache or expired, compute the value
         let data = compute();

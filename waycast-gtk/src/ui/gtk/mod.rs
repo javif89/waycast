@@ -13,6 +13,7 @@ use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use waycast_core::cache::CacheTTL;
 use waycast_core::WaycastLauncher;
 
 // GObject wrapper to store LauncherListItem in GTK's model system
@@ -403,6 +404,25 @@ fn find_icon_file(
     size: &str,
     icon_theme: &IconTheme,
 ) -> Option<std::path::PathBuf> {
+    let cache_key = format!("icon:{}:{}", icon_name, size);
+    let cache = waycast_core::cache::get();
+
+    let result = cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || {
+        search_for_icon(icon_name, size, icon_theme)
+    });
+
+    if let Ok(opt_path) = result {
+        return opt_path;
+    }
+
+    search_for_icon(icon_name, size, icon_theme)
+}
+
+fn search_for_icon(
+    icon_name: &str,
+    size: &str,
+    icon_theme: &IconTheme,
+) -> Option<std::path::PathBuf> {
     let pixmap_paths: Vec<PathBuf> = icon_theme
         .search_path()
         .into_iter()
@@ -439,6 +459,7 @@ fn find_icon_file(
             }
         }
     }
+
     for base in &search_paths {
         for size in sizes {
             for cat in &categories {
