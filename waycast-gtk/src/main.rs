@@ -1,8 +1,11 @@
-use gtk::Application;
+mod ui;
+mod util;
+
 use gtk::prelude::*;
-use waycast::launcher::WaycastLauncher;
-use waycast::plugins;
-use waycast::ui::gtk::GtkLauncherUI;
+use gtk::Application;
+use ui::gtk::GtkLauncherUI;
+use waycast_core::WaycastLauncher;
+use waycast_plugins;
 
 fn main() {
     let app = Application::builder()
@@ -10,7 +13,7 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
-        let mut file_search_plugin = plugins::file_search::new();
+        let mut file_search_plugin = waycast_plugins::file_search::new();
 
         match file_search_plugin.add_search_path("/home/javi/working-files/DJ Music/") {
             Err(e) => eprintln!("{}", e),
@@ -19,7 +22,7 @@ fn main() {
 
         // Create the core launcher
         let launcher = WaycastLauncher::new()
-            .add_plugin(Box::new(plugins::drun::new()))
+            .add_plugin(Box::new(waycast_plugins::drun::new()))
             .add_plugin(Box::new(file_search_plugin))
             .init();
 

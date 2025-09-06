@@ -1,6 +1,5 @@
-use crate::launcher::WaycastLauncher;
-use gio::ListStore;
 use gio::prelude::ApplicationExt;
+use gio::ListStore;
 use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
@@ -14,6 +13,7 @@ use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use waycast_core::WaycastLauncher;
 
 // GObject wrapper to store LauncherListItem in GTK's model system
 mod imp {
@@ -321,8 +321,12 @@ impl GtkLauncherUI {
         let mut launcher_ref = launcher.borrow_mut();
         let results = launcher_ref.get_default_results();
         for entry in results.iter() {
-            let item_obj =
-                LauncherItemObject::new(entry.title(), entry.description(), entry.icon(), entry.id());
+            let item_obj = LauncherItemObject::new(
+                entry.title(),
+                entry.description(),
+                entry.icon(),
+                entry.id(),
+            );
             list_store.append(&item_obj);
         }
 
@@ -332,9 +336,7 @@ impl GtkLauncherUI {
         }
         drop(launcher_ref); // Release the borrow
 
-        Self {
-            window,
-        }
+        Self { window }
     }
 }
 

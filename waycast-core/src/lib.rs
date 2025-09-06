@@ -1,6 +1,32 @@
-use crate::{LauncherListItem, LauncherPlugin};
 use std::collections::HashMap;
 use std::sync::Arc;
+
+#[derive(Debug)]
+pub enum LaunchError {
+    CouldNotLaunch(String),
+}
+
+pub trait LauncherListItem {
+    fn id(&self) -> String;
+    fn title(&self) -> String;
+    fn description(&self) -> Option<String>;
+    fn execute(&self) -> Result<(), LaunchError>;
+    fn icon(&self) -> String;
+}
+
+pub trait LauncherPlugin {
+    fn init(&self);
+    fn name(&self) -> String;
+    fn priority(&self) -> i32;
+    fn description(&self) -> Option<String>;
+    // Prefix to isolate results to only use this plugin
+    fn prefix(&self) -> Option<String>;
+    // Only search/use this plugin if the prefix was typed
+    fn by_prefix_only(&self) -> bool;
+    // Actual item searching functions
+    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>>;
+    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>>;
+}
 
 pub struct WaycastLauncher {
     plugins: Vec<Arc<dyn LauncherPlugin>>,
@@ -20,9 +46,7 @@ impl WaycastLauncher {
             current_results_by_id: HashMap::new(),
         }
     }
-}
 
-impl WaycastLauncher {
     pub fn add_plugin(mut self, plugin: Box<dyn LauncherPlugin>) -> Self {
         let p: Arc<dyn LauncherPlugin> = plugin.into();
         if !p.by_prefix_only() {
@@ -87,23 +111,25 @@ impl WaycastLauncher {
         &self.current_results
     }
 
-    pub fn execute_item(&self, index: usize) -> Result<(), crate::LaunchError> {
+    pub fn execute_item(&self, index: usize) -> Result<(), LaunchError> {
         if let Some(item) = self.current_results.get(index) {
             item.execute()
         } else {
-            Err(crate::LaunchError::CouldNotLaunch("Invalid index".into()))
+            Err(LaunchError::CouldNotLaunch("Invalid index".into()))
         }
     }
 
-    pub fn execute_item_by_id(&self, id: &str) -> Result<(), crate::LaunchError> {
+    pub fn execute_item_by_id(&self, id: &str) -> Result<(), LaunchError> {
         if let Some(&index) = self.current_results_by_id.get(id) {
             if let Some(item) = self.current_results.get(index) {
                 item.execute()
             } else {
-                Err(crate::LaunchError::CouldNotLaunch("Item index out of bounds".into()))
+                Err(LaunchError::CouldNotLaunch(
+                    "Item index out of bounds".into(),
+                ))
             }
         } else {
-            Err(crate::LaunchError::CouldNotLaunch("Item not found".into()))
+            Err(LaunchError::CouldNotLaunch("Item not found".into()))
         }
     }
 

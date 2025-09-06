@@ -1,6 +1,5 @@
-use crate::LauncherPlugin;
-use crate::{LaunchError, LauncherListItem};
-use gio::{AppInfo, DesktopAppInfo, Icon, prelude::*};
+use gio::{prelude::*, AppInfo, DesktopAppInfo, Icon};
+use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 
 #[derive(Debug)]
 pub struct DesktopEntry {

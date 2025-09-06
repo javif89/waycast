@@ -1,0 +1,12 @@
+[package]
+name = "waycast-plugins"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+waycast-core = { path = "../waycast-core" }
+directories = "6.0.0"
+gio = "0.21.1"
+glib = "0.21.1"
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "time", "macros", "sync"] }
+walkdir = "2.5.0"

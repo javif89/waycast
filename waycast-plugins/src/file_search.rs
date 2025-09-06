@@ -1,5 +1,5 @@
 use directories::UserDirs;
-use gio::prelude::{AppInfoExt, FileExt};
+use gio::prelude::FileExt;
 use glib::object::Cast;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -8,7 +8,7 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::{LaunchError, LauncherListItem, LauncherPlugin};
+use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 
 #[derive(Clone)]
 struct FileEntry {
@@ -81,15 +81,6 @@ impl LauncherListItem for FileEntry {
     }
 }
 
-// TODO: There should be a method add_search_path to add new paths
-// when the plugin is getting initialized. After all paths are
-// added I should get the lowest common denominator. So for example
-// if we have:
-// $HOME/Documents
-// $HOME/Documents/wallpapers
-// Then we should just keep $HOME/Documents since wallpapers
-// will be included in it anyways
-
 pub fn default_search_list() -> Vec<PathBuf> {
     if let Some(ud) = UserDirs::new() {
         let mut paths: Vec<PathBuf> = Vec::new();
@@ -124,6 +115,7 @@ pub fn new() -> FileSearchPlugin {
         files: Arc::new(Mutex::new(Vec::new())),
     };
 }
+
 pub struct FileSearchPlugin {
     search_paths: Vec<PathBuf>,
     skip_dirs: Vec<String>,
