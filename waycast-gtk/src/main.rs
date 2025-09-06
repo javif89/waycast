@@ -5,7 +5,6 @@ use gtk::prelude::*;
 use gtk::Application;
 use ui::gtk::GtkLauncherUI;
 use waycast_core::WaycastLauncher;
-use waycast_plugins;
 
 fn main() {
     let app = Application::builder()
@@ -15,16 +14,10 @@ fn main() {
     app.connect_activate(|app| {
         let mut file_search_plugin = waycast_plugins::file_search::new();
 
-        match file_search_plugin.add_search_path("/home/javi/working-files/DJ Music/") {
-            Err(e) => eprintln!("{}", e),
-            _ => (),
-        }
+        if let Err(e) = file_search_plugin.add_search_path("/home/javi/working-files/DJ Music/") { eprintln!("{}", e) }
 
         let mut project_plugin = waycast_plugins::projects::new();
-        match project_plugin.add_search_path("/home/javi/projects") {
-            Err(e) => eprintln!("{}", e),
-            _ => (),
-        }
+        if let Err(e) = project_plugin.add_search_path("/home/javi/projects") { eprintln!("{}", e) }
 
         // Create the core launcher
         let launcher = WaycastLauncher::new()

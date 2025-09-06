@@ -22,5 +22,5 @@ pub fn get_files_with_extension<P: AsRef<Path>>(
         files.push(f);
     }
 
-    return Ok(files);
+    Ok(files)
 }

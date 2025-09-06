@@ -142,12 +142,10 @@ impl GtkLauncherUI {
                             Image::from_icon_name("application-x-executable")
                         }
                     }
+                } else if let Some(default) = find_icon_file("vscode", "48", &icon_theme) {
+                    image = gtk::Image::from_file(default);
                 } else {
-                    if let Some(default) = find_icon_file("vscode", "48", &icon_theme) {
-                        image = gtk::Image::from_file(default);
-                    } else {
-                        image = Image::from_icon_name("application-x-executable");
-                    }
+                    image = Image::from_icon_name("application-x-executable");
                 }
                 image.set_pixel_size(icon_size);
                 image.set_widget_name("item-icon");
@@ -428,7 +426,7 @@ fn find_icon_file(
             for cat in &categories {
                 let path = base
                     .join(icon_theme.theme_name())
-                    .join(if !(size == "scalable".to_string()) {
+                    .join(if (size != "scalable") {
                         format!("{}x{}", size, size)
                     } else {
                         size.to_string()
@@ -446,7 +444,7 @@ fn find_icon_file(
             for cat in &categories {
                 let path = base
                     .join("hicolor")
-                    .join(if !(size == "scalable".to_string()) {
+                    .join(if (size != "scalable") {
                         format!("{}x{}", size, size)
                     } else {
                         size.to_string()
