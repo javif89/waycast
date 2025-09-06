@@ -154,7 +154,7 @@ impl PluginConfig {
             quote! {}
         };
 
-        // Generate default_list method
+        // Generate default_list method only if explicitly specified in config
         let default_list_method = if let Some(ref default_list_fn) = self.default_list_fn {
             quote! {
                 fn default_list(&self) -> Vec<Box<dyn waycast_core::LauncherListItem>> {
@@ -162,14 +162,11 @@ impl PluginConfig {
                 }
             }
         } else {
-            quote! {
-                fn default_list(&self) -> Vec<Box<dyn waycast_core::LauncherListItem>> {
-                    Vec::new()
-                }
-            }
+            // Don't generate default_list method - user must implement it themselves
+            quote! {}
         };
 
-        // Generate filter method
+        // Generate filter method only if explicitly specified in config
         let filter_method = if let Some(ref filter_fn) = self.filter_fn {
             quote! {
                 fn filter(&self, query: &str) -> Vec<Box<dyn waycast_core::LauncherListItem>> {
@@ -177,11 +174,8 @@ impl PluginConfig {
                 }
             }
         } else {
-            quote! {
-                fn filter(&self, query: &str) -> Vec<Box<dyn waycast_core::LauncherListItem>> {
-                    Vec::new()
-                }
-            }
+            // Don't generate filter method - user must implement it themselves
+            quote! {}
         };
 
         quote! {

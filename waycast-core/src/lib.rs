@@ -26,7 +26,10 @@ pub trait LauncherPlugin {
     // Only search/use this plugin if the prefix was typed
     fn by_prefix_only(&self) -> bool;
     // Actual item searching functions
-    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>>;
+    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>> {
+        // Default empty list - plugins can override this
+        Vec::new()
+    }
     fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>>;
 }
 

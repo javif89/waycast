@@ -192,9 +192,7 @@ impl LauncherPlugin for FileSearchPlugin {
         name: "Files",
         priority: 500,
         description: "Search and open files",
-        prefix: "f",
-        default_list: file_search_default_list,
-        filter: file_search_filter
+        prefix: "f"
     }
     
     fn init(&self) {
@@ -214,33 +212,31 @@ impl LauncherPlugin for FileSearchPlugin {
             });
         });
     }
-}
 
-fn file_search_default_list(_plugin: &FileSearchPlugin) -> Vec<Box<dyn LauncherListItem>> {
-    Vec::new()
-}
+    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+        if query.is_empty() {
+            return self.default_list();
+        }
 
-fn file_search_filter(plugin: &FileSearchPlugin, query: &str) -> Vec<Box<dyn LauncherListItem>> {
-    if query.is_empty() {
-        return file_search_default_list(plugin);
-    }
+        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
 
-    let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-
-    // Try to get files without blocking - if indexing is still in progress, return empty
-    if let Ok(files) = plugin.files.try_lock() {
-        for f in files.iter() {
-            if let Some(file_name) = f.path.file_name() {
-                let cmp = file_name.to_string_lossy().to_lowercase();
-                if cmp.contains(&query.to_lowercase()) {
-                    entries.push(Box::new(f.clone()));
+        // Try to get files without blocking - if indexing is still in progress, return empty
+        if let Ok(files) = self.files.try_lock() {
+            for f in files.iter() {
+                if let Some(file_name) = f.path.file_name() {
+                    let cmp = file_name.to_string_lossy().to_lowercase();
+                    if cmp.contains(&query.to_lowercase()) {
+                        entries.push(Box::new(f.clone()));
+                    }
                 }
             }
         }
-    }
 
-    entries
+        entries
+    }
 }
+
+
 
 
 pub fn new() -> FileSearchPlugin {

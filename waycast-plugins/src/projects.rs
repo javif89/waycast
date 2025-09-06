@@ -81,28 +81,26 @@ impl LauncherPlugin for ProjectsPlugin {
         name: "Projects",
         priority: 800,
         description: "Search and open code projects",
-        prefix: "proj",
-        default_list: projects_default_list,
-        filter: projects_filter
+        prefix: "proj"
     }
-    
+
     fn init(&self) {
         let files_clone = Arc::clone(&self.files);
         let search_paths = self.search_paths.clone();
         let skip_dirs = self.skip_dirs.clone();
-        
+
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
                 let mut project_entries = Vec::new();
-                
+
                 for search_path in &search_paths {
                     if let Ok(entries) = fs::read_dir(search_path) {
                         for entry in entries.flatten() {
                             if let Ok(file_type) = entry.file_type() {
                                 if file_type.is_dir() {
                                     let path = entry.path();
-                                    
+
                                     // Skip hidden directories (starting with .)
                                     if let Some(file_name) = path.file_name() {
                                         if let Some(name_str) = file_name.to_str() {
@@ -110,12 +108,12 @@ impl LauncherPlugin for ProjectsPlugin {
                                             if name_str.starts_with('.') {
                                                 continue;
                                             }
-                                            
+
                                             // Skip directories in skip list
                                             if should_skip_dir(name_str, &skip_dirs) {
                                                 continue;
                                             }
-                                            
+
                                             project_entries.push(ProjectEntry { path });
                                         }
                                     }
@@ -124,43 +122,38 @@ impl LauncherPlugin for ProjectsPlugin {
                         }
                     }
                 }
-                
+
                 // Update the shared files collection
                 let mut files_guard = files_clone.lock().await;
                 *files_guard = project_entries;
-                
+
                 println!("Projects plugin: Found {} projects", files_guard.len());
             });
         });
     }
-}
 
-fn projects_default_list(_plugin: &ProjectsPlugin) -> Vec<Box<dyn LauncherListItem>> {
-    Vec::new()
-}
+    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+        if query.is_empty() {
+            return self.default_list();
+        }
 
-fn projects_filter(plugin: &ProjectsPlugin, query: &str) -> Vec<Box<dyn LauncherListItem>> {
-    if query.is_empty() {
-        return projects_default_list(plugin);
-    }
+        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
 
-    let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-
-    // Try to get files without blocking - if indexing is still in progress, return empty
-    if let Ok(files) = plugin.files.try_lock() {
-        for f in files.iter() {
-            if let Some(file_name) = f.path.file_name() {
-                let cmp = file_name.to_string_lossy().to_lowercase();
-                if cmp.contains(&query.to_lowercase()) {
-                    entries.push(Box::new(f.clone()));
+        // Try to get files without blocking - if indexing is still in progress, return empty
+        if let Ok(files) = self.files.try_lock() {
+            for f in files.iter() {
+                if let Some(file_name) = f.path.file_name() {
+                    let cmp = file_name.to_string_lossy().to_lowercase();
+                    if cmp.contains(&query.to_lowercase()) {
+                        entries.push(Box::new(f.clone()));
+                    }
                 }
             }
         }
+
+        entries
     }
-
-    entries
 }
-
 
 pub fn new() -> ProjectsPlugin {
     ProjectsPlugin {
