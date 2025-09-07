@@ -18,7 +18,7 @@
         # pkgs = nixpkgs.legacyPackages.${system};
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [self.overlay];
+          overlays = [ self.overlay ];
         };
       in
       {
@@ -96,9 +96,9 @@
       }
     );
 
-    overlay = final: prev: {
-      waycast = self.packages.${final.system}.default;
-    };
+  overlay = final: prev: {
+    waycast = self.packages.${final.system}.default;
+  };
 
-    homeManagerModules.waycast = import ./modules/home-manager/waycast.nix
+  homeManagerModules.waycast = import ./modules/home-manager/waycast.nix;
 }
