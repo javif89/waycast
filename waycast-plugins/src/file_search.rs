@@ -179,7 +179,6 @@ impl FileSearchPlugin {
             println!("Sup");
 
             for path in &self.search_paths {
-                println!("Scanning: {}", path.display());
                 let walker = WalkDir::new(path).into_iter();
                 for entry in walker
                     .filter_entry(|e| {
