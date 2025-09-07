@@ -1,0 +1,89 @@
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+with lib;
+
+let
+  cfg = config.programs.waycast;
+
+  # Convert a Nix attribute set to TOML format
+  toToml = value: pkgs.formats.toml { }.generate "waycast.toml" value;
+
+in
+{
+  options.programs.waycast = {
+    enable = mkEnableOption "waycast application launcher";
+
+    package = mkOption {
+      type = types.package;
+      default = pkgs.waycast or (throw "waycast package not found in pkgs");
+      description = "The waycast package to use";
+    };
+
+    settings = mkOption {
+      type = types.attrs;
+      default = { };
+      example = literalExpression ''
+        {
+          plugins = {
+            projects = {
+              search_paths = [ "~/code" "~/projects" ];
+              skip_dirs = [ "node_modules" "target" ".git" ];
+              open_command = "code -n {path}";
+            };
+            file_search = {
+              search_paths = [ "~/Documents" "~/Downloads" ];
+              ignore_dirs = [ "cache" "vendor" ];
+            };
+          };
+        }
+      '';
+      description = ''
+        Waycast configuration. This will be converted to TOML format
+        and placed in ~/.config/waycast/waycast.toml
+      '';
+    };
+
+    css = mkOption {
+      type = types.nullOr types.lines;
+      default = null;
+      example = ''
+        window {
+          background: rgba(0, 0, 0, 0.8);
+          border-radius: 12px;
+        }
+
+        .search-entry {
+          font-size: 16px;
+          padding: 12px;
+        }
+      '';
+      description = ''
+        Custom GTK CSS styling for waycast.
+        This will be placed in ~/.config/waycast/waycast.css
+      '';
+    };
+  };
+
+  config = mkIf cfg.enable {
+    home.packages = [ cfg.package ];
+
+    xdg.configFile = mkMerge [
+      (mkIf (cfg.config != { }) {
+        "waycast/waycast.toml".source = toToml cfg.config;
+      })
+
+      (mkIf (cfg.css != null) {
+        "waycast/waycast.css".text = cfg.css;
+      })
+    ];
+
+    # Ensure cache and data dirs exist to avoid runtime errors in the future
+    home.file."${config.xdg.cacheHome}/waycast".isDir = true;
+    home.file."${config.xdg.dataHome}/waycast".isDir = true;
+  };
+}

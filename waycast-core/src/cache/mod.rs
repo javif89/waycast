@@ -50,7 +50,7 @@ pub fn get() -> &'static Cache {
 
 // Get an existing cache at the given path or
 // create it if it doesn't exist
-fn new<P: AsRef<Path>>(db_path: P) -> Result<Cache, CacheError> {
+pub fn new<P: AsRef<Path>>(db_path: P) -> Result<Cache, CacheError> {
     let db = Database::create(db_path)?;
 
     // Initialize the table if it doesn't exist
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn test_cache_remember() {
         let temp_file = NamedTempFile::new().unwrap();
-        let cache = Cache::new(temp_file.path()).unwrap();
+        let cache = new(temp_file.path()).unwrap();
 
         let result = cache
             .remember("test_key", || "computed_value".to_string())
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn test_cache_ttl() {
         let temp_file = NamedTempFile::new().unwrap();
-        let cache = Cache::new(temp_file.path()).unwrap();
+        let cache = new(temp_file.path()).unwrap();
 
         // Cache with very short TTL
         let result = cache
