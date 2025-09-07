@@ -176,6 +176,7 @@ impl FileSearchPlugin {
 
         let scan_task = async move {
             let mut local_files = Vec::new();
+            println!("Sup");
 
             for path in &self.search_paths {
                 println!("Scanning: {}", path.display());
@@ -183,7 +184,7 @@ impl FileSearchPlugin {
                 for entry in walker
                     .filter_entry(|e| {
                         !skip_hidden(e)
-                            && skip_dirs_clone.contains(e.file_name().to_string_lossy().as_ref())
+                            && !skip_dirs_clone.contains(e.file_name().to_string_lossy().as_ref())
                     })
                     .filter_map(|e| e.ok())
                 {
