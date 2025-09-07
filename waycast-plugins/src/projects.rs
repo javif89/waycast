@@ -21,7 +21,7 @@ use waycast_macros::{launcher_entry, plugin};
 #[derive(Clone)]
 pub struct ProjectEntry {
     path: PathBuf,
-    exec_command: String,
+    exec_command: Arc<str>,
 }
 
 impl LauncherListItem for ProjectEntry {
@@ -33,13 +33,21 @@ impl LauncherListItem for ProjectEntry {
             String::from("vscode")
         },
         execute: {
-            // Use xdg-open directly since it works properly with music files
-            match Command::new("code").arg("-n").arg(&self.path).spawn() {
-                Ok(_) => {
-                    println!("Successfully opened with code");
-                    Ok(())
+            let project_path = self.path.to_string_lossy().to_string();
+            let exec_cmd = self.exec_command.replace("{path}", &project_path);
+            let parts: Vec<&str> = exec_cmd.split_whitespace().collect();
+            if let Some((program, args)) = parts.split_first() {
+                let mut cmd = Command::new(program);
+                cmd.args(args);
+                match cmd.spawn() {
+                    Ok(_) => {
+                        println!("Successfully opened with code");
+                        Ok(())
+                    }
+                    Err(_) => Err(LaunchError::CouldNotLaunch("Failed to open project folder".into())),
                 }
-                Err(_) => Err(LaunchError::CouldNotLaunch("Failed to open project folder".into())),
+            } else {
+                Err(LaunchError::CouldNotLaunch("No program found in exec_command".into()))
             }
         }
     }
@@ -87,7 +95,7 @@ impl LauncherPlugin for ProjectsPlugin {
         let files_clone = Arc::clone(&self.files);
         let search_paths = self.search_paths.clone();
         let skip_dirs = self.skip_dirs.clone();
-        let exec_command = self.open_command.clone();
+        let exec_command = Arc::from(self.open_command.as_str());
 
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -116,7 +124,7 @@ impl LauncherPlugin for ProjectsPlugin {
 
                                             project_entries.push(ProjectEntry {
                                                 path,
-                                                exec_command: exec_command.clone(),
+                                                exec_command: Arc::clone(&exec_command),
                                             });
                                         }
                                     }
