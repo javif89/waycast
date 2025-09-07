@@ -7,6 +7,7 @@
 // and I'll just regex in the path.
 // TODO: Project type detection and icon
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -20,6 +21,7 @@ use waycast_macros::{launcher_entry, plugin};
 #[derive(Clone)]
 pub struct ProjectEntry {
     path: PathBuf,
+    exec_command: String,
 }
 
 impl LauncherListItem for ProjectEntry {
@@ -44,8 +46,9 @@ impl LauncherListItem for ProjectEntry {
 }
 
 pub struct ProjectsPlugin {
-    search_paths: Vec<PathBuf>,
-    skip_dirs: Vec<String>,
+    search_paths: HashSet<PathBuf>,
+    skip_dirs: HashSet<String>,
+    open_command: String,
     // Running list of files in memory
     files: Arc<Mutex<Vec<ProjectEntry>>>,
 }
@@ -62,18 +65,14 @@ impl ProjectsPlugin {
             return Err(format!("Path is not a directory: {}", p.display()));
         }
 
-        self.search_paths.push(p.to_path_buf());
+        self.search_paths.insert(p.to_path_buf());
         Ok(())
     }
 
     pub fn add_skip_dir(&mut self, directory_name: String) -> Result<(), String> {
-        self.skip_dirs.push(directory_name);
+        self.skip_dirs.insert(directory_name);
         Ok(())
     }
-}
-
-fn should_skip_dir(dir_name: &str, skip_dirs: &[String]) -> bool {
-    skip_dirs.iter().any(|skip| skip == dir_name)
 }
 
 impl LauncherPlugin for ProjectsPlugin {
@@ -88,6 +87,7 @@ impl LauncherPlugin for ProjectsPlugin {
         let files_clone = Arc::clone(&self.files);
         let search_paths = self.search_paths.clone();
         let skip_dirs = self.skip_dirs.clone();
+        let exec_command = self.open_command.clone();
 
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -110,11 +110,14 @@ impl LauncherPlugin for ProjectsPlugin {
                                             }
 
                                             // Skip directories in skip list
-                                            if should_skip_dir(name_str, &skip_dirs) {
+                                            if skip_dirs.contains(name_str) {
                                                 continue;
                                             }
 
-                                            project_entries.push(ProjectEntry { path });
+                                            project_entries.push(ProjectEntry {
+                                                path,
+                                                exec_command: exec_command.clone(),
+                                            });
                                         }
                                     }
                                 }
@@ -155,17 +158,31 @@ impl LauncherPlugin for ProjectsPlugin {
     }
 }
 
+// fn get_config_value<T>(key: &str) -> Result<T> {
+//     waycast_config::config_file().get::<T>(format!("plugins.projects.{}", key))
+// }
+
 pub fn new() -> ProjectsPlugin {
+    let search_paths =
+        match waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths") {
+            Ok(paths) => paths,
+            Err(_) => HashSet::new(),
+        };
+
+    let skip_dirs = match waycast_config::get::<HashSet<String>>("plugins.projects.skip_dirs") {
+        Ok(paths) => paths,
+        Err(_) => HashSet::new(),
+    };
+
+    let open_command = match waycast_config::get::<String>("plugins.projects.open_command") {
+        Ok(cmd) => cmd,
+        Err(_) => String::from("code -n {path}"),
+    };
+
     ProjectsPlugin {
-        search_paths: Vec::new(),
-        skip_dirs: vec![
-            String::from("vendor"),
-            String::from("node_modules"),
-            String::from("cache"),
-            String::from("zig-cache"),
-            String::from(".git"),
-            String::from(".svn"),
-        ],
+        search_paths,
+        skip_dirs,
+        open_command,
         files: Arc::new(Mutex::new(Vec::new())),
     }
 }

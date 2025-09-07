@@ -12,22 +12,11 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
-        let mut file_search_plugin = waycast_plugins::file_search::new();
-
-        if let Err(e) = file_search_plugin.add_search_path("/home/javi/working-files/DJ Music/") {
-            eprintln!("{}", e)
-        }
-
-        let mut project_plugin = waycast_plugins::projects::new();
-        if let Err(e) = project_plugin.add_search_path("/home/javi/projects") {
-            eprintln!("{}", e)
-        }
-
         // Create the core launcher
         let launcher = WaycastLauncher::new()
             .add_plugin(Box::new(waycast_plugins::drun::new()))
-            .add_plugin(Box::new(file_search_plugin))
-            .add_plugin(Box::new(project_plugin))
+            .add_plugin(Box::new(waycast_plugins::file_search::new()))
+            .add_plugin(Box::new(waycast_plugins::projects::new()))
             .init();
 
         // Create and show the GTK UI

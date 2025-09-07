@@ -4,3 +4,4 @@
 # direnv cache (should not be committed)
 .direnv/
 waycast_cache
+waycast.toml

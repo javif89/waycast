@@ -1,13 +1,14 @@
 use directories::UserDirs;
 use gio::prelude::FileExt;
 use glib::object::Cast;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
-use waycast_macros::{plugin, launcher_entry};
+use waycast_macros::{launcher_entry, plugin};
 
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 
@@ -72,9 +73,9 @@ impl LauncherListItem for FileEntry {
     }
 }
 
-pub fn default_search_list() -> Vec<PathBuf> {
+pub fn default_search_list() -> HashSet<PathBuf> {
     if let Some(ud) = UserDirs::new() {
-        let mut paths: Vec<PathBuf> = Vec::new();
+        let mut paths: HashSet<PathBuf> = HashSet::new();
         let user_dirs = [
             ud.document_dir(),
             ud.picture_dir(),
@@ -83,18 +84,27 @@ pub fn default_search_list() -> Vec<PathBuf> {
         ];
 
         for path in user_dirs.into_iter().flatten() {
-            paths.push(path.to_path_buf());
+            paths.insert(path.to_path_buf());
         }
 
         return paths;
     }
 
-    Vec::new()
+    HashSet::new()
+}
+
+pub fn default_skip_list() -> HashSet<String> {
+    HashSet::from([
+        String::from("vendor"),
+        String::from("node_modules"),
+        String::from("cache"),
+        String::from("zig-cache"),
+    ])
 }
 
 pub struct FileSearchPlugin {
-    search_paths: Vec<PathBuf>,
-    skip_dirs: Vec<String>,
+    search_paths: HashSet<PathBuf>,
+    skip_dirs: HashSet<String>,
     // Running list of files in memory
     files: Arc<Mutex<Vec<FileEntry>>>,
 }
@@ -107,14 +117,24 @@ impl Default for FileSearchPlugin {
 
 impl FileSearchPlugin {
     pub fn new() -> Self {
+        let mut search_paths = default_search_list();
+        let mut skip_dirs = default_skip_list();
+
+        if let Ok(paths) =
+            waycast_config::config_file().get::<Vec<PathBuf>>("plugins.file_search.search_paths")
+        {
+            search_paths.extend(paths);
+        }
+
+        if let Ok(paths) =
+            waycast_config::config_file().get::<Vec<String>>("plugins.file_search.ignore_dirs")
+        {
+            skip_dirs.extend(paths);
+        }
+
         FileSearchPlugin {
-            search_paths: default_search_list(),
-            skip_dirs: vec![
-                String::from("vendor"),
-                String::from("node_modules"),
-                String::from("cache"),
-                String::from("zig-cache"),
-            ],
+            search_paths,
+            skip_dirs,
             files: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -130,12 +150,12 @@ impl FileSearchPlugin {
             return Err(format!("Path is not a directory: {}", p.display()));
         }
 
-        self.search_paths.push(p.to_path_buf());
+        self.search_paths.insert(p.to_path_buf());
         Ok(())
     }
 
     pub fn add_skip_dir(&mut self, directory_name: String) -> Result<(), String> {
-        self.skip_dirs.push(directory_name);
+        self.skip_dirs.insert(directory_name);
         Ok(())
     }
 
@@ -143,13 +163,27 @@ impl FileSearchPlugin {
         let files_clone = Arc::clone(&self.files);
         let skip_dirs_clone = self.skip_dirs.clone();
 
+        println!("File search");
+        println!("---Scanning directories---");
+        for p in &self.search_paths {
+            println!("{}", p.display());
+        }
+
+        println!("---Skipping directories---");
+        for p in &self.skip_dirs {
+            println!("{}", p);
+        }
+
         let scan_task = async move {
             let mut local_files = Vec::new();
 
             for path in &self.search_paths {
                 let walker = WalkDir::new(path).into_iter();
                 for entry in walker
-                    .filter_entry(|e| !skip_hidden(e) && !skip_dir(e, &skip_dirs_clone))
+                    .filter_entry(|e| {
+                        !skip_hidden(e)
+                            && skip_dirs_clone.contains(e.file_name().to_string_lossy().as_ref())
+                    })
                     .filter_map(|e| e.ok())
                 {
                     if entry.path().is_file() {
@@ -183,14 +217,6 @@ fn skip_hidden(entry: &DirEntry) -> bool {
         .unwrap_or(false)
 }
 
-fn skip_dir(entry: &DirEntry, dirs: &Vec<String>) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|n| dirs.contains(&String::from(n)))
-        .unwrap_or(false)
-}
-
 impl LauncherPlugin for FileSearchPlugin {
     plugin! {
         name: "Files",
@@ -198,7 +224,7 @@ impl LauncherPlugin for FileSearchPlugin {
         description: "Search and open files",
         prefix: "f"
     }
-    
+
     fn init(&self) {
         // Start async file scanning with 2000ms timeout
         let self_clone = FileSearchPlugin {
@@ -239,9 +265,6 @@ impl LauncherPlugin for FileSearchPlugin {
         entries
     }
 }
-
-
-
 
 pub fn new() -> FileSearchPlugin {
     FileSearchPlugin::new()

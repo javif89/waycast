@@ -2,7 +2,8 @@
 members = [
     "waycast-core",
     "waycast-macros",
-    "waycast-plugins", 
-    "waycast-gtk"
+    "waycast-plugins",
+    "waycast-gtk",
+    "waycast-config",
 ]
 resolver = "2"
