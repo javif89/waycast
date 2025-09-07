@@ -33,7 +33,19 @@ pub struct Cache {
 }
 
 pub fn get() -> &'static Cache {
-    CACHE_SINGLETON.get_or_init(|| new("waycast_cache").expect("Failed to initialize cache :("))
+    CACHE_SINGLETON.get_or_init(|| {
+        let cache_path = waycast_config::cache_path("waycast_cache.db")
+            .unwrap_or_else(|| std::env::current_dir().unwrap().join("waycast_cache.db"));
+        
+        // Ensure cache directory exists
+        if let Some(parent) = cache_path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                eprintln!("Warning: Failed to create cache directory {}: {}", parent.display(), e);
+            }
+        }
+        
+        new(cache_path).expect("Failed to initialize cache :(")
+    })
 }
 
 // Get an existing cache at the given path or
