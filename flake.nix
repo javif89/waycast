@@ -19,7 +19,7 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [self.overlay];
-        }
+        };
       in
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
