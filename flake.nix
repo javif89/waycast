@@ -1,5 +1,5 @@
 {
-  description = "Waycast - GTK4-based application launcher for Wayland compositors";
+  description = "Waycast - application launcher for Wayland compositors";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -15,7 +15,11 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        # pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [self.overlay];
+        }
       in
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
@@ -89,18 +93,12 @@
             adwaita-icon-theme
           ];
         };
-
-        homeManagerModules.waycast =
-          {
-            config,
-            lib,
-            pkgs,
-            ...
-          }:
-          {
-            imports = [ ./modules/home-manager/waycast.nix ];
-            programs.waycast.package = self.packages.${system}.default;
-          };
       }
     );
+
+    overlay = final: prev: {
+      waycast = self.packages.${final.system}.default;
+    };
+
+    homeManagerModules.waycast = import ./modules/home-manager/waycast.nix
 }
