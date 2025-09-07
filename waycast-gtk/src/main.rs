@@ -27,10 +27,11 @@ fn main() {
             eprintln!("Warning: Could not apply default styles: {}", e);
         }
 
-        // Optionally apply user CSS overrides
-        // if let Err(_) = ui.apply_css("waycast.css") {
-        //     // Silently ignore if user hasn't provided custom CSS
-        // }
+        if let Some(path) = waycast_config::config_path("waycast.css") {
+            if let Err(_) = ui.apply_css(path) {
+                println!("No user css found");
+            }
+        }
 
         ui.show();
     });

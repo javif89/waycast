@@ -10,6 +10,7 @@ path = "src/main.rs"
 [dependencies]
 waycast-core = { path = "../waycast-core" }
 waycast-plugins = { path = "../waycast-plugins" }
+waycast-config = { path = "../waycast-config" }
 gio = "0.21.1"
 glib = "0.21.1"
 gtk = { version = "0.10.0", package = "gtk4" }

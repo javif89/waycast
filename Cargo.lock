@@ -1473,6 +1473,7 @@ dependencies = [
  "gtk4-layer-shell",
  "redb",
  "serde",
+ "waycast-config",
  "waycast-core",
  "waycast-plugins",
 ]
