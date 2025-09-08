@@ -6,7 +6,8 @@ let
   cfg = config.programs.waycast;
 
   # Convert a Nix attribute set to TOML format
-  toToml = value: pkgs.formats.toml { }.generate "waycast.toml" value;
+  tomlFormat = pkgs.formats.toml { };
+  toToml = value: tomlFormat.generate "waycast.toml" value;
 
 in
 {
