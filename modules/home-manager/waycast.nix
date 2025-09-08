@@ -1,9 +1,5 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ pkgs, waycastPackage }:
+{ config, lib, ... }:
 
 with lib;
 
@@ -20,7 +16,7 @@ in
 
     package = mkOption {
       type = types.package;
-      default = pkgs.waycast or (throw "waycast package not found in pkgs");
+      default = waycastPackage;
       description = "The waycast package to use";
     };
 
@@ -73,8 +69,8 @@ in
     home.packages = [ cfg.package ];
 
     xdg.configFile = mkMerge [
-      (mkIf (cfg.config != { }) {
-        "waycast/waycast.toml".source = toToml cfg.config;
+      (mkIf (cfg.settings != { }) {
+        "waycast/waycast.toml".source = toToml cfg.settings;
       })
 
       (mkIf (cfg.css != null) {

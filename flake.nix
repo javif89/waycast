@@ -4,6 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    home-manager.url = "github:nix-community/home-manager";
   };
 
   outputs =
@@ -11,14 +12,14 @@
       self,
       nixpkgs,
       flake-utils,
+      home-manager,
     }:
-    flake-utils.lib.eachDefaultSystem (
+    (flake-utils.lib.eachDefaultSystem (
       system:
       let
         # pkgs = nixpkgs.legacyPackages.${system};
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ self.overlay ];
         };
       in
       {
@@ -93,12 +94,15 @@
             adwaita-icon-theme
           ];
         };
+
+        overlays.default = final: prev: {
+          waycast = self.packages.${system}.default;
+        };
       }
-    );
-
-  overlay = final: prev: {
-    waycast = self.packages.${final.system}.default;
-  };
-
-  homeManagerModules.waycast = import ./modules/home-manager/waycast.nix;
+    )) // {
+      homeManagerModules.default = { pkgs, ... }: import ./modules/home-manager/waycast.nix {
+        inherit pkgs;
+        waycastPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      };
+    };
 }
