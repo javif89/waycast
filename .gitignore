@@ -7,3 +7,5 @@ waycast_cache
 waycast.toml
 # Using locally to test .config, .cache, and data dir
 xdg
+# For when I have to test nix builds
+result

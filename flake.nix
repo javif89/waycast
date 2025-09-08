@@ -39,6 +39,7 @@
           nativeBuildInputs = with pkgs; [
             pkg-config
             makeWrapper
+            wrapGAppsHook4
           ];
 
           buildInputs = with pkgs; [
@@ -56,10 +57,12 @@
             gtk4-layer-shell
           ];
 
-          # Wrap binary to ensure icon themes are available
-          postInstall = ''
-            wrapProgram $out/bin/waycast \
+          # wrapGAppsHook4 handles most GTK runtime setup automatically
+          # Just ensure icon themes are available
+          preFixup = ''
+            gappsWrapperArgs+=(
               --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share"
+            )
           '';
 
           meta = with pkgs.lib; {
