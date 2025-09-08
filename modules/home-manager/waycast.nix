@@ -78,7 +78,7 @@ in
     ];
 
     # Ensure cache and data dirs exist to avoid runtime errors in the future
-    home.file."${config.xdg.cacheHome}/waycast".isDir = true;
-    home.file."${config.xdg.dataHome}/waycast".isDir = true;
+    home.file."${config.xdg.cacheHome}/waycast/.keep".text = "";
+    home.file."${config.xdg.dataHome}/waycast/.keep".text = "";
   };
 }
