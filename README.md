@@ -70,37 +70,42 @@ Add to your `flake.nix` inputs:
 waycast.url = "git+https://gitgud.foo/thegrind/waycast";
 ```
 
-**Install as package:**
+Add the overlay and Home Manager module:
 ```nix
-environment.systemPackages = [ inputs.waycast.packages.${system}.default ];
-# or for home-manager:
-home.packages = [ inputs.waycast.packages.${system}.default ];
+nixpkgs.overlays = [ inputs.waycast.overlays.default ];
+
+home-manager.users.youruser = {
+  imports = [ inputs.waycast.homeManagerModules.default ];
+  
+  programs.waycast = {
+    enable = true;
+    settings = {
+      plugins.projects = {
+        search_paths = ["/absolute/path/to/search"];
+        skip_dirs = [ "node_modules" "target" ".git" ];
+        open_command = "code -n {path}";
+      };
+      plugins.file_search = {
+        search_paths = ["/absolute/path/to/search"];
+        ignore_dirs = ["scripts", "temp"];
+      };
+    };
+    css = ''
+      window {
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 12px;
+      }
+    '';
+  };
+};
 ```
 
-**With Home Manager module (recommended):**
+**Just the package:**
 ```nix
-imports = [ inputs.waycast.homeManagerModules.default ];
-
-programs.waycast = {
-  enable = true;
-  config = {
-    plugins.projects = {
-      search_paths = ["/absolute/path/to/search"];
-      skip_dirs = [ "node_modules" "target" ".git" ];
-      open_command = "code -n {path}";
-    };
-    plugins.file_search = {
-      search_paths = ["/absolute/path/to/search"];
-      ignore_dirs = ["scripts", "temp"]; # Just directory names here
-    };
-  };
-  css = ''
-    window {
-      background: rgba(0, 0, 0, 0.8);
-      border-radius: 12px;
-    }
-  '';
-};
+nixpkgs.overlays = [ inputs.waycast.overlays.default ];
+environment.systemPackages = [ pkgs.waycast ];
+# or for home-manager:
+home.packages = [ pkgs.waycast ];
 ```
 
 ## Contributing

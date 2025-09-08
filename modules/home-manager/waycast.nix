@@ -1,5 +1,4 @@
-{ pkgs, waycastPackage }:
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -16,7 +15,7 @@ in
 
     package = mkOption {
       type = types.package;
-      default = waycastPackage;
+      default = pkgs.waycast;
       description = "The waycast package to use";
     };
 

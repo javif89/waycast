@@ -100,9 +100,6 @@
         };
       }
     )) // {
-      homeManagerModules.default = { pkgs, ... }: import ./modules/home-manager/waycast.nix {
-        inherit pkgs;
-        waycastPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
-      };
+      homeManagerModules.default = import ./modules/home-manager/waycast.nix;
     };
 }
