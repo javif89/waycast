@@ -95,11 +95,13 @@
           ];
         };
 
-        overlays.default = final: prev: {
-          waycast = self.packages.${system}.default;
-        };
+        # Move overlay outside system-specific outputs
       }
     )) // {
+      overlays.default = final: prev: {
+        waycast = self.packages.${final.stdenv.hostPlatform.system}.default;
+      };
+      
       homeManagerModules.default = import ./modules/home-manager/waycast.nix;
     };
 }
