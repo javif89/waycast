@@ -2390,6 +2390,8 @@ dependencies = [
  "directories",
  "gio",
  "glib",
+ "serde",
+ "serde_json",
  "tokei",
  "tokio",
  "walkdir",

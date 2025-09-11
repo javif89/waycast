@@ -1,10 +1,5 @@
-// TODO: Use the user's preferred editor.
-// This should just be in the config when I implement
-// that eventually since figuring out every editor's
-// launch option would be a pain. The user can just
-// configure launch_command and pass a parameter.
-// Example: code -n {path}
-// and I'll just regex in the path.
+pub mod framework_detector;
+pub mod type_scanner;
 // TODO: Project type detection and icon
 use std::{
     collections::HashSet,
