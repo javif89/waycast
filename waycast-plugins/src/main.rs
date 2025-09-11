@@ -5,7 +5,12 @@ use waycast_plugins::projects::{
     type_scanner::TypeScanner,
 };
 
+struct Project {
+    project_type: String,
+    path: PathBuf,
+}
 pub fn main() {
+    let mut projects: Vec<Project> = Vec::new();
     let scanner = TypeScanner::new();
     let framework_detector = FrameworkDetector::new();
     if let Ok(entries) = std::fs::read_dir(PathBuf::from("/home/javi/projects")) {
@@ -17,17 +22,25 @@ pub fn main() {
         {
             let fw = framework_detector.detect(e.path().to_string_lossy().to_string().as_str());
 
+            let mut project_type: String = String::from("NONE");
+
             if let Some(name) = fw {
-                println!("{}: {}", e.path().display(), name);
+                project_type = name;
             } else {
-                println!("{}: {}", e.path().display(), "NONE");
+                let langs = scanner.scan(e.path(), Some(1));
+                if let Some(l) = langs.first() {
+                    project_type = l.name.to_owned()
+                }
             }
-            // let langs = scanner.scan(e.path(), Some(3));
-            // // let langs = lang_breakdown(&[e.path().to_str().unwrap()], &[]);
 
-            // let top: Vec<String> = langs.iter().map(|l| l.name.to_owned()).collect();
-
-            // println!("{}: {:?}", e.path().display(), top);
+            projects.push(Project {
+                project_type,
+                path: e.path().to_path_buf(),
+            });
         }
+    }
+
+    for p in projects {
+        println!("{}: {}", p.path.display(), p.project_type);
     }
 }

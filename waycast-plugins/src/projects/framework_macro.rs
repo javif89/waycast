@@ -95,15 +95,19 @@ macro_rules! frameworks {
                         }
                     )?
                     
-                    // If we have files specified but no other checks, files existing means match
-                    #[allow(unreachable_code)]
+                    // If we reach here and ONLY files were specified (no other validation),
+                    // then files existing means it's a match
                     {
-                        $(
-                            $(
-                                let _ = $file; // Use the file variable to indicate files were specified
-                                return true;
-                            )*
-                        )?
+                        let has_other_checks = false
+                            $(|| { $(let _ = $dir;)* true })?  // has directories
+                            $(|| { $(let _ = ($json_file, $json_path);)* true })?  // has json_checks  
+                            $(|| { let _ = $custom_fn; true })?;  // has custom
+                        
+                        if !has_other_checks {
+                            // Only files specified - if we got this far, files exist so it's a match
+                            $($(let _ = $file; return true;)*)?
+                        }
+                        
                         false
                     }
                 }

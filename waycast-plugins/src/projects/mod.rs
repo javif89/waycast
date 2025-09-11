@@ -1,7 +1,6 @@
 pub mod framework_detector;
 pub mod framework_macro;
 pub mod type_scanner;
-// TODO: Project type detection and icon
 use std::{
     collections::HashSet,
     fs,
@@ -10,14 +9,24 @@ use std::{
     sync::Arc,
 };
 
+use std::sync::LazyLock;
 use tokio::sync::Mutex;
-use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
+use waycast_core::{
+    cache::{Cache, CacheTTL},
+    LaunchError, LauncherListItem, LauncherPlugin,
+};
 use waycast_macros::{launcher_entry, plugin};
+
+use crate::projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner};
+
+static TOKEI_SCANNER: LazyLock<TypeScanner> = LazyLock::new(TypeScanner::new);
+static FRAMEWORK_DETECTOR: LazyLock<FrameworkDetector> = LazyLock::new(FrameworkDetector::new);
 
 #[derive(Clone)]
 pub struct ProjectEntry {
     path: PathBuf,
     exec_command: Arc<str>,
+    project_type: Option<String>,
 }
 
 impl LauncherListItem for ProjectEntry {
@@ -26,6 +35,11 @@ impl LauncherListItem for ProjectEntry {
         title: String::from(self.path.file_name().unwrap().to_string_lossy()),
         description: Some(self.path.to_string_lossy().to_string()),
         icon: {
+            if let Some(t) = &self.project_type {
+                let icon_path = PathBuf::from("./devicons");
+                return icon_path.join(format!("{}.svg", t.to_lowercase())).to_string_lossy().to_string();
+            }
+
             String::from("vscode")
         },
         execute: {
@@ -118,9 +132,13 @@ impl LauncherPlugin for ProjectsPlugin {
                                                 continue;
                                             }
 
+                                            let project_type = detect_project_type(
+                                                path.to_string_lossy().to_string().as_str(),
+                                            );
                                             project_entries.push(ProjectEntry {
                                                 path,
                                                 exec_command: Arc::clone(&exec_command),
+                                                project_type,
                                             });
                                         }
                                     }
@@ -137,6 +155,19 @@ impl LauncherPlugin for ProjectsPlugin {
                 println!("Projects plugin: Found {} projects", files_guard.len());
             });
         });
+    }
+
+    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>> {
+        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
+
+        // Try to get files without blocking - if indexing is still in progress, return empty
+        if let Ok(files) = self.files.try_lock() {
+            for f in files.iter() {
+                entries.push(Box::new(f.clone()));
+            }
+        }
+
+        entries
     }
 
     fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
@@ -162,10 +193,6 @@ impl LauncherPlugin for ProjectsPlugin {
     }
 }
 
-// fn get_config_value<T>(key: &str) -> Result<T> {
-//     waycast_config::config_file().get::<T>(format!("plugins.projects.{}", key))
-// }
-
 pub fn new() -> ProjectsPlugin {
     let search_paths =
         match waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths") {
@@ -189,4 +216,32 @@ pub fn new() -> ProjectsPlugin {
         open_command,
         files: Arc::new(Mutex::new(Vec::new())),
     }
+}
+
+fn detect_project_type(path: &str) -> Option<String> {
+    let cache_key = format!("project_type:{}", path);
+    let cache = waycast_core::cache::get();
+
+    let detect_fn = |path| {
+        let fw = FRAMEWORK_DETECTOR.detect(path);
+        if let Some(name) = fw {
+            return Some(name);
+        } else {
+            let langs = TOKEI_SCANNER.scan(path, Some(1));
+            if let Some(l) = langs.first() {
+                return Some(l.name.to_owned());
+            }
+        }
+
+        None
+    };
+
+    let result: Result<Option<String>, waycast_core::cache::errors::CacheError> =
+        cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || detect_fn(path));
+
+    if let Ok(project_type) = result {
+        return project_type;
+    }
+
+    detect_fn(path)
 }
