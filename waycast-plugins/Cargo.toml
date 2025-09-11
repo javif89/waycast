@@ -18,6 +18,7 @@ tokio = { version = "1.0", features = [
     "sync",
 ] }
 walkdir = "2.5.0"
+tokei = "12.1.2"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(rust_analyzer)'] }

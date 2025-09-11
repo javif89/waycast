@@ -157,3 +157,9 @@ docs: ## Build and open documentation
 tools: ## Install useful development tools
 	cargo install cargo-watch cargo-audit cargo-machete cargo-flamegraph cargo-deb cargo-outdated
 	@echo "Development tools installed!"
+
+nix-install:
+	nix profile install .
+
+nix-reinstall:
+	nix profile install --reinstall .
