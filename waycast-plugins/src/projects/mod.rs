@@ -1,4 +1,5 @@
 pub mod framework_detector;
+pub mod framework_macro;
 pub mod type_scanner;
 // TODO: Project type detection and icon
 use std::{
