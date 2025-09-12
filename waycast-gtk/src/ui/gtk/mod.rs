@@ -468,7 +468,6 @@ fn find_icon_file(
     size: &str,
     icon_theme: &IconTheme,
 ) -> Option<std::path::PathBuf> {
-    println!("Icon: {}", icon_name);
     let cache_key = format!("icon:{}:{}", icon_name, size);
     let cache = waycast_core::cache::get();
 
@@ -488,6 +487,11 @@ fn search_for_icon(
     size: &str,
     icon_theme: &IconTheme,
 ) -> Option<std::path::PathBuf> {
+    // Before doing everything below, check if it's a path
+    if Path::new(icon_name).exists() {
+        return Some(PathBuf::from(icon_name));
+    }
+
     let pixmap_paths: Vec<PathBuf> = icon_theme
         .search_path()
         .into_iter()

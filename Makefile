@@ -157,3 +157,13 @@ docs: ## Build and open documentation
 tools: ## Install useful development tools
 	cargo install cargo-watch cargo-audit cargo-machete cargo-flamegraph cargo-deb cargo-outdated
 	@echo "Development tools installed!"
+
+devicon-theme:
+	rm -rf ./devicons
+	mkdir -p ./devicons
+	devicon remix -t framework,language -o ./devicons --variant original --fallback plain
+	devicon get nixos -o ./devicons
+	devicon get bash -o ./devicons
+	devicon get ansible -o ./devicons
+	cp devicons/nixos.svg devicons/nix.svg
+	cp devicons/bash.svg devicons/shell.svg

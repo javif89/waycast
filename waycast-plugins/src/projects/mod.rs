@@ -229,7 +229,9 @@ fn detect_project_type(path: &str) -> Option<String> {
         } else {
             let langs = TOKEI_SCANNER.scan(path, Some(1));
             if let Some(l) = langs.first() {
-                return Some(l.name.to_owned());
+                // We do some special replacements so it's easier to match
+                // with the icon file names
+                return Some(l.name.to_owned().replace("+", "plus").replace("#", "sharp"));
             }
         }
 
