@@ -34,7 +34,7 @@ build-plugins: ## Build plugins only
 	cargo build -p waycast-plugins
 
 # Release builds
-release: ## Build waycast GUI (optimized)
+build-release: ## Build waycast GUI (optimized)
 	cargo build -p waycast-gtk --release
 
 release-all: ## Build all crates (optimized)
@@ -96,34 +96,6 @@ clean-all: clean ## Deep clean (including cache)
 	rm -rf target/
 	rm -rf ~/.cargo/registry/cache/
 
-# Future: Packaging & Distribution
-deb: release ## Build Debian package (future)
-	@echo "Debian packaging not yet implemented"
-	# Use cargo-deb when ready
-
-rpm: release ## Build RPM package (future)
-	@echo "RPM packaging not yet implemented"
-	# Use cargo-rpm when ready
-
-flatpak: release ## Build Flatpak (future)
-	@echo "Flatpak packaging not yet implemented"
-
-# Future: System Integration
-enable-daemon: ## Enable waycast daemon service (future)
-	@echo "Daemon service not yet implemented"
-	# systemctl --user enable waycast-daemon
-
-disable-daemon: ## Disable waycast daemon service (future)
-	@echo "Daemon service not yet implemented"
-	# systemctl --user disable waycast-daemon
-
-# Docker (for CI/testing)
-docker-build: ## Build in Docker container
-	docker build -t waycast-build .
-
-docker-test: ## Test in Docker container
-	docker run --rm waycast-build make test
-
 # Performance & Profiling
 bench: ## Run benchmarks
 	cargo bench --workspace
@@ -134,13 +106,6 @@ profile: ## Profile the application (requires cargo-flamegraph)
 size: ## Check binary size
 	@echo "Binary sizes:"
 	@ls -lh target/release/waycast 2>/dev/null || echo "Run 'make release' first"
-
-# Development workflow shortcuts
-quick: fmt check ## Quick development check (format + compile)
-
-full: clean fmt lint test build-all ## Full development check
-
-ci: fmt lint test build-all ## CI pipeline simulation
 
 # Git hooks
 hooks: ## Install git hooks
