@@ -157,19 +157,6 @@ impl LauncherPlugin for ProjectsPlugin {
         });
     }
 
-    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>> {
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-
-        // Try to get files without blocking - if indexing is still in progress, return empty
-        if let Ok(files) = self.files.try_lock() {
-            for f in files.iter() {
-                entries.push(Box::new(f.clone()));
-            }
-        }
-
-        entries
-    }
-
     fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
         if query.is_empty() {
             return self.default_list();
