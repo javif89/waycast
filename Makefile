@@ -175,3 +175,32 @@ install-icons: ## Install icons to XDG data directory
 	mkdir -p "$$ICON_DIR" && \
 	cp -r ./assets/icons/* "$$ICON_DIR/" && \
 	echo "Icons installed to $$ICON_DIR"
+
+# Release Management
+bump-version:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Error: VERSION is required. Usage: make release VERSION=0.0.2"; \
+		exit 1; \
+	fi
+	@echo "Bumping WayCast version to v$(VERSION)..."
+	@sed -i 's/version = "[^"]*"/version = "$(VERSION)"/' Cargo.toml
+	@sed -i 's/version = "[^"]*"/version = "$(VERSION)"/' waycast-core/Cargo.toml
+	@sed -i 's/version = "[^"]*"/version = "$(VERSION)"/' waycast-gtk/Cargo.toml
+	@sed -i 's/version = "[^"]*"/version = "$(VERSION)"/' waycast-plugins/Cargo.toml
+	@sed -i 's/version = "[^"]*"/version = "$(VERSION)"/' waycast-config/Cargo.toml
+	@sed -i 's/version = "[^"]*"/version = "$(VERSION)"/' waycast-macros/Cargo.toml
+	@sed -i 's/version = "[^"]*"/version = "$(VERSION)"/' flake.nix
+	@cargo check --workspace --quiet
+
+tag-version: 
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Error: VERSION is required. Usage: make release VERSION=0.0.2"; \
+		exit 1; \
+	fi
+	@git add -A
+	@git commit -m "Bump version to $(VERSION)"
+	@git tag v$(VERSION)
+	@git push origin main
+	@git push origin v$(VERSION)
+	@echo "✅ Release v$(VERSION) created!"
+	@echo "🔗 Go to your Gitea instance to add release notes"
