@@ -12,7 +12,7 @@ use std::{
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
 use waycast_core::{
-    cache::{Cache, CacheTTL},
+    cache::CacheTTL,
     LaunchError, LauncherListItem, LauncherPlugin,
 };
 use waycast_macros::{launcher_entry, plugin};
@@ -195,15 +195,9 @@ impl LauncherPlugin for ProjectsPlugin {
 
 pub fn new() -> ProjectsPlugin {
     let search_paths =
-        match waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths") {
-            Ok(paths) => paths,
-            Err(_) => HashSet::new(),
-        };
+        waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths").unwrap_or_default();
 
-    let skip_dirs = match waycast_config::get::<HashSet<String>>("plugins.projects.skip_dirs") {
-        Ok(paths) => paths,
-        Err(_) => HashSet::new(),
-    };
+    let skip_dirs = waycast_config::get::<HashSet<String>>("plugins.projects.skip_dirs").unwrap_or_default();
 
     let open_command = match waycast_config::get::<String>("plugins.projects.open_command") {
         Ok(cmd) => cmd,

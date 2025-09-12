@@ -21,7 +21,7 @@ crate::frameworks! {
         files: ["Gemfile"],
         json_checks: [("package.json", "dependencies.rails"), ("package.json", "devDependencies.rails")],
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::{has_file, read_json_config};
+            use crate::projects::framework_macro::has_file;
 
             // Check for Gemfile with rails gem
             if let Ok(content) = std::fs::read_to_string(format!("{}/Gemfile", project_path)) {
@@ -125,6 +125,12 @@ crate::frameworks! {
 
 pub struct FrameworkDetector {
     heuristics: &'static [&'static dyn FrameworkHeuristics],
+}
+
+impl Default for FrameworkDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FrameworkDetector {

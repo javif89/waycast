@@ -43,6 +43,12 @@ pub struct WaycastLauncher {
     current_results_by_id: HashMap<String, usize>,
 }
 
+impl Default for WaycastLauncher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WaycastLauncher {
     pub fn new() -> Self {
         WaycastLauncher {

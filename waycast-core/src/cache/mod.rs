@@ -14,11 +14,11 @@ pub struct CacheTTL {}
 
 impl CacheTTL {
     pub fn hours(hours: u64) -> Option<Duration> {
-        return Some(Duration::from_secs(hours * 60 * 60));
+        Some(Duration::from_secs(hours * 60 * 60))
     }
 
     pub fn minutes(minutes: u64) -> Option<Duration> {
-        return Some(Duration::from_secs(minutes * 60));
+        Some(Duration::from_secs(minutes * 60))
     }
 }
 

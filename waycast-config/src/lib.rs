@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::OnceLock;
-use std::{env, fs::File, path::PathBuf};
+use std::{env, path::PathBuf};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WaycastConfig {}
@@ -80,7 +80,7 @@ pub fn cache_path<P: AsRef<Path>>(file: P) -> Option<PathBuf> {
 }
 
 pub fn config_file() -> &'static Config {
-    CONFIG_SINGLETON.get_or_init(|| init())
+    CONFIG_SINGLETON.get_or_init(init)
 }
 
 pub fn get<T: DeserializeOwned>(key: &str) -> Result<T, config::ConfigError> {

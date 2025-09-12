@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use tokei::{Config, Language, LanguageType, Languages};
+use tokei::{Config, LanguageType, Languages};
 
 pub struct ProjectLanguage {
     pub name: String,
@@ -10,6 +10,12 @@ pub struct ProjectLanguage {
 pub struct TypeScanner {
     tokei_config: Config,
     ignore_langs: [LanguageType; 5],
+}
+
+impl Default for TypeScanner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TypeScanner {
@@ -32,7 +38,7 @@ impl TypeScanner {
         let mut langs = Languages::new();
         langs.get_statistics(&[path], &[], &self.tokei_config);
 
-        let total_code: usize = langs.iter().map(|(_, l)| l.code).sum();
+        let total_code: usize = langs.values().map(|l| l.code).sum();
         let mut rows: Vec<ProjectLanguage> = langs
             .iter()
             .map(|(lt, l)| {

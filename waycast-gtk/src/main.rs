@@ -28,7 +28,7 @@ fn main() {
         }
 
         if let Some(path) = waycast_config::config_path("waycast.css") {
-            if let Err(_) = ui.apply_css(path) {
+            if ui.apply_css(path).is_err() {
                 println!("No user css found");
             }
         }

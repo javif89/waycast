@@ -515,7 +515,7 @@ fn search_for_icon(
             for cat in &categories {
                 let path = base
                     .join(icon_theme.theme_name())
-                    .join(if (size != "scalable") {
+                    .join(if size != "scalable" {
                         format!("{}x{}", size, size)
                     } else {
                         size.to_string()
@@ -534,7 +534,7 @@ fn search_for_icon(
             for cat in &categories {
                 let path = base
                     .join("hicolor")
-                    .join(if (size != "scalable") {
+                    .join(if size != "scalable" {
                         format!("{}x{}", size, size)
                     } else {
                         size.to_string()

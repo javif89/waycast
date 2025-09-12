@@ -1,7 +1,6 @@
-use std::{collections::BTreeMap, path::PathBuf};
-use tokei::{Config, LanguageType, Languages};
+use std::path::PathBuf;
 use waycast_plugins::projects::{
-    framework_detector::{self, FrameworkDetector},
+    framework_detector::FrameworkDetector,
     type_scanner::TypeScanner,
 };
 
@@ -16,8 +15,7 @@ pub fn main() {
     if let Ok(entries) = std::fs::read_dir(PathBuf::from("/home/javi/projects")) {
         for e in entries
             .into_iter()
-            .filter(|e| e.is_ok())
-            .map(|e| e.unwrap())
+            .flatten()
             .filter(|e| e.path().is_dir())
         {
             let fw = framework_detector.detect(e.path().to_string_lossy().to_string().as_str());

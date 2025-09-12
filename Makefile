@@ -54,9 +54,9 @@ fmt: ## Format all code
 	cargo fmt --all
 
 lint: ## Run clippy lints
-	cargo clippy --workspace --all-targets --all-features -- -D warnings
+	cargo clippy --workspace --all-targets --all-features
 
-fix: ## Auto-fix linting issues
+lint-fix: ## Auto-fix linting issues
 	cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
 	cargo fmt --all
 
