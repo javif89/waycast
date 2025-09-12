@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.0.2] - 2025-01-16
+## [0.0.3] - 2025-09-12
+
+### Fixed
+- **Home manager module**: The icons were not getting properly copied to $XDG_DATA_HOME
+
+## [0.0.2] - 2025-09-11
 
 ### Added
 - **Framework Detection System**: Automatic detection of project types (Laravel, Rails, NextJS, Vue, Svelte, Django, Flask, Go Fiber, Ansible)
@@ -31,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **File Pattern Matching**: Flexible file existence and directory structure checking
 - **Custom Validation**: Support for complex framework detection logic via closures
 
-## [0.0.1] - 2025-01-15
+## [0.0.1] - 2025-0908-
 
 ### Added
 - **Core Application**: GTK4-based application launcher for Wayland compositors
