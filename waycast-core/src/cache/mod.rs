@@ -74,6 +74,11 @@ impl Cache {
     where
         T: Serialize + DeserializeOwned + Clone,
     {
+        // Check if caching is disabled via environment variable
+        if std::env::var("WAYCAST_NO_CACHE").is_ok() {
+            return Ok(compute());
+        }
+
         // Try to get from cache first
         if let Some(entry) = self.get_cached_entry::<T>(key)? {
             // Check if entry has expired
