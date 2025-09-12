@@ -79,9 +79,9 @@ impl WaycastLauncher {
             p.init();
         }
 
-        self.plugins.sort_by(|a, b| b.priority().cmp(&a.priority()));
+        self.plugins.sort_by_key(|b| std::cmp::Reverse(b.priority()));
         self.plugins_show_always
-            .sort_by(|a, b| b.priority().cmp(&a.priority()));
+            .sort_by_key(|b| std::cmp::Reverse(b.priority()));
 
         self
     }

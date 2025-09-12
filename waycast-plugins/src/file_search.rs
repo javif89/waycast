@@ -204,7 +204,7 @@ impl FileSearchPlugin {
         };
 
         // Run the scan with a timeout
-        if let Err(_) = tokio::time::timeout(timeout, scan_task).await {
+        if tokio::time::timeout(timeout, scan_task).await.is_err() {
             eprintln!("File indexing timed out after {:?}", timeout);
         }
     }
