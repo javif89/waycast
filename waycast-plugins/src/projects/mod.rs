@@ -36,8 +36,21 @@ impl LauncherListItem for ProjectEntry {
         description: Some(self.path.to_string_lossy().to_string()),
         icon: {
             if let Some(t) = &self.project_type {
-                let icon_path = PathBuf::from("./devicons");
-                return icon_path.join(format!("{}.svg", t.to_lowercase())).to_string_lossy().to_string();
+                // Try XDG data directory first, fall back to development path
+                let icon_name = format!("{}.svg", t.to_lowercase());
+
+                if let Some(data_dir) = waycast_config::data_dir() {
+                    let xdg_icon_path = data_dir.join("icons").join("devicons").join(&icon_name);
+                    if xdg_icon_path.exists() {
+                        return xdg_icon_path.to_string_lossy().to_string();
+                    }
+                }
+
+                // Fall back to development path
+                let dev_icon_path = PathBuf::from("./assets/icons/devicons").join(&icon_name);
+                if dev_icon_path.exists() {
+                    return dev_icon_path.to_string_lossy().to_string();
+                }
             }
 
             String::from("vscode")

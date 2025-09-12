@@ -168,3 +168,10 @@ devicon-theme:
 	devicon get ansible -o $(DEVICON_DIR)
 	cp $(DEVICON_DIR)/nixos.svg $(DEVICON_DIR)/nix.svg
 	cp $(DEVICON_DIR)/bash.svg $(DEVICON_DIR)/shell.svg
+
+install-icons: ## Install icons to XDG data directory
+	@XDG_DATA_HOME=$${XDG_DATA_HOME:-$$HOME/.local/share} && \
+	ICON_DIR="$$XDG_DATA_HOME/waycast/icons" && \
+	mkdir -p "$$ICON_DIR" && \
+	cp -r ./assets/icons/* "$$ICON_DIR/" && \
+	echo "Icons installed to $$ICON_DIR"
