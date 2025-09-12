@@ -57,6 +57,12 @@
             gtk4-layer-shell
           ];
 
+          # Install custom icons
+          postInstall = ''
+            mkdir -p $out/share/waycast/icons
+            cp -r assets/icons/* $out/share/waycast/icons/
+          '';
+
           # wrapGAppsHook4 handles most GTK runtime setup automatically
           # Just ensure icon themes are available
           preFixup = ''
