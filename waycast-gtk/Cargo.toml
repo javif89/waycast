@@ -1,7 +1,13 @@
 [package]
 name = "waycast-gtk"
-version = "0.1.0"
-edition = "2021"
+description = "GTK4 frontend for Waycast application launcher"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [[bin]]
 name = "waycast"

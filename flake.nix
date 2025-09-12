@@ -84,7 +84,6 @@
           buildInputs = with pkgs; [
             # Build tools
             pkg-config
-            cargo-release
 
             # GTK4 stack
             gtk4

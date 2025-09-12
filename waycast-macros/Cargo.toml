@@ -1,7 +1,13 @@
 [package]
 name = "waycast-macros"
-version = "0.1.0"
-edition = "2021"
+description = "Procedural macros for Waycast launcher plugin development"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [lib]
 proc-macro = true

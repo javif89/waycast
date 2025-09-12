@@ -1,7 +1,13 @@
 [package]
 name = "waycast-config"
-version = "0.1.0"
-edition = "2024"
+description = "Configuration management and XDG directory handling for Waycast"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
 config = { version = "0.15.15", features = ["toml"] }
