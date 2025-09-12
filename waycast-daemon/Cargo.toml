@@ -1,0 +1,16 @@
+[package]
+name = "waycast-daemon"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+waycast-core = { path = "../waycast-core" }
+waycast-plugins = { path = "../waycast-plugins" }

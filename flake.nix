@@ -84,6 +84,7 @@
           buildInputs = with pkgs; [
             # Build tools
             pkg-config
+            oranda
 
             # GTK4 stack
             gtk4

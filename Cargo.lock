@@ -2359,6 +2359,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "waycast-daemon"
+version = "0.0.2"
+dependencies = [
+ "waycast-core",
+ "waycast-plugins",
+]
+
+[[package]]
 name = "waycast-gtk"
 version = "0.0.2"
 dependencies = [
