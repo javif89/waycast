@@ -158,12 +158,13 @@ tools: ## Install useful development tools
 	cargo install cargo-watch cargo-audit cargo-machete cargo-flamegraph cargo-deb cargo-outdated
 	@echo "Development tools installed!"
 
-devicon-theme:
-	rm -rf ./devicons
-	mkdir -p ./devicons
-	devicon remix -t framework,language -o ./devicons --variant original --fallback plain
-	devicon get nixos -o ./devicons
-	devicon get bash -o ./devicons
-	devicon get ansible -o ./devicons
-	cp devicons/nixos.svg devicons/nix.svg
-	cp devicons/bash.svg devicons/shell.svg
+devicon-theme: DEVICON_DIR = ./assets/icons/devicons
+devicon-theme: 
+	rm -rf $(DEVICON_DIR)
+	mkdir -p $(DEVICON_DIR) 
+	devicon remix -t framework,language -o $(DEVICON_DIR) --variant original --fallback plain
+	devicon get nixos -o $(DEVICON_DIR)
+	devicon get bash -o $(DEVICON_DIR)
+	devicon get ansible -o $(DEVICON_DIR)
+	cp $(DEVICON_DIR)/nixos.svg $(DEVICON_DIR)/nix.svg
+	cp $(DEVICON_DIR)/bash.svg $(DEVICON_DIR)/shell.svg
