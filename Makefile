@@ -16,9 +16,11 @@ help: ## Show this help message
 run: ## Run waycast GUI
 	cargo run -p waycast-gtk
 
-run-daemon: ## Run waycast daemon (when implemented)
-	@echo "Daemon not yet implemented"
-	# cargo run -p waycast-daemon
+run-daemon: 
+	cargo run -p waycast-daemon
+
+call-daemon:
+	busctl --user call dev.waycast.Daemon /dev/waycast/Daemon dev.waycast.Daemon $(METHOD) $(PARAMS)
 
 # Building
 build: ## Build waycast GUI (debug)

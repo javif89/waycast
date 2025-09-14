@@ -8,7 +8,7 @@ pub enum LaunchError {
     CouldNotLaunch(String),
 }
 
-pub trait LauncherListItem {
+pub trait LauncherListItem: Send + Sync {
     fn id(&self) -> String;
     fn title(&self) -> String;
     fn description(&self) -> Option<String>;
@@ -16,7 +16,7 @@ pub trait LauncherListItem {
     fn icon(&self) -> String;
 }
 
-pub trait LauncherPlugin {
+pub trait LauncherPlugin: Send + Sync {
     fn init(&self) {
         // Default empty init - plugins can override this
     }
@@ -79,7 +79,8 @@ impl WaycastLauncher {
             p.init();
         }
 
-        self.plugins.sort_by_key(|b| std::cmp::Reverse(b.priority()));
+        self.plugins
+            .sort_by_key(|b| std::cmp::Reverse(b.priority()));
         self.plugins_show_always
             .sort_by_key(|b| std::cmp::Reverse(b.priority()));
 

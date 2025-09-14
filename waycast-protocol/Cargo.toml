@@ -1,5 +1,5 @@
 [package]
-name = "waycast-daemon"
+name = "waycast-protocol"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -13,8 +13,5 @@ keywords.workspace = true
 
 [dependencies]
 serde = { version = "1.0.223", features = ["derive"] }
-tokio = { version = "1.47.1", features = ["full"] }
-waycast-core = { path = "../waycast-core" }
-waycast-plugins = { path = "../waycast-plugins" }
-waycast-protocol = { version = "0.0.2", path = "../waycast-protocol" }
-zbus = { version = "5.11.0", features = ["option-as-array"] }
+waycast-core = { version = "0.0.2", path = "../waycast-core" }
+zvariant = { version = "5.7.0", features = ["option-as-array"] }

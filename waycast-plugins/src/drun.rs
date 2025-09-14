@@ -1,13 +1,13 @@
-use gio::{prelude::*, AppInfo, DesktopAppInfo, Icon};
+use gio::{AppInfo, DesktopAppInfo, Icon, prelude::*};
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
-use waycast_macros::{plugin, launcher_entry};
+use waycast_macros::{launcher_entry, plugin};
 
 #[derive(Debug)]
 pub struct DesktopEntry {
     id: String,
     name: String,
-    description: Option<glib::GString>,
-    icon: Option<Icon>,
+    description: Option<String>,
+    icon: String,
 }
 
 impl LauncherListItem for DesktopEntry {
@@ -18,21 +18,7 @@ impl LauncherListItem for DesktopEntry {
             self.description.as_ref().map(|glib_string| glib_string.to_string().to_owned())
         },
         icon: {
-            if let Some(icon) = &self.icon {
-                if let Ok(ti) = icon.clone().downcast::<gio::ThemedIcon>() {
-                    // ThemedIcon may have multiple names, we take the first
-                    if let Some(name) = ti.names().first() {
-                        return name.to_string();
-                    }
-                }
-
-                if let Ok(fi) = icon.clone().downcast::<gio::FileIcon>() {
-                    if let Some(path) = fi.file().path() {
-                        return path.to_string_lossy().to_string();
-                    }
-                }
-            }
-            "application-x-executable".into()
+            self.icon.to_owned()
         },
         execute: {
             if let Some(di) = DesktopAppInfo::new(&self.id) {
@@ -53,7 +39,6 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
     let mut entries = Vec::new();
 
     for i in gio::AppInfo::all() {
-        
         let info: gio::DesktopAppInfo = match i.downcast_ref::<gio::DesktopAppInfo>() {
             Some(inf) => inf.to_owned(),
             None => continue,
@@ -65,8 +50,29 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
         let de = DesktopEntry {
             id: info.id().unwrap_or_default().to_string(),
             name: info.display_name().to_string(),
-            description: info.description(),
-            icon: info.icon(),
+            description: info.description().map_or(None, |d| Some(d.to_string())),
+            icon: {
+                if let Some(icon) = info.icon() {
+                    if let Ok(ti) = icon.clone().downcast::<gio::ThemedIcon>() {
+                        // ThemedIcon may have multiple names, we take the first
+                        if let Some(name) = ti.names().first() {
+                            name.to_string()
+                        } else {
+                            "application-x-executable".to_string()
+                        }
+                    } else if let Ok(fi) = icon.clone().downcast::<gio::FileIcon>() {
+                        if let Some(path) = fi.file().path() {
+                            path.to_string_lossy().to_string()
+                        } else {
+                            "application-x-executable".to_string()
+                        }
+                    } else {
+                        "application-x-executable".to_string()
+                    }
+                } else {
+                    "application-x-executable".to_string()
+                }
+            },
         };
 
         entries.push(de);
@@ -74,8 +80,6 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
 
     entries
 }
-
-
 
 pub struct DrunPlugin;
 
