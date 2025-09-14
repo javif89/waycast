@@ -81,5 +81,11 @@ in
     # Ensure cache and data dirs exist to avoid runtime errors in the future
     home.file."${config.xdg.cacheHome}/waycast/.keep".text = "";
     home.file."${config.xdg.dataHome}/waycast/.keep".text = "";
+
+    # Install waycast icons to XDG_DATA_HOME
+    home.file."${config.xdg.dataHome}/waycast/icons" = {
+      source = "${cfg.package}/share/waycast/icons";
+      recursive = true;
+    };
   };
 }

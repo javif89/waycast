@@ -1,11 +1,12 @@
 mod ui;
 
-use gtk::prelude::*;
 use gtk::Application;
+use gtk::prelude::*;
 use ui::gtk::GtkLauncherUI;
 use waycast_core::WaycastLauncher;
 
 fn main() {
+    println!("WayCast v{}", env!("CARGO_PKG_VERSION"));
     let app = Application::builder()
         .application_id("dev.thegrind.waycast")
         .build();
