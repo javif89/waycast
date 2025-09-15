@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use waycast_core::LauncherListItem;
-use zvariant::Type;
+use zbus::zvariant::Type;
+use zbus::{Connection, interface, proxy};
+pub mod client;
+use std::sync::{Arc, Mutex};
+use waycast_core::WaycastLauncher;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct LauncherItem {
@@ -61,5 +65,50 @@ impl From<&Vec<Box<dyn LauncherListItem>>> for Response {
             items,
             error: None,
         }
+    }
+}
+
+pub struct WaycastService {
+    launcher: Arc<Mutex<WaycastLauncher>>,
+}
+
+impl WaycastService {
+    pub fn new(launcher: WaycastLauncher) -> Self {
+        Self {
+            launcher: Arc::new(Mutex::new(launcher)),
+        }
+    }
+}
+
+#[interface(
+    name = "dev.waycast.Daemon",
+    proxy(
+        default_path = "/dev/waycast/Daemon",
+        default_service = "dev.waycast.Daemon",
+    )
+)]
+impl WaycastService {
+    fn search(&self, query: &str) -> Response {
+        let mut launcher = self.launcher.lock().unwrap();
+        launcher.search(query);
+
+        Response::from(launcher.current_results())
+    }
+
+    fn default_list(&self) -> Response {
+        let mut launcher = self.launcher.lock().unwrap();
+        launcher.get_default_results();
+
+        Response::from(launcher.current_results())
+    }
+
+    fn execute(&self, id: &str) -> Response {
+        let launcher = self.launcher.lock().unwrap();
+
+        if let Err(_) = launcher.execute_item_by_id(id) {
+            return Response::error(format!("Failed to launch item: {}", id));
+        }
+
+        Response::success()
     }
 }

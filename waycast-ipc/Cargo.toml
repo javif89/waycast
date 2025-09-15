@@ -14,4 +14,4 @@ keywords.workspace = true
 [dependencies]
 serde = { version = "1.0.223", features = ["derive"] }
 waycast-core = { version = "0.0.2", path = "../waycast-core" }
-zvariant = { version = "5.7.0", features = ["option-as-array"] }
+zbus = { version = "5.11.0", features = ["option-as-array"] }
