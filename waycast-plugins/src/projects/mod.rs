@@ -5,7 +5,6 @@ use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
-    process::Command,
     sync::Arc,
 };
 
@@ -18,6 +17,7 @@ use waycast_core::{
 use waycast_macros::{launcher_entry, plugin};
 
 use crate::projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner};
+use crate::util::spawn_detached;
 
 static TOKEI_SCANNER: LazyLock<TypeScanner> = LazyLock::new(TypeScanner::new);
 static FRAMEWORK_DETECTOR: LazyLock<FrameworkDetector> = LazyLock::new(FrameworkDetector::new);
@@ -60,9 +60,7 @@ impl LauncherListItem for ProjectEntry {
             let exec_cmd = self.exec_command.replace("{path}", &project_path);
             let parts: Vec<&str> = exec_cmd.split_whitespace().collect();
             if let Some((program, args)) = parts.split_first() {
-                let mut cmd = Command::new(program);
-                cmd.args(args);
-                match cmd.spawn() {
+                match spawn_detached(program, args) {
                     Ok(_) => {
                         println!("Successfully opened with code");
                         Ok(())

@@ -3,7 +3,6 @@ use gio::prelude::FileExt;
 use glib::object::Cast;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -11,6 +10,7 @@ use walkdir::{DirEntry, WalkDir};
 use waycast_macros::{launcher_entry, plugin};
 
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
+use crate::util::spawn_detached;
 
 #[derive(Clone)]
 struct FileEntry {
@@ -44,7 +44,8 @@ impl LauncherListItem for FileEntry {
             println!("Executing: {}", self.path.display());
 
             // Use xdg-open directly since it works properly with music files
-            match Command::new("xdg-open").arg(&self.path).spawn() {
+            // Detach the process so it doesn't die when daemon is killed
+            match spawn_detached("xdg-open", &[self.path.to_str().unwrap()]) {
                 Ok(_) => {
                     println!("Successfully launched with xdg-open");
                     Ok(())

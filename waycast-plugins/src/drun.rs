@@ -22,12 +22,26 @@ impl LauncherListItem for DesktopEntry {
         },
         execute: {
             if let Some(di) = DesktopAppInfo::new(&self.id) {
-                let app: AppInfo = di.upcast();
-                let ctx = gio::AppLaunchContext::new();
-                if app.launch(&[], Some(&ctx)).ok().is_none() {
-                    return Err(LaunchError::CouldNotLaunch("App failed to launch".into()));
-                };
-                Ok(())
+                // Get the command from the desktop entry and use our detached spawning
+                if let Some(commandline) = di.commandline() {
+                    let cmd_str = commandline.to_string_lossy();
+                    let parts: Vec<&str> = cmd_str.split_whitespace().collect();
+                    if let Some((program, args)) = parts.split_first() {
+                        crate::util::spawn_detached(program, args)
+                            .map_err(|e| LaunchError::CouldNotLaunch(format!("Failed to spawn: {}", e)))?;
+                        Ok(())
+                    } else {
+                        Err(LaunchError::CouldNotLaunch("Empty command".into()))
+                    }
+                } else {
+                    // Fallback to GIO method for complex desktop entries
+                    let app: AppInfo = di.upcast();
+                    let ctx = gio::AppLaunchContext::new();
+                    if app.launch(&[], Some(&ctx)).ok().is_none() {
+                        return Err(LaunchError::CouldNotLaunch("App failed to launch".into()));
+                    };
+                    Ok(())
+                }
             } else {
                 Err(LaunchError::CouldNotLaunch("Invalid .desktop entry".into()))
             }

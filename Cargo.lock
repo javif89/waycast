@@ -2458,6 +2458,7 @@ dependencies = [
  "directories",
  "gio",
  "glib",
+ "libc",
  "serde",
  "serde_json",
  "tokei",
