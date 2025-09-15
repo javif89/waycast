@@ -1,5 +1,5 @@
 [package]
-name = "waycast-ipc"
+name = "waycast-protocol"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -13,5 +13,9 @@ keywords.workspace = true
 
 [dependencies]
 serde = { version = "1.0.223", features = ["derive"] }
-waycast-core = { version = "0.0.2", path = "../waycast-core" }
-zbus = { version = "5.11.0", features = ["option-as-array"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["net", "io-util", "macros", "rt", "sync"] }
+thiserror = "2.0"
+libc = "0.2"
+dirs = "5.0"
+async-trait = "0.1"

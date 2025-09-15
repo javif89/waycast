@@ -6,7 +6,7 @@ members = [
     "waycast-gtk",
     "waycast-config",
     "waycast-daemon",
-    "waycast-ipc",
+    "waycast-protocol",
 ]
 resolver = "2"
 
