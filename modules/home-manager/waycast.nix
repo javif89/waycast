@@ -20,6 +20,12 @@ in
       description = "The waycast package to use";
     };
 
+    enableDaemon = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Whether to enable the waycast daemon as a systemd user service";
+    };
+
     settings = mkOption {
       type = types.attrs;
       default = { };
@@ -86,6 +92,31 @@ in
     home.file."${config.xdg.dataHome}/waycast/icons" = {
       source = "${cfg.package}/share/waycast/icons";
       recursive = true;
+    };
+
+    # Enable waycast daemon as systemd user service
+    systemd.user.services.waycast-daemon = mkIf cfg.enableDaemon {
+      Unit = {
+        Description = "Waycast application launcher daemon";
+        Documentation = "https://waycast.dev";
+        After = [ "graphical-session.target" ];
+        PartOf = [ "graphical-session.target" ];
+      };
+
+      Service = {
+        Type = "simple";
+        ExecStart = "${cfg.package}/bin/waycast-daemon";
+        Restart = "on-failure";
+        RestartSec = "5";
+        Environment = [
+          "XDG_RUNTIME_DIR=%t"
+          "WAYLAND_DISPLAY=wayland-0"
+        ];
+      };
+
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
     };
   };
 }

@@ -57,10 +57,15 @@
             gtk4-layer-shell
           ];
 
-          # Install custom icons
+          # Install custom icons and systemd service
           postInstall = ''
             mkdir -p $out/share/waycast/icons
             cp -r assets/icons/* $out/share/waycast/icons/
+            
+            # Install systemd user service
+            mkdir -p $out/lib/systemd/user
+            substitute ${./waycast-daemon.service} $out/lib/systemd/user/waycast-daemon.service \
+              --replace "%i" "$out"
           '';
 
           # wrapGAppsHook4 handles most GTK runtime setup automatically
