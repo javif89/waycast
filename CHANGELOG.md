@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2025-09-15
+
+### Breaking Changes
+- **Architecture Refactor**: Moved from embedded launcher to daemon-based architecture
+
+### Added
+- **Waycast Daemon**: Background service for managing launcher state and plugins
+- **JSON-RPC Protocol**: Simple, debuggable communication protocol between GTK client and daemon
+- **Automatic Refresh**: Daemon periodically rescans applications and projects every 2 minutes
+- **Systemd Integration**: User service configuration for automatic daemon startup
+- **Home Manager Support**: Enhanced module with optional daemon service management
+
+### Enhanced
+- **Performance**: Persistent daemon keeps data indexed and ready. Should decrease UI startup time since launcher logic now lives in a separate long running process.
+
+### Technical
+- **Protocol Crates**: New `waycast-protocol` crate with client/server libraries
+- **Socket Utilities**: Automatic socket path resolution with fallbacks
+- **Error Handling**: Comprehensive protocol error types with proper propagation
+- **Thread Safety**: Arc/Mutex patterns for safe daemon state sharing
+- **Background Tasks**: Tokio-based async server with sync client compatibility
+
+### Infrastructure
+- **Service Definition**: Systemd user service file with proper dependencies
+- **Nix Integration**: Flake automatically installs systemd service configuration
+- **Build System**: Updated workspace with new protocol crate
+
 ## [0.0.3] - 2025-09-12
 
 ### Fixed
