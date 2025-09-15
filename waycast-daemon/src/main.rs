@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use waycast_core::WaycastLauncher;
 use waycast_protocol::{LauncherItem, RequestHandler, WaycastServer, socket::default_socket_path};
 
@@ -77,6 +78,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     let handler = Arc::new(LauncherHandler::new(launcher));
+    
+    // Clone the launcher reference for the refresh task
+    let launcher_for_refresh = Arc::clone(&handler.launcher);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(120)); // 2 minutes
+        loop {
+            interval.tick().await;
+            if let Ok(launcher) = launcher_for_refresh.lock() {
+                println!("Refreshing plugins...");
+                launcher.refresh_plugins();
+            }
+        }
+    });
+    
     let socket_path = default_socket_path()?;
     let server = WaycastServer::new(&socket_path)?;
 

@@ -150,4 +150,10 @@ impl WaycastLauncher {
     pub fn current_results(&self) -> &Vec<Box<dyn LauncherListItem>> {
         &self.current_results
     }
+
+    pub fn refresh_plugins(&self) {
+        for plugin in &self.plugins {
+            plugin.init();
+        }
+    }
 }
