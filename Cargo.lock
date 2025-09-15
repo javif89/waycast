@@ -2771,8 +2771,8 @@ dependencies = [
  "serde",
  "tokio",
  "waycast-core",
+ "waycast-ipc",
  "waycast-plugins",
- "waycast-protocol",
  "zbus",
 ]
 
@@ -2790,6 +2790,15 @@ dependencies = [
  "waycast-config",
  "waycast-core",
  "waycast-plugins",
+]
+
+[[package]]
+name = "waycast-ipc"
+version = "0.0.2"
+dependencies = [
+ "serde",
+ "waycast-core",
+ "zvariant",
 ]
 
 [[package]]
@@ -2816,15 +2825,6 @@ dependencies = [
  "waycast-config",
  "waycast-core",
  "waycast-macros",
-]
-
-[[package]]
-name = "waycast-protocol"
-version = "0.0.2"
-dependencies = [
- "serde",
- "waycast-core",
- "zvariant",
 ]
 
 [[package]]

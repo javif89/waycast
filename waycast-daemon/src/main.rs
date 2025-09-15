@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use waycast_core::{LauncherListItem, WaycastLauncher};
-use waycast_protocol::LauncherItem;
+use waycast_protocol::{LauncherItem, Response};
 use zbus::{connection, interface};
 
 struct WaycastService {
@@ -10,28 +10,28 @@ struct WaycastService {
 
 #[interface(name = "dev.waycast.Daemon")]
 impl WaycastService {
-    fn search(&self, query: &str) -> Vec<LauncherItem> {
+    fn search(&self, query: &str) -> Response {
         let mut launcher = self.launcher.lock().unwrap();
         launcher.search(query);
-        launcher
-            .current_results()
-            .iter()
-            .map(|r| LauncherItem::from(r))
-            .collect()
+
+        Response::from(launcher.current_results())
     }
 
-    fn default_list(&self) -> Vec<LauncherItem> {
+    fn default_list(&self) -> Response {
         let mut launcher = self.launcher.lock().unwrap();
-        launcher
-            .get_default_results()
-            .iter()
-            .map(|r| LauncherItem::from(r))
-            .collect()
+        launcher.get_default_results();
+
+        Response::from(launcher.current_results())
     }
 
-    fn execute(&self, id: &str) {
+    fn execute(&self, id: &str) -> Response {
         let launcher = self.launcher.lock().unwrap();
-        let _ = launcher.execute_item_by_id(id);
+
+        if let Err(_) = launcher.execute_item_by_id(id) {
+            return Response::error(format!("Failed to launch item: {}", id));
+        }
+
+        Response::success()
     }
 }
 

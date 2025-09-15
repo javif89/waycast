@@ -1,5 +1,5 @@
 [package]
-name = "waycast-protocol"
+name = "waycast-ipc"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
