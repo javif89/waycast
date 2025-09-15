@@ -9,8 +9,8 @@ use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
 use waycast_macros::{launcher_entry, plugin};
 
-use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 use crate::util::spawn_detached;
+use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 
 #[derive(Clone)]
 struct FileEntry {
@@ -33,11 +33,10 @@ impl LauncherListItem for FileEntry {
         icon: {
             let (content_type, _) = gio::content_type_guess(Some(&self.path), None);
             let icon = gio::content_type_get_icon(&content_type);
-            if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>() {
-                if let Some(icon_name) = themed_icon.names().first() {
+            if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>()
+                && let Some(icon_name) = themed_icon.names().first() {
                     return icon_name.to_string();
                 }
-            }
             String::from("text-x-generic")
         },
         execute: {

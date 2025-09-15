@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 
-use crate::protocol::{Request, Response, Method, ResponseData, LauncherItem, Result};
+use crate::protocol::{LauncherItem, Method, Request, Response, ResponseData, Result};
 use crate::socket::cleanup_socket;
 
 #[async_trait::async_trait]
@@ -21,12 +21,12 @@ pub struct WaycastServer {
 impl WaycastServer {
     pub fn new(socket_path: impl AsRef<Path>) -> Result<Self> {
         let socket_path = socket_path.as_ref().to_path_buf();
-        
+
         // Clean up any existing socket
         cleanup_socket(&socket_path)?;
-        
+
         let listener = UnixListener::bind(&socket_path)?;
-        
+
         Ok(Self {
             listener,
             socket_path,
@@ -35,7 +35,7 @@ impl WaycastServer {
 
     pub async fn serve<H: RequestHandler + 'static>(self, handler: Arc<H>) -> Result<()> {
         println!("Waycast server listening on {}", self.socket_path.display());
-        
+
         loop {
             match self.listener.accept().await {
                 Ok((stream, _)) => {
@@ -52,7 +52,7 @@ impl WaycastServer {
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -63,10 +63,7 @@ impl Drop for WaycastServer {
     }
 }
 
-async fn handle_connection<H: RequestHandler>(
-    stream: UnixStream,
-    handler: Arc<H>,
-) -> Result<()> {
+async fn handle_connection<H: RequestHandler>(stream: UnixStream, handler: Arc<H>) -> Result<()> {
     let (reader, mut writer) = stream.into_split();
     let mut reader = BufReader::new(reader);
     let mut line = String::new();
@@ -85,7 +82,7 @@ async fn handle_connection<H: RequestHandler>(
                 };
 
                 let response = handle_request(&request, handler.as_ref()).await;
-                
+
                 match serde_json::to_string(&response) {
                     Ok(response_json) => {
                         if let Err(e) = writer.write_all(response_json.as_bytes()).await {
@@ -112,29 +109,20 @@ async fn handle_connection<H: RequestHandler>(
     Ok(())
 }
 
-async fn handle_request<H: RequestHandler>(
-    request: &Request,
-    handler: &H,
-) -> Response {
+async fn handle_request<H: RequestHandler>(request: &Request, handler: &H) -> Response {
     let result = match &request.method {
-        Method::Search(query) => {
-            match handler.search(query).await {
-                Ok(items) => Ok(ResponseData::Items(items)),
-                Err(e) => Err(e),
-            }
-        }
-        Method::DefaultList => {
-            match handler.default_list().await {
-                Ok(items) => Ok(ResponseData::Items(items)),
-                Err(e) => Err(e),
-            }
-        }
-        Method::Execute(id) => {
-            match handler.execute(id).await {
-                Ok(()) => Ok(ResponseData::Success),
-                Err(e) => Err(e),
-            }
-        }
+        Method::Search(query) => match handler.search(query).await {
+            Ok(items) => Ok(ResponseData::Items(items)),
+            Err(e) => Err(e),
+        },
+        Method::DefaultList => match handler.default_list().await {
+            Ok(items) => Ok(ResponseData::Items(items)),
+            Err(e) => Err(e),
+        },
+        Method::Execute(id) => match handler.execute(id).await {
+            Ok(()) => Ok(ResponseData::Success),
+            Err(e) => Err(e),
+        },
     };
 
     Response {
@@ -175,7 +163,7 @@ mod tests {
         let handler = TestHandler;
         let request = Request::new(Method::Search("test".to_string()));
         let response = handle_request(&request, &handler).await;
-        
+
         assert_eq!(response.id, request.id);
         assert!(response.result.is_ok());
     }

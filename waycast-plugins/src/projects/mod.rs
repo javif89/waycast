@@ -10,10 +10,7 @@ use std::{
 
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
-use waycast_core::{
-    cache::CacheTTL,
-    LaunchError, LauncherListItem, LauncherPlugin,
-};
+use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin, cache::CacheTTL};
 use waycast_macros::{launcher_entry, plugin};
 
 use crate::projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner};
@@ -126,33 +123,33 @@ impl LauncherPlugin for ProjectsPlugin {
                 for search_path in &search_paths {
                     if let Ok(entries) = fs::read_dir(search_path) {
                         for entry in entries.flatten() {
-                            if let Ok(file_type) = entry.file_type() {
-                                if file_type.is_dir() {
-                                    let path = entry.path();
+                            if let Ok(file_type) = entry.file_type()
+                                && file_type.is_dir()
+                            {
+                                let path = entry.path();
 
-                                    // Skip hidden directories (starting with .)
-                                    if let Some(file_name) = path.file_name() {
-                                        if let Some(name_str) = file_name.to_str() {
-                                            // Skip hidden directories
-                                            if name_str.starts_with('.') {
-                                                continue;
-                                            }
-
-                                            // Skip directories in skip list
-                                            if skip_dirs.contains(name_str) {
-                                                continue;
-                                            }
-
-                                            let project_type = detect_project_type(
-                                                path.to_string_lossy().to_string().as_str(),
-                                            );
-                                            project_entries.push(ProjectEntry {
-                                                path,
-                                                exec_command: Arc::clone(&exec_command),
-                                                project_type,
-                                            });
-                                        }
+                                // Skip hidden directories (starting with .)
+                                if let Some(file_name) = path.file_name()
+                                    && let Some(name_str) = file_name.to_str()
+                                {
+                                    // Skip hidden directories
+                                    if name_str.starts_with('.') {
+                                        continue;
                                     }
+
+                                    // Skip directories in skip list
+                                    if skip_dirs.contains(name_str) {
+                                        continue;
+                                    }
+
+                                    let project_type = detect_project_type(
+                                        path.to_string_lossy().to_string().as_str(),
+                                    );
+                                    project_entries.push(ProjectEntry {
+                                        path,
+                                        exec_command: Arc::clone(&exec_command),
+                                        project_type,
+                                    });
                                 }
                             }
                         }
@@ -192,10 +189,11 @@ impl LauncherPlugin for ProjectsPlugin {
 }
 
 pub fn new() -> ProjectsPlugin {
-    let search_paths =
-        waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths").unwrap_or_default();
+    let search_paths = waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths")
+        .unwrap_or_default();
 
-    let skip_dirs = waycast_config::get::<HashSet<String>>("plugins.projects.skip_dirs").unwrap_or_default();
+    let skip_dirs =
+        waycast_config::get::<HashSet<String>>("plugins.projects.skip_dirs").unwrap_or_default();
 
     let open_command = match waycast_config::get::<String>("plugins.projects.open_command") {
         Ok(cmd) => cmd,

@@ -1,6 +1,6 @@
 pub mod errors;
 use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::path::Path;
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
@@ -36,14 +36,18 @@ pub fn get() -> &'static Cache {
     CACHE_SINGLETON.get_or_init(|| {
         let cache_path = waycast_config::cache_path("waycast_cache.db")
             .unwrap_or_else(|| std::env::current_dir().unwrap().join("waycast_cache.db"));
-        
+
         // Ensure cache directory exists
-        if let Some(parent) = cache_path.parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
-                eprintln!("Warning: Failed to create cache directory {}: {}", parent.display(), e);
-            }
+        if let Some(parent) = cache_path.parent()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            eprintln!(
+                "Warning: Failed to create cache directory {}: {}",
+                parent.display(),
+                e
+            );
         }
-        
+
         new(cache_path).expect("Failed to initialize cache :(")
     })
 }

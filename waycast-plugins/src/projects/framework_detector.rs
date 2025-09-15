@@ -24,11 +24,10 @@ crate::frameworks! {
             use crate::projects::framework_macro::has_file;
 
             // Check for Gemfile with rails gem
-            if let Ok(content) = std::fs::read_to_string(format!("{}/Gemfile", project_path)) {
-                if content.contains("gem 'rails'") || content.contains("gem \"rails\"") {
+            if let Ok(content) = std::fs::read_to_string(format!("{}/Gemfile", project_path))
+                && (content.contains("gem 'rails'") || content.contains("gem \"rails\"")) {
                     return true;
                 }
-            }
 
             // Check for Rails-specific directories
             has_file(project_path, "config/application.rb") ||
@@ -68,11 +67,10 @@ crate::frameworks! {
             use crate::projects::framework_macro::has_file;
 
             // Check for requirements.txt with Django
-            if let Ok(content) = std::fs::read_to_string(format!("{}/requirements.txt", project_path)) {
-                if content.contains("Django") || content.contains("django") {
+            if let Ok(content) = std::fs::read_to_string(format!("{}/requirements.txt", project_path))
+                && (content.contains("Django") || content.contains("django")) {
                     return true;
                 }
-            }
 
             // Check for Django-specific files
             has_file(project_path, "settings.py") ||
@@ -85,11 +83,10 @@ crate::frameworks! {
             use crate::projects::framework_macro::has_file;
 
             // Check for requirements.txt with Flask
-            if let Ok(content) = std::fs::read_to_string(format!("{}/requirements.txt", project_path)) {
-                if content.contains("Flask") || content.contains("flask") {
+            if let Ok(content) = std::fs::read_to_string(format!("{}/requirements.txt", project_path))
+                && (content.contains("Flask") || content.contains("flask")) {
                     return true;
                 }
-            }
 
             // Check for common Flask files
             has_file(project_path, "app.py") ||
@@ -101,11 +98,10 @@ crate::frameworks! {
         files: ["go.mod"],
         custom: |project_path: &str| {
             // Check for go.mod with fiber dependency
-            if let Ok(content) = std::fs::read_to_string(format!("{}/go.mod", project_path)) {
-                if content.contains("github.com/gofiber/fiber") {
+            if let Ok(content) = std::fs::read_to_string(format!("{}/go.mod", project_path))
+                && content.contains("github.com/gofiber/fiber") {
                     return true;
                 }
-            }
             false
         },
     },

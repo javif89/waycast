@@ -2,9 +2,9 @@ use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
 use syn::{
+    Expr, ExprLit, Lit, LitInt, LitStr, Result, Token,
     parse::{Parse, ParseStream},
     parse_macro_input,
-    Expr, ExprLit, Lit, LitInt, LitStr, Result, Token,
 };
 
 /// Plugin configuration parsed from the macro input
@@ -21,7 +21,6 @@ struct PluginConfig {
 
 impl Parse for PluginConfig {
     fn parse(input: ParseStream) -> Result<Self> {
-
         let mut name = None;
         let mut priority = None;
         let mut description = None;
@@ -36,7 +35,7 @@ impl Parse for PluginConfig {
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;
             }
-            
+
             if input.is_empty() {
                 break;
             }
@@ -63,7 +62,11 @@ impl Parse for PluginConfig {
                 }
                 "by_prefix_only" => {
                     let expr: Expr = input.parse()?;
-                    if let Expr::Lit(ExprLit { lit: Lit::Bool(lit_bool), .. }) = expr {
+                    if let Expr::Lit(ExprLit {
+                        lit: Lit::Bool(lit_bool),
+                        ..
+                    }) = expr
+                    {
                         by_prefix_only = Some(lit_bool.value);
                     } else {
                         return Err(syn::Error::new_spanned(expr, "Expected boolean literal"));
@@ -92,9 +95,8 @@ impl Parse for PluginConfig {
         }
 
         // Validate required fields
-        let name = name.ok_or_else(|| {
-            syn::Error::new(input.span(), "Plugin must have a 'name' field")
-        })?;
+        let name =
+            name.ok_or_else(|| syn::Error::new(input.span(), "Plugin must have a 'name' field"))?;
 
         Ok(PluginConfig {
             name,
@@ -229,7 +231,7 @@ impl PluginConfig {
 }
 
 /// The main plugin! proc macro
-/// 
+///
 /// Usage inside impl LauncherPlugin block:
 /// ```rust
 /// impl LauncherPlugin for MyPlugin {
@@ -269,7 +271,7 @@ impl Parse for LauncherEntryConfig {
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;
             }
-            
+
             if input.is_empty() {
                 break;
             }
@@ -319,7 +321,10 @@ impl Parse for LauncherEntryConfig {
             syn::Error::new(input.span(), "LauncherListItem must have an 'icon' field")
         })?;
         let execute = execute.ok_or_else(|| {
-            syn::Error::new(input.span(), "LauncherListItem must have an 'execute' field")
+            syn::Error::new(
+                input.span(),
+                "LauncherListItem must have an 'execute' field",
+            )
         })?;
 
         Ok(LauncherEntryConfig {
@@ -391,7 +396,7 @@ impl LauncherEntryConfig {
 }
 
 /// The launcher_entry! proc macro
-/// 
+///
 /// Usage inside impl LauncherListItem block:
 /// ```rust
 /// impl LauncherListItem for FileEntry {

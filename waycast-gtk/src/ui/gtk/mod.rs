@@ -1,5 +1,5 @@
-use gio::prelude::ApplicationExt;
 use gio::ListStore;
+use gio::prelude::ApplicationExt;
 use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
@@ -263,7 +263,7 @@ impl GtkLauncherUI {
                     match response {
                         Ok(items) => {
                             list_store_clone.remove_all();
-                            
+
                             for item in items {
                                 let item_obj = LauncherItemObject::new(
                                     item.title,
@@ -293,19 +293,19 @@ impl GtkLauncherUI {
         let selection_for_enter = selection.clone();
         let app_for_enter = app.clone();
         search_input.connect_activate(move |_| {
-            if let Some(selected_item) = selection_for_enter.selected_item() {
-                if let Some(item_obj) = selected_item.downcast_ref::<LauncherItemObject>() {
-                    let id = item_obj.id();
-                    let client_clone = client_for_enter.clone();
-                    let app_clone = app_for_enter.clone();
-                    let result = {
-                        let mut client = client_clone.borrow_mut();
-                        client.execute(&id)
-                    };
-                    match result {
-                        Ok(_) => app_clone.quit(),
-                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
-                    }
+            if let Some(selected_item) = selection_for_enter.selected_item()
+                && let Some(item_obj) = selected_item.downcast_ref::<LauncherItemObject>()
+            {
+                let id = item_obj.id();
+                let client_clone = client_for_enter.clone();
+                let app_clone = app_for_enter.clone();
+                let result = {
+                    let mut client = client_clone.borrow_mut();
+                    client.execute(&id)
+                };
+                match result {
+                    Ok(_) => app_clone.quit(),
+                    Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
             }
         });
@@ -355,19 +355,19 @@ impl GtkLauncherUI {
         let app_for_activate = app.clone();
         let list_store_for_activate = list_store.clone();
         list_view.connect_activate(move |_, position| {
-            if let Some(obj) = list_store_for_activate.item(position) {
-                if let Some(item_obj) = obj.downcast_ref::<LauncherItemObject>() {
-                    let id = item_obj.id();
-                    let client_clone = client_for_activate.clone();
-                    let app_clone = app_for_activate.clone();
-                    let result = {
-                        let mut client = client_clone.borrow_mut();
-                        client.execute(&id)
-                    };
-                    match result {
-                        Ok(_) => app_clone.quit(),
-                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
-                    }
+            if let Some(obj) = list_store_for_activate.item(position)
+                && let Some(item_obj) = obj.downcast_ref::<LauncherItemObject>()
+            {
+                let id = item_obj.id();
+                let client_clone = client_for_activate.clone();
+                let app_clone = app_for_activate.clone();
+                let result = {
+                    let mut client = client_clone.borrow_mut();
+                    client.execute(&id)
+                };
+                match result {
+                    Ok(_) => app_clone.quit(),
+                    Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
             }
         });
@@ -380,16 +380,12 @@ impl GtkLauncherUI {
             let mut client = client_init.borrow_mut();
             client.default_list()
         };
-        
+
         match items {
             Ok(items) => {
                 for item in items {
-                    let item_obj = LauncherItemObject::new(
-                        item.title,
-                        item.description,
-                        item.icon,
-                        item.id,
-                    );
+                    let item_obj =
+                        LauncherItemObject::new(item.title, item.description, item.icon, item.id);
                     list_store_init.append(&item_obj);
                 }
 

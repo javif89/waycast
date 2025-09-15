@@ -11,10 +11,10 @@ pub fn has_directory<P: AsRef<Path>>(project_path: P, dir: P) -> bool {
 
 pub fn read_json_config<P: AsRef<Path>>(project_path: P, file: P) -> Option<serde_json::Value> {
     let pb = PathBuf::from(project_path.as_ref());
-    if let Ok(text) = std::fs::read_to_string(pb.join(file)) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
-            return Some(v);
-        }
+    if let Ok(text) = std::fs::read_to_string(pb.join(file))
+        && let Ok(v) = serde_json::from_str::<serde_json::Value>(&text)
+    {
+        return Some(v);
     }
     None
 }
@@ -22,7 +22,7 @@ pub fn read_json_config<P: AsRef<Path>>(project_path: P, file: P) -> Option<serd
 pub fn check_json_path(json: &serde_json::Value, path: &str) -> bool {
     let parts: Vec<&str> = path.split('.').collect();
     let mut current = json;
-    
+
     for part in parts {
         if let Some(next) = current.get(part) {
             current = next;
@@ -30,7 +30,7 @@ pub fn check_json_path(json: &serde_json::Value, path: &str) -> bool {
             return false;
         }
     }
-    
+
     true
 }
 
@@ -57,7 +57,7 @@ macro_rules! frameworks {
                 fn name(&self) -> &'static str {
                     stringify!($name)
                 }
-                
+
                 fn matches(&self, project_path: &str) -> bool {
                     // Check required files first
                     $(
@@ -67,7 +67,7 @@ macro_rules! frameworks {
                             }
                         )*
                     )?
-                    
+
                     // Check directories - any match returns true
                     $(
                         $(
@@ -76,7 +76,7 @@ macro_rules! frameworks {
                             }
                         )*
                     )?
-                    
+
                     // Check JSON paths - any match returns true
                     $(
                         $(
@@ -87,34 +87,34 @@ macro_rules! frameworks {
                             }
                         )*
                     )?
-                    
+
                     // Custom validation
                     $(
                         if ($custom_fn)(project_path) {
                             return true;
                         }
                     )?
-                    
+
                     // If we reach here and ONLY files were specified (no other validation),
                     // then files existing means it's a match
                     {
                         let has_other_checks = false
                             $(|| { $(let _ = $dir;)* true })?  // has directories
-                            $(|| { $(let _ = ($json_file, $json_path);)* true })?  // has json_checks  
+                            $(|| { $(let _ = ($json_file, $json_path);)* true })?  // has json_checks
                             $(|| { let _ = $custom_fn; true })?;  // has custom
-                        
+
                         if !has_other_checks {
                             // Only files specified - if we got this far, files exist so it's a match
                             $($(let _ = $file; return true;)*)?
                         }
-                        
+
                         false
                     }
                 }
             }
-            
+
         )*
-        
+
         static HEURISTICS: &[&dyn $crate::projects::framework_macro::FrameworkHeuristics] = &[
             $(&$name {},)*
         ];

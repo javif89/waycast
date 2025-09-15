@@ -1,7 +1,9 @@
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 
-use crate::protocol::{Request, Response, Method, ResponseData, LauncherItem, ProtocolError, Result};
+use crate::protocol::{
+    LauncherItem, Method, ProtocolError, Request, Response, ResponseData, Result,
+};
 use crate::socket::default_socket_path;
 
 pub struct WaycastClient {
@@ -15,8 +17,8 @@ impl WaycastClient {
     }
 
     pub fn connect_to(socket_path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let stream = UnixStream::connect(socket_path)
-            .map_err(|_| ProtocolError::DaemonNotRunning)?;
+        let stream =
+            UnixStream::connect(socket_path).map_err(|_| ProtocolError::DaemonNotRunning)?;
 
         Ok(Self { stream })
     }
@@ -32,7 +34,7 @@ impl WaycastClient {
         let mut reader = BufReader::new(&self.stream);
         let mut line = String::new();
         reader.read_line(&mut line)?;
-        
+
         let response: Response = serde_json::from_str(&line)?;
         Ok(response)
     }
@@ -40,10 +42,12 @@ impl WaycastClient {
     pub fn search(&mut self, query: &str) -> Result<Vec<LauncherItem>> {
         let request = Request::new(Method::Search(query.to_string()));
         let response = self.send_request(request)?;
-        
+
         match response.result {
             Ok(ResponseData::Items(items)) => Ok(items),
-            Ok(_) => Err(ProtocolError::Request("Expected items response".to_string())),
+            Ok(_) => Err(ProtocolError::Request(
+                "Expected items response".to_string(),
+            )),
             Err(e) => Err(ProtocolError::Request(e)),
         }
     }
@@ -51,10 +55,12 @@ impl WaycastClient {
     pub fn default_list(&mut self) -> Result<Vec<LauncherItem>> {
         let request = Request::new(Method::DefaultList);
         let response = self.send_request(request)?;
-        
+
         match response.result {
             Ok(ResponseData::Items(items)) => Ok(items),
-            Ok(_) => Err(ProtocolError::Request("Expected items response".to_string())),
+            Ok(_) => Err(ProtocolError::Request(
+                "Expected items response".to_string(),
+            )),
             Err(e) => Err(ProtocolError::Request(e)),
         }
     }
@@ -62,10 +68,12 @@ impl WaycastClient {
     pub fn execute(&mut self, id: &str) -> Result<()> {
         let request = Request::new(Method::Execute(id.to_string()));
         let response = self.send_request(request)?;
-        
+
         match response.result {
             Ok(ResponseData::Success) => Ok(()),
-            Ok(_) => Err(ProtocolError::Request("Expected success response".to_string())),
+            Ok(_) => Err(ProtocolError::Request(
+                "Expected success response".to_string(),
+            )),
             Err(e) => Err(ProtocolError::Request(e)),
         }
     }
@@ -73,7 +81,7 @@ impl WaycastClient {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+
     use crate::protocol::*;
 
     #[test]

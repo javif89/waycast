@@ -7,7 +7,7 @@ use waycast_protocol::WaycastClient;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("WayCast v{}", env!("CARGO_PKG_VERSION"));
-    
+
     let app = Application::builder()
         .application_id("dev.thegrind.waycast")
         .build();
@@ -24,10 +24,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     eprintln!("Warning: Could not apply default styles: {}", e);
                 }
 
-                if let Some(path) = waycast_config::config_path("waycast.css") {
-                    if ui.apply_css(path).is_err() {
-                        println!("No user css found");
-                    }
+                if let Some(path) = waycast_config::config_path("waycast.css")
+                    && ui.apply_css(path).is_err()
+                {
+                    println!("No user css found");
                 }
 
                 ui.show();

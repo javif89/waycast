@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use waycast_core::WaycastLauncher;
-use waycast_protocol::{WaycastServer, RequestHandler, LauncherItem, socket::default_socket_path};
+use waycast_protocol::{LauncherItem, RequestHandler, WaycastServer, socket::default_socket_path};
 
 struct LauncherHandler {
     launcher: Arc<Mutex<WaycastLauncher>>,
@@ -18,36 +18,53 @@ impl LauncherHandler {
 #[waycast_protocol::async_trait::async_trait]
 impl RequestHandler for LauncherHandler {
     async fn search(&self, query: &str) -> Result<Vec<LauncherItem>, String> {
-        let mut launcher = self.launcher.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let mut launcher = self
+            .launcher
+            .lock()
+            .map_err(|e| format!("Lock error: {}", e))?;
         let results = launcher.search(query);
-        
-        let items = results.iter().map(|item| LauncherItem {
-            id: item.id(),
-            title: item.title(),
-            description: item.description(),
-            icon: item.icon(),
-        }).collect();
-        
+
+        let items = results
+            .iter()
+            .map(|item| LauncherItem {
+                id: item.id(),
+                title: item.title(),
+                description: item.description(),
+                icon: item.icon(),
+            })
+            .collect();
+
         Ok(items)
     }
 
     async fn default_list(&self) -> Result<Vec<LauncherItem>, String> {
-        let mut launcher = self.launcher.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let mut launcher = self
+            .launcher
+            .lock()
+            .map_err(|e| format!("Lock error: {}", e))?;
         let results = launcher.get_default_results();
-        
-        let items = results.iter().map(|item| LauncherItem {
-            id: item.id(),
-            title: item.title(),
-            description: item.description(),
-            icon: item.icon(),
-        }).collect();
-        
+
+        let items = results
+            .iter()
+            .map(|item| LauncherItem {
+                id: item.id(),
+                title: item.title(),
+                description: item.description(),
+                icon: item.icon(),
+            })
+            .collect();
+
         Ok(items)
     }
 
     async fn execute(&self, id: &str) -> Result<(), String> {
-        let launcher = self.launcher.lock().map_err(|e| format!("Lock error: {}", e))?;
-        launcher.execute_item_by_id(id).map_err(|e| format!("Execute error: {:?}", e))
+        let launcher = self
+            .launcher
+            .lock()
+            .map_err(|e| format!("Lock error: {}", e))?;
+        launcher
+            .execute_item_by_id(id)
+            .map_err(|e| format!("Execute error: {:?}", e))
     }
 }
 
@@ -65,6 +82,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Waycast daemon starting on {}", socket_path.display());
     server.serve(handler).await?;
-    
+
     Ok(())
 }

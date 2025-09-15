@@ -1,4 +1,4 @@
-use gio::{AppInfo, DesktopAppInfo, Icon, prelude::*};
+use gio::{AppInfo, DesktopAppInfo, prelude::*};
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 use waycast_macros::{launcher_entry, plugin};
 
@@ -64,7 +64,7 @@ pub fn get_desktop_entries() -> Vec<DesktopEntry> {
         let de = DesktopEntry {
             id: info.id().unwrap_or_default().to_string(),
             name: info.display_name().to_string(),
-            description: info.description().map_or(None, |d| Some(d.to_string())),
+            description: info.description().map(|d| d.to_string()),
             icon: {
                 if let Some(icon) = info.icon() {
                     if let Ok(ti) = icon.clone().downcast::<gio::ThemedIcon>() {
