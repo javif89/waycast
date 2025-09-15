@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-09-15
+
+### Enhanced
+
+**UI Startup Performance**: Loading icons async and caching results makes the UI load faster.
+
 ## [0.1.0] - 2025-09-15
 
 This update introduces the waycast-daemon binary. Instead of re-doing all the computation of starting up plugins,

@@ -25,7 +25,7 @@
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "waycast";
-          version = "0.1.0";
+          version = "0.1.1";
           src = self;
 
           cargoLock.lockFile = ./Cargo.lock;
@@ -61,7 +61,7 @@
           postInstall = ''
             mkdir -p $out/share/waycast/icons
             cp -r assets/icons/* $out/share/waycast/icons/
-            
+
             # Install systemd user service
             mkdir -p $out/lib/systemd/user
             substitute ${./waycast-daemon.service} $out/lib/systemd/user/waycast-daemon.service \
