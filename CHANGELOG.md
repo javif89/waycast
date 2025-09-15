@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2025-09-15
 
+This update introduces the waycast-daemon binary. Instead of re-doing all the computation of starting up plugins,
+scanning the file system and getting desktop entries every time the app starts, this will now happen in a long running
+background process.
+
 ### Breaking Changes
 - **Architecture Refactor**: Moved from embedded launcher to daemon-based architecture
 
