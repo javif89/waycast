@@ -13,8 +13,7 @@ use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use waycast_core::cache::CacheTTL;
-use waycast_core::WaycastLauncher;
+use waycast_ipc::WaycastServiceProxy;
 
 // GObject wrapper to store LauncherListItem in GTK's model system
 mod imp {
@@ -80,8 +79,8 @@ pub struct GtkLauncherUI {
 }
 
 impl GtkLauncherUI {
-    pub fn new(app: &gtk::Application, launcher: WaycastLauncher) -> Self {
-        let launcher = Rc::new(RefCell::new(launcher));
+    pub fn new(app: &gtk::Application, daemon_proxy: WaycastServiceProxy<'static>) -> Self {
+        let daemon_proxy = Rc::new(daemon_proxy);
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -220,7 +219,7 @@ impl GtkLauncherUI {
         search_input.grab_focus();
 
         // Set up async search handlers to prevent UI blocking
-        let launcher_for_search = launcher.clone();
+        let daemon_proxy_for_search = daemon_proxy.clone();
         let list_store_for_search = list_store.clone();
         let selection_for_search = selection.clone();
 
@@ -233,93 +232,79 @@ impl GtkLauncherUI {
             // Increment generation to cancel any pending searches
             *search_generation.borrow_mut() += 1;
 
-            if query.trim().is_empty() {
-                // Handle empty query synchronously for immediate response
-                let mut launcher_ref = launcher_for_search.borrow_mut();
-                let results = launcher_ref.get_default_results();
+            let daemon_proxy_clone = daemon_proxy_for_search.clone();
+            let list_store_clone = list_store_for_search.clone();
+            let selection_clone = selection_for_search.clone();
 
-                list_store_for_search.remove_all();
-                for entry in results.iter() {
-                    let item_obj = LauncherItemObject::new(
-                        entry.title(),
-                        entry.description(),
-                        entry.icon(),
-                        entry.id(),
-                    );
-                    list_store_for_search.append(&item_obj);
-                }
+            let current_generation = *search_generation.borrow();
+            let generation_check = search_generation.clone();
+            let _timeout_id =
+                glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
+                    // Check if this search is still the current one
+                    if *generation_check.borrow() != current_generation {
+                        return glib::ControlFlow::Break; // This search was superseded
+                    }
 
-                // Select first item
-                if list_store_for_search.n_items() > 0 {
-                    selection_for_search.set_selected(0);
-                }
-            } else {
-                // Debounced async search for non-empty queries
-                let launcher_clone = launcher_for_search.clone();
-                let list_store_clone = list_store_for_search.clone();
-                let selection_clone = selection_for_search.clone();
+                    let daemon_proxy_clone = daemon_proxy_clone.clone();
+                    let list_store_clone = list_store_clone.clone();
+                    let selection_clone = selection_clone.clone();
+                    let query = query.clone();
 
-                let current_generation = *search_generation.borrow();
-                let generation_check = search_generation.clone();
-                let _timeout_id =
-                    glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
-                        // Check if this search is still the current one
-                        if *generation_check.borrow() != current_generation {
-                            return glib::ControlFlow::Break; // This search was superseded
+                    glib::spawn_future_local(async move {
+                        // Call daemon for search or default results
+                        let response = if query.trim().is_empty() {
+                            daemon_proxy_clone.default_list().await
+                        } else {
+                            daemon_proxy_clone.search(&query).await
+                        };
+
+                        match response {
+                            Ok(resp) => {
+                                list_store_clone.remove_all();
+                                
+                                if let Some(items) = resp.items {
+                                    for item in items {
+                                        let item_obj = LauncherItemObject::new(
+                                            item.title,
+                                            item.description,
+                                            item.icon,
+                                            item.id,
+                                        );
+                                        list_store_clone.append(&item_obj);
+                                    }
+                                }
+
+                                // Select first item
+                                if list_store_clone.n_items() > 0 {
+                                    selection_clone.set_selected(0);
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to search: {:?}", e);
+                            }
                         }
-
-                        let launcher_clone = launcher_clone.clone();
-                        let list_store_clone = list_store_clone.clone();
-                        let selection_clone = selection_clone.clone();
-                        let query = query.clone();
-
-                        glib::spawn_future_local(async move {
-                            // Run search and collect items immediately
-                            let items: Vec<LauncherItemObject> = {
-                                let mut launcher_ref = launcher_clone.borrow_mut();
-                                let results = launcher_ref.search(&query);
-                                results
-                                    .iter()
-                                    .map(|entry| {
-                                        LauncherItemObject::new(
-                                            entry.title(),
-                                            entry.description(),
-                                            entry.icon(),
-                                            entry.id(),
-                                        )
-                                    })
-                                    .collect()
-                            };
-
-                            // Update UI on main thread
-                            list_store_clone.remove_all();
-                            for item_obj in items {
-                                list_store_clone.append(&item_obj);
-                            }
-
-                            // Select first item
-                            if list_store_clone.n_items() > 0 {
-                                selection_clone.set_selected(0);
-                            }
-                        });
-
-                        glib::ControlFlow::Break
                     });
-            }
+
+                    glib::ControlFlow::Break
+                });
         });
 
         // Connect Enter key activation for search input
-        let launcher_for_enter = launcher.clone();
+        let daemon_proxy_for_enter = daemon_proxy.clone();
         let selection_for_enter = selection.clone();
         let app_for_enter = app.clone();
         search_input.connect_activate(move |_| {
             if let Some(selected_item) = selection_for_enter.selected_item() {
                 if let Some(item_obj) = selected_item.downcast_ref::<LauncherItemObject>() {
                     let id = item_obj.id();
-                    match launcher_for_enter.borrow().execute_item_by_id(&id) {
-                        Ok(_) => app_for_enter.quit(),
-                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
-                    }
+                    let daemon_proxy_clone = daemon_proxy_for_enter.clone();
+                    let app_clone = app_for_enter.clone();
+                    glib::spawn_future_local(async move {
+                        match daemon_proxy_clone.execute(&id).await {
+                            Ok(_) => app_clone.quit(),
+                            Err(e) => eprintln!("Failed to launch app: {:?}", e),
+                        }
+                    });
                 }
             }
         });
@@ -365,39 +350,54 @@ impl GtkLauncherUI {
         window.add_controller(window_key_controller);
 
         // Connect list activation signal
-        let launcher_for_activate = launcher.clone();
+        let daemon_proxy_for_activate = daemon_proxy.clone();
         let app_for_activate = app.clone();
         let list_store_for_activate = list_store.clone();
         list_view.connect_activate(move |_, position| {
             if let Some(obj) = list_store_for_activate.item(position) {
                 if let Some(item_obj) = obj.downcast_ref::<LauncherItemObject>() {
                     let id = item_obj.id();
-                    match launcher_for_activate.borrow().execute_item_by_id(&id) {
-                        Ok(_) => app_for_activate.quit(),
-                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
-                    }
+                    let daemon_proxy_clone = daemon_proxy_for_activate.clone();
+                    let app_clone = app_for_activate.clone();
+                    glib::spawn_future_local(async move {
+                        match daemon_proxy_clone.execute(&id).await {
+                            Ok(_) => app_clone.quit(),
+                            Err(e) => eprintln!("Failed to launch app: {:?}", e),
+                        }
+                    });
                 }
             }
         });
 
         // Initialize with default results
-        let mut launcher_ref = launcher.borrow_mut();
-        let results = launcher_ref.get_default_results();
-        for entry in results.iter() {
-            let item_obj = LauncherItemObject::new(
-                entry.title(),
-                entry.description(),
-                entry.icon(),
-                entry.id(),
-            );
-            list_store.append(&item_obj);
-        }
+        let daemon_proxy_init = daemon_proxy.clone();
+        let list_store_init = list_store.clone();
+        let selection_init = selection.clone();
+        glib::spawn_future_local(async move {
+            match daemon_proxy_init.default_list().await {
+                Ok(resp) => {
+                    if let Some(items) = resp.items {
+                        for item in items {
+                            let item_obj = LauncherItemObject::new(
+                                item.title,
+                                item.description,
+                                item.icon,
+                                item.id,
+                            );
+                            list_store_init.append(&item_obj);
+                        }
+                    }
 
-        // Select the first item if available
-        if list_store.n_items() > 0 {
-            selection.set_selected(0);
-        }
-        drop(launcher_ref); // Release the borrow
+                    // Select the first item if available
+                    if list_store_init.n_items() > 0 {
+                        selection_init.set_selected(0);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to get default list: {:?}", e);
+                }
+            }
+        });
 
         Self { window }
     }
@@ -468,17 +468,6 @@ fn find_icon_file(
     size: &str,
     icon_theme: &IconTheme,
 ) -> Option<std::path::PathBuf> {
-    let cache_key = format!("icon:{}:{}", icon_name, size);
-    let cache = waycast_core::cache::get();
-
-    let result = cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || {
-        search_for_icon(icon_name, size, icon_theme)
-    });
-
-    if let Ok(opt_path) = result {
-        return opt_path;
-    }
-
     search_for_icon(icon_name, size, icon_theme)
 }
 

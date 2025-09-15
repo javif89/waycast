@@ -3,24 +3,23 @@ mod ui;
 use gtk::Application;
 use gtk::prelude::*;
 use ui::gtk::GtkLauncherUI;
-use waycast_core::WaycastLauncher;
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("WayCast v{}", env!("CARGO_PKG_VERSION"));
+    
+    // Connect to the daemon
+    let connection = zbus::Connection::session().await?;
+    let daemon_proxy = waycast_ipc::WaycastServiceProxy::new(&connection).await?;
+    
     let app = Application::builder()
         .application_id("dev.thegrind.waycast")
         .build();
 
-    app.connect_activate(|app| {
-        // Create the core launcher
-        let launcher = WaycastLauncher::new()
-            .add_plugin(Box::new(waycast_plugins::drun::new()))
-            .add_plugin(Box::new(waycast_plugins::file_search::new()))
-            .add_plugin(Box::new(waycast_plugins::projects::new()))
-            .init();
-
+    let daemon_proxy_clone = daemon_proxy.clone();
+    app.connect_activate(move |app| {
         // Create and show the GTK UI
-        let ui = GtkLauncherUI::new(app, launcher);
+        let ui = GtkLauncherUI::new(app, daemon_proxy_clone.clone());
 
         // Apply built-in default styles
         if let Err(e) = ui.apply_default_css() {
@@ -37,4 +36,5 @@ fn main() {
     });
 
     app.run();
+    Ok(())
 }

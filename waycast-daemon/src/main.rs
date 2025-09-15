@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use waycast_core::WaycastLauncher;
-use waycast_ipc::{Client, Response, WaycastService};
+use waycast_ipc::WaycastService;
 use zbus::{connection, interface};
 
 #[tokio::main]

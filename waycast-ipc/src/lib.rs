@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use waycast_core::LauncherListItem;
 use zbus::zvariant::Type;
-use zbus::{Connection, interface, proxy};
+use zbus::interface;
 pub mod client;
 use std::sync::{Arc, Mutex};
 use waycast_core::WaycastLauncher;
@@ -26,9 +26,9 @@ impl From<&Box<dyn LauncherListItem>> for LauncherItem {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Response {
-    response_type: ResponseType,
-    items: Option<Vec<LauncherItem>>,
-    error: Option<String>,
+    pub response_type: ResponseType,
+    pub items: Option<Vec<LauncherItem>>,
+    pub error: Option<String>,
 }
 
 impl Response {
@@ -58,11 +58,11 @@ pub enum ResponseType {
 
 impl From<&Vec<Box<dyn LauncherListItem>>> for Response {
     fn from(value: &Vec<Box<dyn LauncherListItem>>) -> Self {
-        let items = value.iter().map(|r| Some(LauncherItem::from(r))).collect();
+        let items = value.iter().map(|r| LauncherItem::from(r)).collect();
 
         Response {
             response_type: ResponseType::Items,
-            items,
+            items: Some(items),
             error: None,
         }
     }
