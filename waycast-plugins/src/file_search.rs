@@ -272,15 +272,25 @@ impl LauncherPlugin for FileSearchPlugin {
         let mut scored_entries: Vec<(u16, FileEntry)> = Vec::new();
 
         for f in files.iter() {
+            let mut best_score = None;
+
+            // Try to match against filename first
             if let Some(file_name) = f.path.file_name() {
                 let file_name_str = file_name.to_string_lossy();
-
-                // Try to match against filename
-                if let Some(score) =
-                    atom.score(Utf32Str::Ascii(file_name_str.as_bytes()), &mut matcher)
-                {
-                    scored_entries.push((score, f.clone()));
+                if let Some(score) = atom.score(Utf32Str::Ascii(file_name_str.as_bytes()), &mut matcher) {
+                    best_score = Some(score);
                 }
+            }
+
+            // Also try to match against the full path (relative to search paths for cleaner display)
+            let full_path_str = f.path.to_string_lossy();
+            if let Some(score) = atom.score(Utf32Str::Ascii(full_path_str.as_bytes()), &mut matcher) {
+                // Use the better score (higher is better)
+                best_score = Some(best_score.map_or(score, |existing| existing.max(score)));
+            }
+
+            if let Some(score) = best_score {
+                scored_entries.push((score, f.clone()));
             }
         }
 
