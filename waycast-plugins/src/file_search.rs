@@ -1,6 +1,10 @@
 use directories::UserDirs;
 use gio::prelude::FileExt;
 use glib::object::Cast;
+use nucleo_matcher::{
+    Matcher, Utf32Str,
+    pattern::{Atom, AtomKind, CaseMatching, Normalization},
+};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -249,21 +253,46 @@ impl LauncherPlugin for FileSearchPlugin {
             return self.default_list();
         }
 
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-
         // Try to get files without blocking - if indexing is still in progress, return empty
-        if let Ok(files) = self.files.try_lock() {
-            for f in files.iter() {
-                if let Some(file_name) = f.path.file_name() {
-                    let cmp = file_name.to_string_lossy().to_lowercase();
-                    if cmp.contains(&query.to_lowercase()) {
-                        entries.push(Box::new(f.clone()));
-                    }
+        let Ok(files) = self.files.try_lock() else {
+            return Vec::new();
+        };
+
+        // Create matcher and pattern
+        let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+        let atom = Atom::new(
+            query,
+            CaseMatching::Ignore,
+            Normalization::Smart,
+            AtomKind::Fuzzy,
+            false,
+        );
+
+        // Collect matches with scores
+        let mut scored_entries: Vec<(u16, FileEntry)> = Vec::new();
+
+        for f in files.iter() {
+            if let Some(file_name) = f.path.file_name() {
+                let file_name_str = file_name.to_string_lossy();
+
+                // Try to match against filename
+                if let Some(score) =
+                    atom.score(Utf32Str::Ascii(file_name_str.as_bytes()), &mut matcher)
+                {
+                    scored_entries.push((score, f.clone()));
                 }
             }
         }
 
-        entries
+        // Sort by score (higher scores first)
+        scored_entries.sort_by(|a, b| b.0.cmp(&a.0));
+
+        // Convert to launcher items, limiting results for performance
+        scored_entries
+            .into_iter()
+            .take(10) // Limit to top 50 results
+            .map(|(_, entry)| Box::new(entry) as Box<dyn LauncherListItem>)
+            .collect()
     }
 }
 

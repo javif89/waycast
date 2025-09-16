@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use freedesktop::ApplicationEntry;
-use gio::{AppInfo, DesktopAppInfo, prelude::*};
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 use waycast_macros::{launcher_entry, plugin};
 
