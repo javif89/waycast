@@ -4,6 +4,18 @@ A launcher for Wayland that doesn't suck. Think Raycast but for Linux.
 
 I already ordered the programmer socks.
 
+## Special Thanks
+
+- [DevIcon](https://devicon.dev/). Used for the project folder icons
+- [Nucleo Matcher](https://github.com/helix-editor/nucleo). Amazing fuzzy finder library. It powers the search functionality in all the plugins. Very fast.
+
+## Tools I've made as part of developing waycast
+
+Who knows how many it will end up being. So I'll be keeping track below.
+
+- [FreeDesktop](https://github.com/javif89/freedesktop). A rust implementation of the freedesktop spec (in progress). I was relying on GIO for these kinds of things, but the library is very annoying to use and some times not reliable.
+- [Devicon CLI](https://gitgud.foo/javif89/devicon-cli). Needed an easy way to manage and remix the devicon set for this project.
+
 ## What is this?
 
 Waycast is an application launcher built for Wayland desktops. It's fast, extensible, and designed to get out of your way while helping you find what you need.
