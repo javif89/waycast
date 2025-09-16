@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+use freedesktop::ApplicationEntry;
 use gio::{AppInfo, DesktopAppInfo, prelude::*};
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 use waycast_macros::{launcher_entry, plugin};
@@ -8,6 +11,7 @@ pub struct DesktopEntry {
     name: String,
     description: Option<String>,
     icon: String,
+    path: PathBuf,
 }
 
 impl LauncherListItem for DesktopEntry {
@@ -21,29 +25,11 @@ impl LauncherListItem for DesktopEntry {
             self.icon.to_owned()
         },
         execute: {
-            if let Some(di) = DesktopAppInfo::new(&self.id) {
-                // Get the command from the desktop entry and use our detached spawning
-                if let Some(commandline) = di.commandline() {
-                    let cmd_str = commandline.to_string_lossy();
-                    let parts: Vec<&str> = cmd_str.split_whitespace().collect();
-                    if let Some((program, args)) = parts.split_first() {
-                        crate::util::spawn_detached(program, args)
-                            .map_err(|e| LaunchError::CouldNotLaunch(format!("Failed to spawn: {}", e)))?;
-                        Ok(())
-                    } else {
-                        Err(LaunchError::CouldNotLaunch("Empty command".into()))
-                    }
-                } else {
-                    // Fallback to GIO method for complex desktop entries
-                    let app: AppInfo = di.upcast();
-                    let ctx = gio::AppLaunchContext::new();
-                    if app.launch(&[], Some(&ctx)).ok().is_none() {
-                        return Err(LaunchError::CouldNotLaunch("App failed to launch".into()));
-                    };
-                    Ok(())
-                }
-            } else {
-                Err(LaunchError::CouldNotLaunch("Invalid .desktop entry".into()))
+            let app = ApplicationEntry::from_path(&self.path);
+
+            match app.execute() {
+                Ok(_) => Ok(()),
+                Err(_) => Err(LaunchError::CouldNotLaunch("Failed to launch app".into()))
             }
         }
     }
@@ -52,41 +38,17 @@ impl LauncherListItem for DesktopEntry {
 pub fn get_desktop_entries() -> Vec<DesktopEntry> {
     let mut entries = Vec::new();
 
-    for i in gio::AppInfo::all() {
-        let info: gio::DesktopAppInfo = match i.downcast_ref::<gio::DesktopAppInfo>() {
-            Some(inf) => inf.to_owned(),
-            None => continue,
-        };
-        if !info.should_show() {
+    for app in ApplicationEntry::all() {
+        if !app.should_show() {
             continue;
         }
 
         let de = DesktopEntry {
-            id: info.id().unwrap_or_default().to_string(),
-            name: info.display_name().to_string(),
-            description: info.description().map(|d| d.to_string()),
-            icon: {
-                if let Some(icon) = info.icon() {
-                    if let Ok(ti) = icon.clone().downcast::<gio::ThemedIcon>() {
-                        // ThemedIcon may have multiple names, we take the first
-                        if let Some(name) = ti.names().first() {
-                            name.to_string()
-                        } else {
-                            "application-x-executable".to_string()
-                        }
-                    } else if let Ok(fi) = icon.clone().downcast::<gio::FileIcon>() {
-                        if let Some(path) = fi.file().path() {
-                            path.to_string_lossy().to_string()
-                        } else {
-                            "application-x-executable".to_string()
-                        }
-                    } else {
-                        "application-x-executable".to_string()
-                    }
-                } else {
-                    "application-x-executable".to_string()
-                }
-            },
+            id: app.id().unwrap_or_default().to_string(),
+            name: app.name().unwrap_or("Name not found".into()),
+            description: app.comment().map(|d| d.to_string()),
+            icon: app.icon().unwrap_or("application-x-executable".to_string()),
+            path: app.path().into(),
         };
 
         entries.push(de);
