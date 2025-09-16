@@ -4,7 +4,9 @@ use freedesktop::ApplicationEntry;
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 use waycast_macros::{launcher_entry, plugin};
 
-#[derive(Debug)]
+use crate::util::{FuzzyMatcher, FuzzySearchable};
+
+#[derive(Debug, Clone)]
 pub struct DesktopEntry {
     id: String,
     name: String,
@@ -31,6 +33,12 @@ impl LauncherListItem for DesktopEntry {
                 Err(_) => Err(LaunchError::CouldNotLaunch("Failed to launch app".into()))
             }
         }
+    }
+}
+
+impl FuzzySearchable for DesktopEntry {
+    fn primary_key(&self) -> String {
+        self.name.to_owned()
     }
 }
 
@@ -93,16 +101,14 @@ impl LauncherPlugin for DrunPlugin {
             return self.default_list();
         }
 
-        let query_lower = query.to_lowercase();
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-        for entry in self.default_list() {
-            let title_lower = entry.title().to_lowercase();
-            if title_lower.contains(&query_lower) {
-                entries.push(entry);
-            }
-        }
+        let mut fm = FuzzyMatcher::new();
+        let entries = get_desktop_entries();
+        let matches = fm.match_items(query, &entries, 5);
 
-        entries
+        matches
+            .into_iter()
+            .map(|de| Box::new(de.clone()) as Box<dyn LauncherListItem>)
+            .collect()
     }
 }
 

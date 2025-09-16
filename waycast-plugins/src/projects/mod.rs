@@ -13,8 +13,11 @@ use tokio::sync::Mutex;
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin, cache::CacheTTL};
 use waycast_macros::{launcher_entry, plugin};
 
-use crate::projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner};
-use crate::util::spawn_detached;
+use crate::util::{FuzzyMatcher, spawn_detached};
+use crate::{
+    projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner},
+    util::FuzzySearchable,
+};
 
 static TOKEI_SCANNER: LazyLock<TypeScanner> = LazyLock::new(TypeScanner::new);
 static FRAMEWORK_DETECTOR: LazyLock<FrameworkDetector> = LazyLock::new(FrameworkDetector::new);
@@ -68,6 +71,20 @@ impl LauncherListItem for ProjectEntry {
                 Err(LaunchError::CouldNotLaunch("No program found in exec_command".into()))
             }
         }
+    }
+}
+
+impl FuzzySearchable for ProjectEntry {
+    fn primary_key(&self) -> String {
+        self.path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string()
+    }
+
+    fn secondary_keys(&self) -> Vec<String> {
+        vec![self.path.to_string_lossy().to_string()]
     }
 }
 
@@ -170,21 +187,21 @@ impl LauncherPlugin for ProjectsPlugin {
             return self.default_list();
         }
 
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
-
         // Try to get files without blocking - if indexing is still in progress, return empty
-        if let Ok(files) = self.files.try_lock() {
-            for f in files.iter() {
-                if let Some(file_name) = f.path.file_name() {
-                    let cmp = file_name.to_string_lossy().to_lowercase();
-                    if cmp.contains(&query.to_lowercase()) {
-                        entries.push(Box::new(f.clone()));
-                    }
-                }
-            }
-        }
+        let Ok(files) = self.files.try_lock() else {
+            return Vec::new();
+        };
 
-        entries
+        let mut fuzzy_matcher = FuzzyMatcher::new();
+
+        // Get fuzzy matches directly on FileEntry slice
+        let matches = fuzzy_matcher.match_items(query, &files, 10);
+
+        // Convert to LauncherListItem
+        matches
+            .into_iter()
+            .map(|project_entry| Box::new(project_entry.clone()) as Box<dyn LauncherListItem>)
+            .collect()
     }
 }
 
