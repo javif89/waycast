@@ -3,42 +3,38 @@ mod ui;
 use gtk::Application;
 use gtk::prelude::*;
 use ui::gtk::GtkLauncherUI;
-use waycast_protocol::WaycastClient;
+use waycast_core::WaycastLauncher;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     println!("WayCast v{}", env!("CARGO_PKG_VERSION"));
-
     let app = Application::builder()
         .application_id("dev.thegrind.waycast")
         .build();
 
     app.connect_activate(|app| {
-        // Connect to the daemon synchronously
-        match WaycastClient::connect() {
-            Ok(client) => {
-                // Create and show the GTK UI
-                let ui = GtkLauncherUI::new(app, client);
+        // Create the core launcher
+        let launcher = WaycastLauncher::new()
+            .add_plugin(Box::new(waycast_plugins::drun::new()))
+            .add_plugin(Box::new(waycast_plugins::file_search::new()))
+            .add_plugin(Box::new(waycast_plugins::projects::new()))
+            .init();
 
-                // Apply built-in default styles
-                if let Err(e) = ui.apply_default_css() {
-                    eprintln!("Warning: Could not apply default styles: {}", e);
-                }
+        // Create and show the GTK UI
+        let ui = GtkLauncherUI::new(app, launcher);
 
-                if let Some(path) = waycast_config::config_path("waycast.css")
-                    && ui.apply_css(path).is_err()
-                {
-                    println!("No user css found");
-                }
+        // Apply built-in default styles
+        if let Err(e) = ui.apply_default_css() {
+            eprintln!("Warning: Could not apply default styles: {}", e);
+        }
 
-                ui.show();
-            }
-            Err(e) => {
-                eprintln!("Failed to connect to daemon: {}", e);
-                app.quit();
+        if let Some(path) = waycast_config::config_path("waycast.css") {
+            if ui.apply_css(path).is_err() {
+                println!("No user css found");
             }
         }
+
+        ui.show();
     });
 
     app.run();
-    Ok(())
 }

@@ -5,8 +5,6 @@ members = [
     "waycast-plugins",
     "waycast-gtk",
     "waycast-config",
-    "waycast-daemon",
-    "waycast-protocol",
 ]
 resolver = "2"
 

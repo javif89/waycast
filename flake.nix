@@ -57,15 +57,10 @@
             gtk4-layer-shell
           ];
 
-          # Install custom icons and systemd service
+          # Install custom icons
           postInstall = ''
             mkdir -p $out/share/waycast/icons
             cp -r assets/icons/* $out/share/waycast/icons/
-
-            # Install systemd user service
-            mkdir -p $out/lib/systemd/user
-            substitute ${./waycast-daemon.service} $out/lib/systemd/user/waycast-daemon.service \
-              --replace "%i" "$out"
           '';
 
           # wrapGAppsHook4 handles most GTK runtime setup automatically
@@ -108,6 +103,29 @@
             hicolor-icon-theme
             adwaita-icon-theme
           ];
+
+          # Ensure display environment variables are available
+          shellHook = ''
+            export GDK_BACKEND=wayland,x11
+            export QT_QPA_PLATFORM=wayland;xcb
+            export SDL_VIDEODRIVER=wayland
+            export CLUTTER_BACKEND=wayland
+            
+            # Inherit display variables from parent environment if available
+            if [ -n "$WAYLAND_DISPLAY" ]; then
+              export WAYLAND_DISPLAY="$WAYLAND_DISPLAY"
+            fi
+            if [ -n "$DISPLAY" ]; then
+              export DISPLAY="$DISPLAY"
+            fi
+            if [ -n "$XDG_RUNTIME_DIR" ]; then
+              export XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"
+            fi
+            
+            echo "Display environment setup complete"
+            echo "WAYLAND_DISPLAY: $WAYLAND_DISPLAY"
+            echo "DISPLAY: $DISPLAY"
+          '';
         };
 
         # Move overlay outside system-specific outputs
