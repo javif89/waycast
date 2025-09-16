@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-09-16
+
+### Breaking Changes
+- **Architecture Revert**: Removed daemon-based architecture and returned to direct embedded launcher
+- **Removed Components**: Eliminated `waycast-daemon` and `waycast-protocol` crates
+
+### Added
+- **Direct UI Integration**: GTK application now constructs its own `WaycastLauncher` instance directly
+- **All Plugin Support**: Restored support for all plugins (drun, file_search, projects) in single process
+
+### Fixed
+- **Application Spawn Environment**: Fixed critical issue where launched applications lost display environment access
+- **VS Code Terminal Compatibility**: Applications launched through waycast now properly inherit display variables
+- **Session Preservation**: Changed from `setsid()` to `setpgid(0, 0)` to maintain session while detaching processes
+
+### Enhanced
+- **Development Experience**: Simplified architecture makes debugging and development easier
+
+### Technical
+- **Spawn Function Improvements**: Enhanced `spawn_detached` to explicitly preserve `WAYLAND_DISPLAY`, `DISPLAY`, `XDG_RUNTIME_DIR`, `XDG_SESSION_TYPE`, and `XDG_CURRENT_DESKTOP`
+- **Nix Development Shell**: Added proper display environment variable setup for VS Code integration
+- **Process Group Management**: Proper detachment without losing session context
+
+### Infrastructure
+- **Systemd Removal**: Eliminated systemd service installation and management
+
 ## [0.1.1] - 2025-09-15
 
 ### Enhanced

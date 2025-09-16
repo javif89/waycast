@@ -2328,7 +2328,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-config"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "config",
  "directories",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bincode",
  "redb",
@@ -2350,7 +2350,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-gtk"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gio",
  "glib",
@@ -2363,7 +2363,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-macros"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2372,7 +2372,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-plugins"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "directories",
  "gio",
