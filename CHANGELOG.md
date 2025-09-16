@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-09-16
+
+### Added
+- **Nucleo-Matcher Integration**: Lightning-fast fuzzy matching from the Helix editor team
+- **FuzzySearchable Trait**: Clean abstraction for fuzzy searching any data type
+- **FuzzyMatcher Utility**: Reusable fuzzy matching component for all plugins
+- **Primary/Secondary Key Support**: Smart scoring system that prioritizes primary matches over secondary ones
+- **Path-Based File Search**: Search files by directory path (e.g., "wallpapers/") alongside filename matching
+- **Intelligent Scoring**: Better relevance ranking with typo tolerance and smart prioritization
+- **Custom Freedesktop Integration**: Replaced complex GIO dependencies with clean, purpose-built freedesktop crate
+
+### Enhanced
+- **File Search Performance**: Dramatically faster search with better relevance ranking
+- **Desktop App Search**: Now uses fuzzy matching for much better app discovery
+- **Search Quality**: Fuzzy matching provides typo tolerance and intelligent substring matching
+- **Developer Experience**: Clean, reusable fuzzy search API for plugin developers
+- **Code Simplification**: Desktop app handling reduced from ~150 lines of complex GIO code to ~60 lines of clean, readable logic
+- **Dependency Reduction**: Eliminated heavy GIO dependencies in favor of lightweight, focused freedesktop crate
+
+### Technical
+- **Generic-Based Design**: Type-safe fuzzy matching without trait object overhead
+- **Zero-Copy Architecture**: Efficient matching that returns references to original data
+- **Configurable Limits**: Built-in result limiting for optimal performance
+- **Score-Based Ranking**: 90% penalty for secondary key matches ensures primary keys rank higher
+
+### Performance
+- **Blazing Fast Search**: Orders of magnitude faster than previous substring matching
+- **Scalable**: Consistent performance even with large file/app collections
+
+### Plugin Updates
+- **File Search**: Now matches both filenames and full paths with intelligent scoring
+- **Desktop Apps**: Fuzzy matching on application names with much better discovery
+- **Unified API**: All plugins use the same high-quality search infrastructure
+
 ## [0.1.2] - 2025-09-16
 
 ### Breaking Changes
