@@ -74,12 +74,18 @@ impl LauncherListItem for FileEntry {
 }
 
 impl FuzzySearchable for FileEntry {
-    fn search_key(&self) -> String {
+    fn primary_key(&self) -> String {
+        // Primary: filename (most common search case)
         self.path
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string()
+    }
+    
+    fn secondary_keys(&self) -> Vec<String> {
+        // Secondary: full path (for directory-based searches)
+        vec![self.path.to_string_lossy().to_string()]
     }
 }
 
