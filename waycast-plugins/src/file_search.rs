@@ -1,10 +1,6 @@
 use directories::UserDirs;
 use gio::prelude::FileExt;
 use glib::object::Cast;
-use nucleo_matcher::{
-    Matcher, Utf32Str,
-    pattern::{Atom, AtomKind, CaseMatching, Normalization},
-};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -13,7 +9,7 @@ use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
 use waycast_macros::{launcher_entry, plugin};
 
-use crate::util::spawn_detached;
+use crate::util::{FuzzyMatcher, FuzzySearchable, spawn_detached};
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
 
 #[derive(Clone)]
@@ -74,6 +70,16 @@ impl LauncherListItem for FileEntry {
                 }
             }
         }
+    }
+}
+
+impl FuzzySearchable for FileEntry {
+    fn search_key(&self) -> String {
+        self.path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string()
     }
 }
 
@@ -258,50 +264,15 @@ impl LauncherPlugin for FileSearchPlugin {
             return Vec::new();
         };
 
-        // Create matcher and pattern
-        let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
-        let atom = Atom::new(
-            query,
-            CaseMatching::Ignore,
-            Normalization::Smart,
-            AtomKind::Fuzzy,
-            false,
-        );
+        let mut fuzzy_matcher = FuzzyMatcher::new();
 
-        // Collect matches with scores
-        let mut scored_entries: Vec<(u16, FileEntry)> = Vec::new();
+        // Get fuzzy matches directly on FileEntry slice
+        let matches = fuzzy_matcher.match_items(query, &files, 10);
 
-        for f in files.iter() {
-            let mut best_score = None;
-
-            // Try to match against filename first
-            if let Some(file_name) = f.path.file_name() {
-                let file_name_str = file_name.to_string_lossy();
-                if let Some(score) = atom.score(Utf32Str::Ascii(file_name_str.as_bytes()), &mut matcher) {
-                    best_score = Some(score);
-                }
-            }
-
-            // Also try to match against the full path (relative to search paths for cleaner display)
-            let full_path_str = f.path.to_string_lossy();
-            if let Some(score) = atom.score(Utf32Str::Ascii(full_path_str.as_bytes()), &mut matcher) {
-                // Use the better score (higher is better)
-                best_score = Some(best_score.map_or(score, |existing| existing.max(score)));
-            }
-
-            if let Some(score) = best_score {
-                scored_entries.push((score, f.clone()));
-            }
-        }
-
-        // Sort by score (higher scores first)
-        scored_entries.sort_by(|a, b| b.0.cmp(&a.0));
-
-        // Convert to launcher items, limiting results for performance
-        scored_entries
+        // Convert to LauncherListItem
+        matches
             .into_iter()
-            .take(10) // Limit to top 50 results
-            .map(|(_, entry)| Box::new(entry) as Box<dyn LauncherListItem>)
+            .map(|file_entry| Box::new(file_entry.clone()) as Box<dyn LauncherListItem>)
             .collect()
     }
 }
