@@ -25,7 +25,7 @@
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "waycast";
-          version = "0.1.1";
+          version = "0.2.0";
           src = self;
 
           cargoLock.lockFile = ./Cargo.lock;
@@ -110,7 +110,7 @@
             export QT_QPA_PLATFORM=wayland;xcb
             export SDL_VIDEODRIVER=wayland
             export CLUTTER_BACKEND=wayland
-            
+
             # Inherit display variables from parent environment if available
             if [ -n "$WAYLAND_DISPLAY" ]; then
               export WAYLAND_DISPLAY="$WAYLAND_DISPLAY"
@@ -121,7 +121,7 @@
             if [ -n "$XDG_RUNTIME_DIR" ]; then
               export XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"
             fi
-            
+
             # Set XDG_SESSION_TYPE if not already set
             if [ -z "$XDG_SESSION_TYPE" ]; then
               if [ -n "$WAYLAND_DISPLAY" ]; then
@@ -130,7 +130,7 @@
                 export XDG_SESSION_TYPE=x11
               fi
             fi
-            
+
             echo "Display environment setup complete"
             echo "WAYLAND_DISPLAY: $WAYLAND_DISPLAY"
             echo "DISPLAY: $DISPLAY"
