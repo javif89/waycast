@@ -122,9 +122,19 @@
               export XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"
             fi
             
+            # Set XDG_SESSION_TYPE if not already set
+            if [ -z "$XDG_SESSION_TYPE" ]; then
+              if [ -n "$WAYLAND_DISPLAY" ]; then
+                export XDG_SESSION_TYPE=wayland
+              elif [ -n "$DISPLAY" ]; then
+                export XDG_SESSION_TYPE=x11
+              fi
+            fi
+            
             echo "Display environment setup complete"
             echo "WAYLAND_DISPLAY: $WAYLAND_DISPLAY"
             echo "DISPLAY: $DISPLAY"
+            echo "XDG_SESSION_TYPE: $XDG_SESSION_TYPE"
           '';
         };
 
