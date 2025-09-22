@@ -9,3 +9,5 @@ waycast.toml
 xdg
 # For when I have to test nix builds
 result
+flamegraph.svg
+perf.data

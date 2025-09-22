@@ -102,6 +102,9 @@
             # Icons (so themed icons resolve)
             hicolor-icon-theme
             adwaita-icon-theme
+
+            # Benchmarking
+            linuxKernel.packages.linux_6_6.perf
           ];
 
           # Ensure display environment variables are available

@@ -103,7 +103,8 @@ bench: ## Run benchmarks
 	cargo bench --workspace
 
 profile: ## Profile the application (requires cargo-flamegraph)
-	cargo flamegraph --bin waycast
+	cargo flamegraph
+	brave flamegraph.svg
 
 size: ## Check binary size
 	@echo "Binary sizes:"
