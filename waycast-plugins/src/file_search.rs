@@ -82,7 +82,7 @@ impl FuzzySearchable for FileEntry {
             .to_string_lossy()
             .to_string()
     }
-    
+
     fn secondary_keys(&self) -> Vec<String> {
         // Secondary: full path (for directory-based searches)
         vec![self.path.to_string_lossy().to_string()]

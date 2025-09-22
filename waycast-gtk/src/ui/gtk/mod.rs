@@ -1,19 +1,19 @@
 use gio::prelude::ApplicationExt;
+use glib;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
     ApplicationWindow, Box as GtkBox, CellRendererPixbuf, CellRendererText, Entry,
-    EventControllerKey, IconTheme, ListStore, Orientation, ScrolledWindow, TreeView,
-    TreeViewColumn, TreePath,
+    EventControllerKey, IconTheme, ListStore, Orientation, ScrolledWindow, TreePath, TreeView,
+    TreeViewColumn,
 };
-use glib;
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use waycast_core::cache::CacheTTL;
 use waycast_core::WaycastLauncher;
+use waycast_core::cache::CacheTTL;
 
 // Column indices for the ListStore
 const COL_ICON: u32 = 0;
@@ -51,9 +51,9 @@ impl GtkLauncherUI {
 
         // Create the list store with columns: Icon (Pixbuf), Text (String with markup), ID (String)
         let list_store = ListStore::new(&[
-            Pixbuf::static_type(),  // Icon
-            String::static_type(),   // Combined title/description with Pango markup
-            String::static_type(),   // Hidden ID
+            Pixbuf::static_type(), // Icon
+            String::static_type(), // Combined title/description with Pango markup
+            String::static_type(), // Hidden ID
         ]);
 
         // Create the TreeView
@@ -119,27 +119,37 @@ impl GtkLauncherUI {
         search_input.grab_focus();
 
         // Helper function to populate the TreeView
-        let populate_tree_view = |list_store: &ListStore, results: &[Box<dyn waycast_core::LauncherListItem>], icon_theme: &IconTheme| {
+        let populate_tree_view = |list_store: &ListStore,
+                                  results: &[Box<dyn waycast_core::LauncherListItem>],
+                                  icon_theme: &IconTheme| {
             list_store.clear();
-            
+
             for entry in results.iter() {
                 // Load icon as Pixbuf (with caching)
-                let pixbuf = if let Some(icon_path) = find_icon_file(&entry.icon(), "48", icon_theme) {
-                    Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok()
-                } else {
-                    None
-                }.unwrap_or_else(|| {
-                    // Try to get default icon from theme or create empty pixbuf
-                    if let Some(default_path) = find_icon_file("application-x-executable", "48", icon_theme) {
-                        Pixbuf::from_file_at_scale(&default_path, 48, 48, true).ok()
+                let pixbuf =
+                    if let Some(icon_path) = find_icon_file(&entry.icon(), "48", icon_theme) {
+                        Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok()
                     } else {
                         None
-                    }.unwrap_or_else(|| {
-                        // Last resort: create an empty pixbuf  
-                        Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 48, 48)
-                            .unwrap_or_else(|| Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 1, 1).unwrap())
-                    })
-                });
+                    }
+                    .unwrap_or_else(|| {
+                        // Try to get default icon from theme or create empty pixbuf
+                        if let Some(default_path) =
+                            find_icon_file("application-x-executable", "48", icon_theme)
+                        {
+                            Pixbuf::from_file_at_scale(&default_path, 48, 48, true).ok()
+                        } else {
+                            None
+                        }
+                        .unwrap_or_else(|| {
+                            // Last resort: create an empty pixbuf
+                            Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 48, 48)
+                                .unwrap_or_else(|| {
+                                    Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 1, 1)
+                                        .unwrap()
+                                })
+                        })
+                    });
 
                 // Create Pango markup for title and description
                 let text_markup = if let Some(desc) = entry.description() {
@@ -154,11 +164,14 @@ impl GtkLauncherUI {
 
                 // Add row to ListStore
                 let iter = list_store.append();
-                list_store.set(&iter, &[
-                    (COL_ICON, &pixbuf),
-                    (COL_TEXT, &text_markup),
-                    (COL_ID, &entry.id()),
-                ]);
+                list_store.set(
+                    &iter,
+                    &[
+                        (COL_ICON, &pixbuf),
+                        (COL_TEXT, &text_markup),
+                        (COL_ID, &entry.id()),
+                    ],
+                );
             }
         };
 
@@ -255,7 +268,7 @@ impl GtkLauncherUI {
                 gtk::gdk::Key::Down => {
                     let selection = tree_view_for_keys.selection();
                     let (selected_paths, _) = selection.selected_rows();
-                    
+
                     if let Some(path) = selected_paths.first() {
                         let indices = path.indices();
                         if let Some(index) = indices.first() {
@@ -263,21 +276,33 @@ impl GtkLauncherUI {
                             if next_index < list_store_for_keys.iter_n_children(None) {
                                 let next_path = gtk::TreePath::from_indices(&[next_index]);
                                 selection.select_path(&next_path);
-                                tree_view_for_keys.scroll_to_cell(Some(&next_path), None::<&TreeViewColumn>, false, 0.0, 0.0);
+                                tree_view_for_keys.scroll_to_cell(
+                                    Some(&next_path),
+                                    None::<&TreeViewColumn>,
+                                    false,
+                                    0.0,
+                                    0.0,
+                                );
                             }
                         }
                     } else if list_store_for_keys.iter_n_children(None) > 0 {
                         // No selection, select first item
                         let first_path = gtk::TreePath::from_indices(&[0]);
                         selection.select_path(&first_path);
-                        tree_view_for_keys.scroll_to_cell(Some(&first_path), None::<&TreeViewColumn>, false, 0.0, 0.0);
+                        tree_view_for_keys.scroll_to_cell(
+                            Some(&first_path),
+                            None::<&TreeViewColumn>,
+                            false,
+                            0.0,
+                            0.0,
+                        );
                     }
                     gtk::glib::Propagation::Stop
                 }
                 gtk::gdk::Key::Up => {
                     let selection = tree_view_for_keys.selection();
                     let (selected_paths, _) = selection.selected_rows();
-                    
+
                     if let Some(path) = selected_paths.first() {
                         let indices = path.indices();
                         if let Some(index) = indices.first() {
@@ -285,7 +310,13 @@ impl GtkLauncherUI {
                                 let prev_index = index - 1;
                                 let prev_path = gtk::TreePath::from_indices(&[prev_index]);
                                 selection.select_path(&prev_path);
-                                tree_view_for_keys.scroll_to_cell(Some(&prev_path), None::<&TreeViewColumn>, false, 0.0, 0.0);
+                                tree_view_for_keys.scroll_to_cell(
+                                    Some(&prev_path),
+                                    None::<&TreeViewColumn>,
+                                    false,
+                                    0.0,
+                                    0.0,
+                                );
                             }
                         }
                     }
@@ -336,7 +367,11 @@ impl GtkLauncherUI {
             tree_view.selection().select_iter(&iter);
         }
 
-        Self { window, tree_view, list_store }
+        Self {
+            window,
+            tree_view,
+            list_store,
+        }
     }
 }
 

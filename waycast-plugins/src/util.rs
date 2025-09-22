@@ -1,8 +1,8 @@
-use std::process::{Command, Stdio};
 use nucleo_matcher::{
     Matcher, Utf32Str,
     pattern::{Atom, AtomKind, CaseMatching, Normalization},
 };
+use std::process::{Command, Stdio};
 
 /// Spawn a detached process that preserves the display environment
 pub fn spawn_detached(program: &str, args: &[&str]) -> Result<(), std::io::Error> {
@@ -49,7 +49,7 @@ pub fn spawn_detached(program: &str, args: &[&str]) -> Result<(), std::io::Error
 pub trait FuzzySearchable {
     /// Return the primary string to match against (highest priority)
     fn primary_key(&self) -> String;
-    
+
     /// Return secondary search keys (lower priority than primary)
     /// Default implementation returns empty Vec for types with no secondary keys
     fn secondary_keys(&self) -> Vec<String> {
@@ -71,9 +71,14 @@ impl FuzzyMatcher {
     }
 
     /// Match a query against a list of strings, returning the best matches with their scores
-    /// 
+    ///
     /// Returns a Vec of (score, original_string) tuples, sorted by score (best first)
-    pub fn match_strings(&mut self, query: &str, candidates: &[String], max_results: usize) -> Vec<(u16, String)> {
+    pub fn match_strings(
+        &mut self,
+        query: &str,
+        candidates: &[String],
+        max_results: usize,
+    ) -> Vec<(u16, String)> {
         if query.is_empty() {
             return Vec::new();
         }
@@ -89,7 +94,9 @@ impl FuzzyMatcher {
         let mut scored_matches: Vec<(u16, String)> = Vec::new();
 
         for candidate in candidates {
-            if let Some(score) = atom.score(Utf32Str::Ascii(candidate.as_bytes()), &mut self.matcher) {
+            if let Some(score) =
+                atom.score(Utf32Str::Ascii(candidate.as_bytes()), &mut self.matcher)
+            {
                 scored_matches.push((score, candidate.clone()));
             }
         }
@@ -102,9 +109,14 @@ impl FuzzyMatcher {
     }
 
     /// Match a query against a list of FuzzySearchable items, returning the best matches
-    /// 
+    ///
     /// Returns a Vec of matched items, sorted by relevance (best first)
-    pub fn match_items<'a, T: FuzzySearchable>(&mut self, query: &str, candidates: &'a [T], max_results: usize) -> Vec<&'a T> {
+    pub fn match_items<'a, T: FuzzySearchable>(
+        &mut self,
+        query: &str,
+        candidates: &'a [T],
+        max_results: usize,
+    ) -> Vec<&'a T> {
         if query.is_empty() {
             return Vec::new();
         }
@@ -124,17 +136,23 @@ impl FuzzyMatcher {
 
             // Try primary key first (full score)
             let primary_key = candidate.primary_key();
-            if let Some(score) = atom.score(Utf32Str::Ascii(primary_key.as_bytes()), &mut self.matcher) {
+            if let Some(score) =
+                atom.score(Utf32Str::Ascii(primary_key.as_bytes()), &mut self.matcher)
+            {
                 best_score = Some(score);
             }
 
             // Try secondary keys (with slight penalty to prioritize primary)
             let secondary_keys = candidate.secondary_keys();
             for secondary_key in &secondary_keys {
-                if let Some(score) = atom.score(Utf32Str::Ascii(secondary_key.as_bytes()), &mut self.matcher) {
+                if let Some(score) =
+                    atom.score(Utf32Str::Ascii(secondary_key.as_bytes()), &mut self.matcher)
+                {
                     // Apply small penalty to secondary matches (90% of original score)
                     let adjusted_score = (score as f32 * 0.9) as u16;
-                    best_score = Some(best_score.map_or(adjusted_score, |existing| existing.max(adjusted_score)));
+                    best_score = Some(
+                        best_score.map_or(adjusted_score, |existing| existing.max(adjusted_score)),
+                    );
                 }
             }
 
