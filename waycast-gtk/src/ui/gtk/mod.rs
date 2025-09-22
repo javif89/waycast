@@ -1,13 +1,12 @@
 use gio::prelude::ApplicationExt;
-use gio::ListStore;
-use gtk::gdk::Texture;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
-use gtk::subclass::prelude::ObjectSubclassIsExt;
 use gtk::{
-    ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, IconTheme, Image, Label, ListView,
-    Orientation, ScrolledWindow, SignalListItemFactory, SingleSelection,
+    ApplicationWindow, Box as GtkBox, CellRendererPixbuf, CellRendererText, Entry,
+    EventControllerKey, IconTheme, ListStore, Orientation, ScrolledWindow, TreeView,
+    TreeViewColumn, TreePath,
 };
+use glib;
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
@@ -16,67 +15,17 @@ use std::rc::Rc;
 use waycast_core::cache::CacheTTL;
 use waycast_core::WaycastLauncher;
 
-// GObject wrapper to store LauncherListItem in GTK's model system
-mod imp {
-    use gtk::glib;
-    use gtk::subclass::prelude::*;
-    use std::cell::RefCell;
-
-    #[derive(Default)]
-    pub struct LauncherItemObject {
-        pub title: RefCell<String>,
-        pub description: RefCell<Option<String>>,
-        pub icon: RefCell<String>,
-        pub id: RefCell<String>, // Store id to access original entry
-    }
-
-    #[glib::object_subclass]
-    impl ObjectSubclass for LauncherItemObject {
-        const NAME: &'static str = "WaycastLauncherItemObject";
-        type Type = super::LauncherItemObject;
-        type ParentType = glib::Object;
-    }
-
-    impl ObjectImpl for LauncherItemObject {}
-}
-
-glib::wrapper! {
-    pub struct LauncherItemObject(ObjectSubclass<imp::LauncherItemObject>);
-}
-
-impl LauncherItemObject {
-    pub fn new(title: String, description: Option<String>, icon: String, id: String) -> Self {
-        let obj: Self = glib::Object::new();
-        let imp = obj.imp();
-
-        // Store the data
-        *imp.title.borrow_mut() = title;
-        *imp.description.borrow_mut() = description;
-        *imp.icon.borrow_mut() = icon;
-        *imp.id.borrow_mut() = id;
-
-        obj
-    }
-
-    pub fn title(&self) -> String {
-        self.imp().title.borrow().clone()
-    }
-
-    pub fn icon(&self) -> String {
-        self.imp().icon.borrow().clone()
-    }
-
-    pub fn description(&self) -> Option<String> {
-        self.imp().description.borrow().clone()
-    }
-
-    pub fn id(&self) -> String {
-        self.imp().id.borrow().clone()
-    }
-}
+// Column indices for the ListStore
+const COL_ICON: u32 = 0;
+const COL_TEXT: u32 = 1;
+const COL_ID: u32 = 2;
 
 pub struct GtkLauncherUI {
     window: ApplicationWindow,
+    #[allow(dead_code)]
+    tree_view: TreeView,
+    #[allow(dead_code)]
+    list_store: ListStore,
 }
 
 impl GtkLauncherUI {
@@ -100,96 +49,46 @@ impl GtkLauncherUI {
         let scrolled_window = ScrolledWindow::new();
         scrolled_window.set_min_content_height(300);
 
-        // Create the list store and selection model
-        let list_store = ListStore::new::<LauncherItemObject>();
-        let selection = SingleSelection::new(Some(list_store.clone()));
+        // Create the list store with columns: Icon (Pixbuf), Text (String with markup), ID (String)
+        let list_store = ListStore::new(&[
+            Pixbuf::static_type(),  // Icon
+            String::static_type(),   // Combined title/description with Pango markup
+            String::static_type(),   // Hidden ID
+        ]);
 
-        // Create factory for rendering list items
-        let factory = SignalListItemFactory::new();
+        // Create the TreeView
+        let tree_view = TreeView::with_model(&list_store);
+        tree_view.set_headers_visible(false);
+        tree_view.set_enable_search(false);
+        tree_view.set_activate_on_single_click(false);
+        tree_view.set_vexpand(true);
+        tree_view.set_can_focus(true);
+        tree_view.set_widget_name("results-list");
+        tree_view.add_css_class("launcher-list");
 
-        // Setup factory to create widgets
-        factory.connect_setup(move |_, list_item| {
-            let container = GtkBox::new(Orientation::Horizontal, 10);
-            container.set_widget_name("list-item");
-            container.add_css_class("launcher-item");
-            list_item.set_child(Some(&container));
-        });
+        // Create icon column with CellRendererPixbuf
+        let icon_renderer = CellRendererPixbuf::new();
+        icon_renderer.set_padding(5, 5);
+        let icon_column = TreeViewColumn::new();
+        icon_column.pack_start(&icon_renderer, false);
+        icon_column.add_attribute(&icon_renderer, "pixbuf", COL_ICON as i32);
+        tree_view.append_column(&icon_column);
 
-        // Setup factory to bind data to widgets
-        factory.connect_bind(move |_, list_item| {
-            let child = list_item.child().and_downcast::<GtkBox>().unwrap();
+        // Create text column with CellRendererText using Pango markup
+        let text_renderer = CellRendererText::new();
+        text_renderer.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        text_renderer.set_padding(5, 5);
+        let text_column = TreeViewColumn::new();
+        text_column.set_expand(true);
+        text_column.pack_start(&text_renderer, true);
+        text_column.add_attribute(&text_renderer, "markup", COL_TEXT as i32);
+        tree_view.append_column(&text_column);
 
-            // Clear existing children
-            while let Some(first_child) = child.first_child() {
-                child.remove(&first_child);
-            }
+        // Get the selection model
+        let selection = tree_view.selection();
+        selection.set_mode(gtk::SelectionMode::Single);
 
-            if let Some(item_obj) = list_item.item().and_downcast::<LauncherItemObject>() {
-                let display = gtk::gdk::Display::default().unwrap();
-                let icon_theme = gtk::IconTheme::for_display(&display);
-                let icon_size = 48;
-
-                // Create icon
-                let image: gtk::Image;
-                if let Some(icon_path) = find_icon_file(&item_obj.icon(), "48", &icon_theme) {
-                    image = match Pixbuf::from_file_at_scale(icon_path, icon_size, icon_size, true)
-                    {
-                        Ok(pb) => {
-                            let tex = Texture::for_pixbuf(&pb);
-                            gtk::Image::from_paintable(Some(&tex))
-                        }
-                        Err(e) => {
-                            eprintln!("err: {}", e);
-                            Image::from_icon_name("application-x-executable")
-                        }
-                    }
-                } else if let Some(default) = find_icon_file("vscode", "48", &icon_theme) {
-                    image = gtk::Image::from_file(default);
-                } else {
-                    image = Image::from_icon_name("application-x-executable");
-                }
-                image.set_pixel_size(icon_size);
-                image.set_widget_name("item-icon");
-                image.add_css_class("launcher-icon");
-
-                // Create text container (vertical box for title + description)
-                let text_box = GtkBox::new(Orientation::Vertical, 2);
-                text_box.set_hexpand(true);
-                text_box.set_valign(gtk::Align::Center);
-                text_box.set_widget_name("item-text");
-                text_box.add_css_class("launcher-text");
-
-                // Create title label
-                let title_label = Label::new(Some(&item_obj.title()));
-                title_label.set_xalign(0.0);
-                title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-                title_label.set_widget_name("item-title");
-                title_label.add_css_class("launcher-title");
-                text_box.append(&title_label);
-
-                // Create description label if description exists
-                if let Some(description) = item_obj.description() {
-                    let desc_label = Label::new(Some(&description));
-                    desc_label.set_xalign(0.0);
-                    desc_label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
-                    desc_label.set_widget_name("item-description");
-                    desc_label.add_css_class("launcher-description");
-                    desc_label.set_opacity(0.7);
-                    text_box.append(&desc_label);
-                }
-
-                child.append(&image);
-                child.append(&text_box);
-            }
-        });
-
-        let list_view = ListView::new(Some(selection.clone()), Some(factory));
-        list_view.set_vexpand(true);
-        list_view.set_can_focus(true);
-        list_view.set_widget_name("results-list");
-        list_view.add_css_class("launcher-list");
-
-        scrolled_window.set_child(Some(&list_view));
+        scrolled_window.set_child(Some(&tree_view));
         scrolled_window.set_widget_name("results-container");
         scrolled_window.add_css_class("launcher-results-container");
 
@@ -219,16 +118,62 @@ impl GtkLauncherUI {
         // Set initial focus to search input so user can start typing immediately
         search_input.grab_focus();
 
+        // Helper function to populate the TreeView
+        let populate_tree_view = |list_store: &ListStore, results: &[Box<dyn waycast_core::LauncherListItem>], icon_theme: &IconTheme| {
+            list_store.clear();
+            
+            for entry in results.iter() {
+                // Load icon as Pixbuf (with caching)
+                let pixbuf = if let Some(icon_path) = find_icon_file(&entry.icon(), "48", icon_theme) {
+                    Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok()
+                } else {
+                    None
+                }.unwrap_or_else(|| {
+                    // Try to get default icon from theme or create empty pixbuf
+                    if let Some(default_path) = find_icon_file("application-x-executable", "48", icon_theme) {
+                        Pixbuf::from_file_at_scale(&default_path, 48, 48, true).ok()
+                    } else {
+                        None
+                    }.unwrap_or_else(|| {
+                        // Last resort: create an empty pixbuf  
+                        Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 48, 48)
+                            .unwrap_or_else(|| Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 1, 1).unwrap())
+                    })
+                });
+
+                // Create Pango markup for title and description
+                let text_markup = if let Some(desc) = entry.description() {
+                    format!(
+                        "<b>{}</b>\n<small><i>{}</i></small>",
+                        glib::markup_escape_text(&entry.title()),
+                        glib::markup_escape_text(&desc)
+                    )
+                } else {
+                    format!("<b>{}</b>", glib::markup_escape_text(&entry.title()))
+                };
+
+                // Add row to ListStore
+                let iter = list_store.append();
+                list_store.set(&iter, &[
+                    (COL_ICON, &pixbuf),
+                    (COL_TEXT, &text_markup),
+                    (COL_ID, &entry.id()),
+                ]);
+            }
+        };
+
         // Set up async search handlers to prevent UI blocking
         let launcher_for_search = launcher.clone();
         let list_store_for_search = list_store.clone();
-        let selection_for_search = selection.clone();
+        let tree_view_for_search = tree_view.clone();
 
         // Add debouncing to avoid excessive searches with generation counter
         let search_generation = Rc::new(RefCell::new(0u64));
 
         search_input.connect_changed(move |entry| {
             let query = entry.text().to_string();
+            let display = gtk::gdk::Display::default().unwrap();
+            let icon_theme = IconTheme::for_display(&display);
 
             // Increment generation to cancel any pending searches
             *search_generation.borrow_mut() += 1;
@@ -237,27 +182,18 @@ impl GtkLauncherUI {
                 // Handle empty query synchronously for immediate response
                 let mut launcher_ref = launcher_for_search.borrow_mut();
                 let results = launcher_ref.get_default_results();
-
-                list_store_for_search.remove_all();
-                for entry in results.iter() {
-                    let item_obj = LauncherItemObject::new(
-                        entry.title(),
-                        entry.description(),
-                        entry.icon(),
-                        entry.id(),
-                    );
-                    list_store_for_search.append(&item_obj);
-                }
+                populate_tree_view(&list_store_for_search, &results, &icon_theme);
+                drop(launcher_ref);
 
                 // Select first item
-                if list_store_for_search.n_items() > 0 {
-                    selection_for_search.set_selected(0);
+                if let Some(iter) = list_store_for_search.iter_first() {
+                    tree_view_for_search.selection().select_iter(&iter);
                 }
             } else {
                 // Debounced async search for non-empty queries
                 let launcher_clone = launcher_for_search.clone();
                 let list_store_clone = list_store_for_search.clone();
-                let selection_clone = selection_for_search.clone();
+                let tree_view_clone = tree_view_for_search.clone();
 
                 let current_generation = *search_generation.borrow();
                 let generation_check = search_generation.clone();
@@ -270,36 +206,20 @@ impl GtkLauncherUI {
 
                         let launcher_clone = launcher_clone.clone();
                         let list_store_clone = list_store_clone.clone();
-                        let selection_clone = selection_clone.clone();
+                        let tree_view_clone = tree_view_clone.clone();
                         let query = query.clone();
+                        let icon_theme = icon_theme.clone();
 
                         glib::spawn_future_local(async move {
-                            // Run search and collect items immediately
-                            let items: Vec<LauncherItemObject> = {
-                                let mut launcher_ref = launcher_clone.borrow_mut();
-                                let results = launcher_ref.search(&query);
-                                results
-                                    .iter()
-                                    .map(|entry| {
-                                        LauncherItemObject::new(
-                                            entry.title(),
-                                            entry.description(),
-                                            entry.icon(),
-                                            entry.id(),
-                                        )
-                                    })
-                                    .collect()
-                            };
-
-                            // Update UI on main thread
-                            list_store_clone.remove_all();
-                            for item_obj in items {
-                                list_store_clone.append(&item_obj);
-                            }
+                            // Run search and populate immediately
+                            let mut launcher_ref = launcher_clone.borrow_mut();
+                            let results = launcher_ref.search(&query);
+                            populate_tree_view(&list_store_clone, &results, &icon_theme);
+                            drop(launcher_ref);
 
                             // Select first item
-                            if list_store_clone.n_items() > 0 {
-                                selection_clone.set_selected(0);
+                            if let Some(iter) = list_store_clone.iter_first() {
+                                tree_view_clone.selection().select_iter(&iter);
                             }
                         });
 
@@ -310,12 +230,14 @@ impl GtkLauncherUI {
 
         // Connect Enter key activation for search input
         let launcher_for_enter = launcher.clone();
-        let selection_for_enter = selection.clone();
+        let list_store_for_enter = list_store.clone();
+        let tree_view_for_enter = tree_view.clone();
         let app_for_enter = app.clone();
         search_input.connect_activate(move |_| {
-            if let Some(selected_item) = selection_for_enter.selected_item() {
-                if let Some(item_obj) = selected_item.downcast_ref::<LauncherItemObject>() {
-                    let id = item_obj.id();
+            let (selected_paths, _) = tree_view_for_enter.selection().selected_rows();
+            if let Some(path) = selected_paths.first() {
+                if let Some(iter) = list_store_for_enter.iter(path) {
+                    let id: String = list_store_for_enter.get(&iter, COL_ID as i32);
                     match launcher_for_enter.borrow().execute_item_by_id(&id) {
                         Ok(_) => app_for_enter.quit(),
                         Err(e) => eprintln!("Failed to launch app: {:?}", e),
@@ -326,23 +248,46 @@ impl GtkLauncherUI {
 
         // Add key handler for launcher-style navigation
         let search_key_controller = EventControllerKey::new();
-        let selection_for_keys = selection.clone();
+        let tree_view_for_keys = tree_view.clone();
+        let list_store_for_keys = list_store.clone();
         search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
             match keyval {
                 gtk::gdk::Key::Down => {
-                    let current_pos = selection_for_keys.selected();
-                    let n_items = selection_for_keys.model().unwrap().n_items();
-                    if current_pos < n_items - 1 {
-                        selection_for_keys.set_selected(current_pos + 1);
-                    } else if n_items > 0 && current_pos == gtk::INVALID_LIST_POSITION {
-                        selection_for_keys.set_selected(0);
+                    let selection = tree_view_for_keys.selection();
+                    let (selected_paths, _) = selection.selected_rows();
+                    
+                    if let Some(path) = selected_paths.first() {
+                        let indices = path.indices();
+                        if let Some(index) = indices.first() {
+                            let next_index = index + 1;
+                            if next_index < list_store_for_keys.iter_n_children(None) {
+                                let next_path = gtk::TreePath::from_indices(&[next_index]);
+                                selection.select_path(&next_path);
+                                tree_view_for_keys.scroll_to_cell(Some(&next_path), None::<&TreeViewColumn>, false, 0.0, 0.0);
+                            }
+                        }
+                    } else if list_store_for_keys.iter_n_children(None) > 0 {
+                        // No selection, select first item
+                        let first_path = gtk::TreePath::from_indices(&[0]);
+                        selection.select_path(&first_path);
+                        tree_view_for_keys.scroll_to_cell(Some(&first_path), None::<&TreeViewColumn>, false, 0.0, 0.0);
                     }
                     gtk::glib::Propagation::Stop
                 }
                 gtk::gdk::Key::Up => {
-                    let current_pos = selection_for_keys.selected();
-                    if current_pos > 0 {
-                        selection_for_keys.set_selected(current_pos - 1);
+                    let selection = tree_view_for_keys.selection();
+                    let (selected_paths, _) = selection.selected_rows();
+                    
+                    if let Some(path) = selected_paths.first() {
+                        let indices = path.indices();
+                        if let Some(index) = indices.first() {
+                            if *index > 0 {
+                                let prev_index = index - 1;
+                                let prev_path = gtk::TreePath::from_indices(&[prev_index]);
+                                selection.select_path(&prev_path);
+                                tree_view_for_keys.scroll_to_cell(Some(&prev_path), None::<&TreeViewColumn>, false, 0.0, 0.0);
+                            }
+                        }
                     }
                     gtk::glib::Propagation::Stop
                 }
@@ -364,42 +309,34 @@ impl GtkLauncherUI {
         });
         window.add_controller(window_key_controller);
 
-        // Connect list activation signal
+        // Connect tree view row activation signal
         let launcher_for_activate = launcher.clone();
         let app_for_activate = app.clone();
         let list_store_for_activate = list_store.clone();
-        list_view.connect_activate(move |_, position| {
-            if let Some(obj) = list_store_for_activate.item(position) {
-                if let Some(item_obj) = obj.downcast_ref::<LauncherItemObject>() {
-                    let id = item_obj.id();
-                    match launcher_for_activate.borrow().execute_item_by_id(&id) {
-                        Ok(_) => app_for_activate.quit(),
-                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
-                    }
+        tree_view.connect_row_activated(move |_, path, _| {
+            if let Some(iter) = list_store_for_activate.iter(path) {
+                let id: String = list_store_for_activate.get(&iter, COL_ID as i32);
+                match launcher_for_activate.borrow().execute_item_by_id(&id) {
+                    Ok(_) => app_for_activate.quit(),
+                    Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
             }
         });
 
         // Initialize with default results
+        let display = gtk::gdk::Display::default().unwrap();
+        let icon_theme = IconTheme::for_display(&display);
         let mut launcher_ref = launcher.borrow_mut();
         let results = launcher_ref.get_default_results();
-        for entry in results.iter() {
-            let item_obj = LauncherItemObject::new(
-                entry.title(),
-                entry.description(),
-                entry.icon(),
-                entry.id(),
-            );
-            list_store.append(&item_obj);
-        }
-
-        // Select the first item if available
-        if list_store.n_items() > 0 {
-            selection.set_selected(0);
-        }
+        populate_tree_view(&list_store, &results, &icon_theme);
         drop(launcher_ref); // Release the borrow
 
-        Self { window }
+        // Select the first item if available
+        if let Some(iter) = list_store.iter_first() {
+            tree_view.selection().select_iter(&iter);
+        }
+
+        Self { window, tree_view, list_store }
     }
 }
 

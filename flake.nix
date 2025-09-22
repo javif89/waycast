@@ -103,8 +103,9 @@
             hicolor-icon-theme
             adwaita-icon-theme
 
-            # Benchmarking
+            # Benchmarking / Profiling
             linuxKernel.packages.linux_6_6.perf
+            valgrind
           ];
 
           # Ensure display environment variables are available
