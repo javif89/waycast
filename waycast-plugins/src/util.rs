@@ -70,44 +70,6 @@ impl FuzzyMatcher {
         }
     }
 
-    /// Match a query against a list of strings, returning the best matches with their scores
-    ///
-    /// Returns a Vec of (score, original_string) tuples, sorted by score (best first)
-    pub fn match_strings(
-        &mut self,
-        query: &str,
-        candidates: &[String],
-        max_results: usize,
-    ) -> Vec<(u16, String)> {
-        if query.is_empty() {
-            return Vec::new();
-        }
-
-        let atom = Atom::new(
-            query,
-            CaseMatching::Ignore,
-            Normalization::Smart,
-            AtomKind::Fuzzy,
-            false,
-        );
-
-        let mut scored_matches: Vec<(u16, String)> = Vec::new();
-
-        for candidate in candidates {
-            if let Some(score) =
-                atom.score(Utf32Str::Ascii(candidate.as_bytes()), &mut self.matcher)
-            {
-                scored_matches.push((score, candidate.clone()));
-            }
-        }
-
-        // Sort by score (higher scores first)
-        scored_matches.sort_by(|a, b| b.0.cmp(&a.0));
-
-        // Return top results
-        scored_matches.into_iter().take(max_results).collect()
-    }
-
     /// Match a query against a list of FuzzySearchable items, returning the best matches
     ///
     /// Returns a Vec of matched items, sorted by relevance (best first)

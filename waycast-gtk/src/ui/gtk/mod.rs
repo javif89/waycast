@@ -172,7 +172,7 @@ impl GtkLauncherUI {
                 // Handle empty query synchronously for immediate response
                 let mut launcher_ref = launcher_for_search.borrow_mut();
                 let results = launcher_ref.get_default_results();
-                populate_flow_box(&flow_box_for_search, &results);
+                populate_flow_box(&flow_box_for_search, results);
                 drop(launcher_ref);
 
                 // Select first item
@@ -202,7 +202,7 @@ impl GtkLauncherUI {
                             // Run search and populate immediately
                             let mut launcher_ref = launcher_clone.borrow_mut();
                             let results = launcher_ref.search(&query);
-                            populate_flow_box(&flow_box_clone, &results);
+                            populate_flow_box(&flow_box_clone, results);
                             drop(launcher_ref);
 
                             // Select first item
@@ -222,15 +222,15 @@ impl GtkLauncherUI {
         let flow_box_for_enter = flow_box.clone();
         let app_for_enter = app.clone();
         search_input.connect_activate(move |_| {
-            if let Some(selected_child) = flow_box_for_enter.selected_children().first() {
-                if let Some(item_box) = selected_child.child() {
-                    let id = item_box.widget_name();
-                    match launcher_for_enter.borrow().execute_item_by_id(id.as_str()) {
-                        Ok(_) => {
-                            app_for_enter.quit();
-                        }
-                        Err(e) => eprintln!("Failed to launch app: {:?}", e),
+            if let Some(selected_child) = flow_box_for_enter.selected_children().first()
+                && let Some(item_box) = selected_child.child()
+            {
+                let id = item_box.widget_name();
+                match launcher_for_enter.borrow().execute_item_by_id(id.as_str()) {
+                    Ok(_) => {
+                        app_for_enter.quit();
                     }
+                    Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
             }
         });
@@ -269,7 +269,7 @@ impl GtkLauncherUI {
                 }
             };
 
-            let result = match keyval {
+            match keyval {
                 gtk::gdk::Key::Down => {
                     // Move to next item in FlowBox
                     if let Some(selected_children) = flow_box_for_keys.selected_children().first() {
@@ -289,19 +289,18 @@ impl GtkLauncherUI {
                 }
                 gtk::gdk::Key::Up => {
                     // Move to previous item in FlowBox
-                    if let Some(selected_children) = flow_box_for_keys.selected_children().first() {
-                        if let Some(prev_child) = selected_children.prev_sibling() {
-                            flow_box_for_keys.unselect_all();
-                            flow_box_for_keys
-                                .select_child(&prev_child.downcast::<FlowBoxChild>().unwrap());
-                            scroll_to_selected();
-                        }
+                    if let Some(selected_children) = flow_box_for_keys.selected_children().first()
+                        && let Some(prev_child) = selected_children.prev_sibling()
+                    {
+                        flow_box_for_keys.unselect_all();
+                        flow_box_for_keys
+                            .select_child(&prev_child.downcast::<FlowBoxChild>().unwrap());
+                        scroll_to_selected();
                     }
                     gtk::glib::Propagation::Stop
                 }
                 _ => gtk::glib::Propagation::Proceed,
-            };
-            result
+            }
         });
         search_input.add_controller(search_key_controller);
 
@@ -346,7 +345,7 @@ impl GtkLauncherUI {
         glib::idle_add_local(move || {
             let mut launcher_ref = launcher_for_defer.borrow_mut();
             let results = launcher_ref.get_default_results();
-            populate_flow_box(&flow_box_for_defer, &results);
+            populate_flow_box(&flow_box_for_defer, results);
             drop(launcher_ref);
 
             // Select the first item if available
