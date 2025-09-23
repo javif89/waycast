@@ -90,18 +90,11 @@ pub fn get<T: DeserializeOwned>(key: &str) -> Result<T, config::ConfigError> {
 fn init() -> Config {
     let mut cfg = Config::builder();
 
-    println!("Config: {}", config_path("waycast.toml").unwrap().display());
     if let Some(path) = config_path("waycast.toml") {
         cfg = cfg.add_source(config::File::with_name(&path.to_string_lossy()).required(false));
     }
 
     cfg = cfg.add_source(Environment::with_prefix("WAYCAST"));
-
-    println!("Using directories");
-    println!("---");
-    println!("{}", config_dir().unwrap().display());
-    println!("{}", cache_dir().unwrap().display());
-    println!("{}", data_dir().unwrap().display());
 
     cfg.build().unwrap()
 }

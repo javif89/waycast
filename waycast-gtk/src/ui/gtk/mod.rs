@@ -1,6 +1,5 @@
 use gio::prelude::ApplicationExt;
 use glib;
-use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
     ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, FlowBox, FlowBoxChild, Image, Label,
@@ -11,7 +10,6 @@ use layerShell::LayerShell;
 use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
-use std::time::Instant;
 use waycast_core::WaycastLauncher;
 use waycast_core::cache::CacheTTL;
 
@@ -31,12 +29,8 @@ pub struct FlowBoxItem {
 
 impl GtkLauncherUI {
     pub fn new(app: &gtk::Application, launcher: WaycastLauncher) -> Self {
-        let ui_start = Instant::now();
-        eprintln!("[PROFILE] Starting UI creation");
-        
         let launcher = Rc::new(std::cell::RefCell::new(launcher));
         
-        let window_start = Instant::now();
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -44,9 +38,6 @@ impl GtkLauncherUI {
             .default_height(500)
             .resizable(false)
             .build();
-        eprintln!("[PROFILE] Window creation: {:?}", window_start.elapsed());
-
-        let widgets_start = Instant::now();
         let main_box = GtkBox::new(Orientation::Vertical, 0);
 
         let search_input = Entry::new();
@@ -59,7 +50,6 @@ impl GtkLauncherUI {
         scrolled_window.set_vexpand(true); // Make sure scroll window expands
 
         // Create FlowBox like wofi (much simpler than TreeView)
-        let flow_box_start = Instant::now();
         let flow_box = FlowBox::new();
         flow_box.set_max_children_per_line(1); // Single column like a list
         flow_box.set_selection_mode(gtk::SelectionMode::Browse);
@@ -69,7 +59,6 @@ impl GtkLauncherUI {
         flow_box.set_hexpand(true); // Expand horizontally too
         flow_box.set_widget_name("results-list");
         flow_box.add_css_class("launcher-list");
-        eprintln!("[PROFILE] FlowBox creation: {:?}", flow_box_start.elapsed());
 
         scrolled_window.set_child(Some(&flow_box));
         scrolled_window.set_widget_name("results-container");
@@ -79,14 +68,12 @@ impl GtkLauncherUI {
         main_box.append(&scrolled_window);
         main_box.set_widget_name("main-container");
         main_box.add_css_class("launcher-main");
-        eprintln!("[PROFILE] Basic widgets creation: {:?}", widgets_start.elapsed());
 
         window.set_child(Some(&main_box));
         window.set_widget_name("launcher-window");
         window.add_css_class("launcher-window");
 
         // Set up layer shell so the launcher can float
-        let layer_shell_start = Instant::now();
         window.init_layer_shell();
         let edges = [
             layerShell::Edge::Top,
@@ -99,7 +86,6 @@ impl GtkLauncherUI {
         }
         window.set_keyboard_mode(layerShell::KeyboardMode::OnDemand);
         window.set_layer(layerShell::Layer::Top);
-        eprintln!("[PROFILE] Layer shell setup: {:?}", layer_shell_start.elapsed());
 
         // Set initial focus to search input so user can start typing immediately
         search_input.grab_focus();
@@ -107,22 +93,12 @@ impl GtkLauncherUI {
         // Helper function to populate the FlowBox with direct GtkImage widgets
         let populate_flow_box =
             |flow_box: &FlowBox, results: &[Box<dyn waycast_core::LauncherListItem>]| {
-                let populate_start = Instant::now();
-                eprintln!("[PROFILE] Starting to populate FlowBox with {} items", results.len());
-                
-                let clear_start = Instant::now();
                 // Remove all existing children
                 while let Some(child) = flow_box.first_child() {
                     flow_box.remove(&child);
                 }
-                eprintln!("[PROFILE]   FlowBox clear: {:?}", clear_start.elapsed());
 
-                let mut total_icon_time = std::time::Duration::new(0, 0);
-                let mut total_widget_time = std::time::Duration::new(0, 0);
-
-                for (idx, entry) in results.iter().enumerate() {
-                    let widget_start = Instant::now();
-                    
+                for entry in results.iter() {
                     // Create main horizontal box for this item (like wofi does)
                     let item_box = GtkBox::new(Orientation::Horizontal, 8);
                     item_box.set_margin_start(8);
@@ -131,14 +107,9 @@ impl GtkLauncherUI {
                     item_box.set_margin_bottom(4);
 
                     // Load icon and create GtkImage directly
-                    let icon_start = Instant::now();
                     let image = if let Some(icon_path) = find_icon_file(&entry.icon(), "48") {
-                        let image_load_start = Instant::now();
                         let image = Image::from_file(&icon_path);
                         image.set_pixel_size(48);
-                        if idx < 5 {
-                            eprintln!("[PROFILE]     Image::from_file: {:?}", image_load_start.elapsed());
-                        }
                         image
                     } else {
                         // Fallback to default icon
@@ -153,11 +124,6 @@ impl GtkLauncherUI {
                             image
                         }
                     };
-                    let icon_elapsed = icon_start.elapsed();
-                    total_icon_time += icon_elapsed;
-                    if idx < 5 || idx % 50 == 0 {
-                        eprintln!("[PROFILE]   Icon {} load: {:?}", idx, icon_elapsed);
-                    }
 
                     // Create text label with markup
                     let label = Label::new(None);
@@ -184,18 +150,7 @@ impl GtkLauncherUI {
 
                     // Add to flow box
                     flow_box.insert(&item_box, -1);
-                    
-                    let widget_elapsed = widget_start.elapsed();
-                    total_widget_time += widget_elapsed;
                 }
-                
-                eprintln!("[PROFILE] FlowBox population complete: {:?}", populate_start.elapsed());
-                eprintln!("[PROFILE]   Total icon time: {:?} (avg: {:?})", 
-                    total_icon_time, 
-                    total_icon_time / results.len().max(1) as u32);
-                eprintln!("[PROFILE]   Total widget time: {:?} (avg: {:?})", 
-                    total_widget_time,
-                    total_widget_time / results.len().max(1) as u32);
             };
 
         // Set up async search handlers to prevent UI blocking
@@ -206,9 +161,7 @@ impl GtkLauncherUI {
         let search_generation = Rc::new(RefCell::new(0u64));
 
         search_input.connect_changed(move |entry| {
-            let search_start = Instant::now();
             let query = entry.text().to_string();
-            eprintln!("[PROFILE] Search triggered for: '{}'", query);
             let _display = gtk::gdk::Display::default().unwrap();
 
             // Increment generation to cancel any pending searches
@@ -216,10 +169,8 @@ impl GtkLauncherUI {
 
             if query.trim().is_empty() {
                 // Handle empty query synchronously for immediate response
-                let default_start = Instant::now();
                 let mut launcher_ref = launcher_for_search.borrow_mut();
                 let results = launcher_ref.get_default_results();
-                eprintln!("[PROFILE]   Get default results: {:?}", default_start.elapsed());
                 populate_flow_box(&flow_box_for_search, &results);
                 drop(launcher_ref);
 
@@ -227,7 +178,6 @@ impl GtkLauncherUI {
                 if let Some(first_child) = flow_box_for_search.first_child() {
                     flow_box_for_search.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                 }
-                eprintln!("[PROFILE] Empty query handling total: {:?}", search_start.elapsed());
             } else {
                 // Debounced async search for non-empty queries
                 let launcher_clone = launcher_for_search.clone();
@@ -248,10 +198,8 @@ impl GtkLauncherUI {
 
                         glib::spawn_future_local(async move {
                             // Run search and populate immediately
-                            let search_exec_start = Instant::now();
                             let mut launcher_ref = launcher_clone.borrow_mut();
                             let results = launcher_ref.search(&query);
-                            eprintln!("[PROFILE]   Search execution for '{}': {:?}", query, search_exec_start.elapsed());
                             populate_flow_box(&flow_box_clone, &results);
                             drop(launcher_ref);
 
@@ -259,7 +207,6 @@ impl GtkLauncherUI {
                             if let Some(first_child) = flow_box_clone.first_child() {
                                 flow_box_clone.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                             }
-                            eprintln!("[PROFILE] Search + populate total for '{}': {:?}", query, search_exec_start.elapsed());
                         });
 
                         glib::ControlFlow::Break
@@ -272,21 +219,17 @@ impl GtkLauncherUI {
         let flow_box_for_enter = flow_box.clone();
         let app_for_enter = app.clone();
         search_input.connect_activate(move |_| {
-            let activate_start = Instant::now();
             if let Some(selected_child) = flow_box_for_enter.selected_children().first() {
                 if let Some(item_box) = selected_child.child() {
                     let id = item_box.widget_name();
-                    let execute_start = Instant::now();
                     match launcher_for_enter.borrow().execute_item_by_id(id.as_str()) {
                         Ok(_) => {
-                            eprintln!("[PROFILE] Execute item: {:?}", execute_start.elapsed());
                             app_for_enter.quit();
                         },
                         Err(e) => eprintln!("Failed to launch app: {:?}", e),
                     }
                 }
             }
-            eprintln!("[PROFILE] Total activation handling: {:?}", activate_start.elapsed());
         });
 
         // Add key handler for launcher-style navigation
@@ -294,7 +237,6 @@ impl GtkLauncherUI {
         let flow_box_for_keys = flow_box.clone();
         let scrolled_window_for_keys = scrolled_window.clone();
         search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
-            let key_start = Instant::now();
             
             // Helper function to scroll to the selected widget
             let scroll_to_selected = || {
@@ -354,9 +296,6 @@ impl GtkLauncherUI {
                 }
                 _ => gtk::glib::Propagation::Proceed,
             };
-            if matches!(keyval, gtk::gdk::Key::Down | gtk::gdk::Key::Up) {
-                eprintln!("[PROFILE] Key navigation: {:?}", key_start.elapsed());
-            }
             result
         });
         search_input.add_controller(search_key_controller);
@@ -378,24 +317,18 @@ impl GtkLauncherUI {
         let launcher_for_activate = launcher.clone();
         let app_for_activate = app.clone();
         flow_box.connect_child_activated(move |_, child| {
-            let row_activate_start = Instant::now();
             if let Some(item_box) = child.child() {
                 let id = item_box.widget_name();
-                let execute_start = Instant::now();
                 match launcher_for_activate.borrow().execute_item_by_id(id.as_str()) {
                     Ok(_) => {
-                        eprintln!("[PROFILE] Row activation execute: {:?}", execute_start.elapsed());
                         app_for_activate.quit();
                     },
                     Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
             }
-            eprintln!("[PROFILE] Row activation total: {:?}", row_activate_start.elapsed());
         });
 
         // Don't populate initially - defer until after window is shown
-        eprintln!("[PROFILE] Total UI creation time: {:?}", ui_start.elapsed());
-        eprintln!("[PROFILE] =======================================\n");
         
         // Store launcher for deferred population
         let launcher_for_defer = launcher.clone();
@@ -403,10 +336,8 @@ impl GtkLauncherUI {
         
         // Schedule population after window is shown (like wofi does)
         glib::idle_add_local(move || {
-            let defer_start = Instant::now();
             let mut launcher_ref = launcher_for_defer.borrow_mut();
             let results = launcher_ref.get_default_results();
-            eprintln!("[PROFILE] Deferred: Get default results: {:?}", defer_start.elapsed());
             populate_flow_box(&flow_box_for_defer, &results);
             drop(launcher_ref);
             
@@ -414,7 +345,6 @@ impl GtkLauncherUI {
             if let Some(first_child) = flow_box_for_defer.first_child() {
                 flow_box_for_defer.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
             }
-            eprintln!("[PROFILE] Deferred: Population complete: {:?}", defer_start.elapsed());
             
             glib::ControlFlow::Break
         });
@@ -428,22 +358,10 @@ impl GtkLauncherUI {
 
 impl GtkLauncherUI {
     pub fn show(&self) {
-        let show_start = Instant::now();
-        
         // Try to minimize GTK's icon processing by showing window first without content
-        let realize_start = Instant::now();
         gtk::prelude::WidgetExt::realize(&self.window); // Create the GDK resources
-        eprintln!("[PROFILE] Window realize: {:?}", realize_start.elapsed());
-        
-        let show_window_start = Instant::now();
         self.window.show(); // Show without focusing
-        eprintln!("[PROFILE] Window show: {:?}", show_window_start.elapsed());
-        
-        let present_start = Instant::now();
         self.window.present(); // Now present (focus)
-        eprintln!("[PROFILE] Window present: {:?}", present_start.elapsed());
-        
-        eprintln!("[PROFILE] Total window display: {:?}", show_start.elapsed());
     }
 
     /// Apply default built-in CSS styles
@@ -502,21 +420,13 @@ impl GtkLauncherUI {
 }
 
 fn find_icon_file(icon_name: &str, size: &str) -> Option<std::path::PathBuf> {
-    let icon_lookup_start = Instant::now();
     let cache_key = format!("icon:{}:{}", icon_name, size);
     let cache = waycast_core::cache::get();
 
-    let _cache_start = Instant::now();
     let result = cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || {
-        let freedesktop_start = Instant::now();
-        let icon_result = freedesktop::get_icon(icon_name);
-        eprintln!("[PROFILE]     freedesktop::get_icon('{}') uncached: {:?}", icon_name, freedesktop_start.elapsed());
-        icon_result
+        freedesktop::get_icon(icon_name)
     });
     
-    let cached = result.is_ok();
-    eprintln!("[PROFILE]     Icon lookup '{}' (cached={}): {:?}", icon_name, cached, icon_lookup_start.elapsed());
-
     if let Ok(opt_path) = result {
         return opt_path;
     }

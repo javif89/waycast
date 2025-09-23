@@ -179,20 +179,8 @@ impl FileSearchPlugin {
         let files_clone = Arc::clone(&self.files);
         let skip_dirs_clone = self.skip_dirs.clone();
 
-        println!("File search");
-        println!("---Scanning directories---");
-        for p in &self.search_paths {
-            println!("{}", p.display());
-        }
-
-        println!("---Skipping directories---");
-        for p in &self.skip_dirs {
-            println!("{}", p);
-        }
-
         let scan_task = async move {
             let mut local_files = Vec::new();
-            println!("Sup");
 
             for path in &self.search_paths {
                 let walker = WalkDir::new(path).into_iter();
