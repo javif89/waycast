@@ -56,6 +56,7 @@ impl GtkLauncherUI {
 
         let scrolled_window = ScrolledWindow::new();
         scrolled_window.set_min_content_height(300);
+        scrolled_window.set_vexpand(true); // Make sure scroll window expands
 
         // Create FlowBox like wofi (much simpler than TreeView)
         let flow_box_start = Instant::now();
@@ -64,6 +65,8 @@ impl GtkLauncherUI {
         flow_box.set_selection_mode(gtk::SelectionMode::Browse);
         flow_box.set_activate_on_single_click(false);
         flow_box.set_can_focus(true);
+        flow_box.set_vexpand(true); // Expand vertically to fill space
+        flow_box.set_hexpand(true); // Expand horizontally too
         flow_box.set_widget_name("results-list");
         flow_box.add_css_class("launcher-list");
         eprintln!("[PROFILE] FlowBox creation: {:?}", flow_box_start.elapsed());
@@ -289,8 +292,39 @@ impl GtkLauncherUI {
         // Add key handler for launcher-style navigation
         let search_key_controller = EventControllerKey::new();
         let flow_box_for_keys = flow_box.clone();
+        let scrolled_window_for_keys = scrolled_window.clone();
         search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
             let key_start = Instant::now();
+            
+            // Helper function to scroll to the selected widget
+            let scroll_to_selected = || {
+                if let Some(selected_child) = flow_box_for_keys.selected_children().first() {
+                    // Get the widget's allocation to determine scroll position
+                    let allocation = selected_child.allocation();
+                    let _scroll_allocation = scrolled_window_for_keys.allocation();
+                    
+                    // Get current scroll position
+                    let vadjustment = scrolled_window_for_keys.vadjustment();
+                    let current_scroll = vadjustment.value();
+                    let page_size = vadjustment.page_size();
+                    
+                    // Calculate if we need to scroll
+                    let widget_top = allocation.y() as f64;
+                    let widget_bottom = (allocation.y() + allocation.height()) as f64;
+                    let visible_top = current_scroll;
+                    let visible_bottom = current_scroll + page_size;
+                    
+                    // Scroll if widget is not fully visible
+                    if widget_top < visible_top {
+                        // Widget is above visible area, scroll up
+                        vadjustment.set_value(widget_top);
+                    } else if widget_bottom > visible_bottom {
+                        // Widget is below visible area, scroll down
+                        vadjustment.set_value(widget_bottom - page_size);
+                    }
+                }
+            };
+            
             let result = match keyval {
                 gtk::gdk::Key::Down => {
                     // Move to next item in FlowBox
@@ -298,10 +332,12 @@ impl GtkLauncherUI {
                         if let Some(next_child) = selected_children.next_sibling() {
                             flow_box_for_keys.unselect_all();
                             flow_box_for_keys.select_child(&next_child.downcast::<FlowBoxChild>().unwrap());
+                            scroll_to_selected();
                         }
                     } else if let Some(first_child) = flow_box_for_keys.first_child() {
                         // No selection, select first item
                         flow_box_for_keys.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
+                        scroll_to_selected();
                     }
                     gtk::glib::Propagation::Stop
                 }
@@ -311,6 +347,7 @@ impl GtkLauncherUI {
                         if let Some(prev_child) = selected_children.prev_sibling() {
                             flow_box_for_keys.unselect_all();
                             flow_box_for_keys.select_child(&prev_child.downcast::<FlowBoxChild>().unwrap());
+                            scroll_to_selected();
                         }
                     }
                     gtk::glib::Propagation::Stop
