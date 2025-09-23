@@ -4,14 +4,15 @@ use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
     ApplicationWindow, Box as GtkBox, CellRendererPixbuf, CellRendererText, Entry,
-    EventControllerKey, IconTheme, ListStore, Orientation, ScrolledWindow, TreePath, TreeView,
+    EventControllerKey, ListStore, Orientation, ScrolledWindow, TreeView,
     TreeViewColumn,
 };
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
 use std::cell::RefCell;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::rc::Rc;
+use std::time::Instant;
 use waycast_core::WaycastLauncher;
 use waycast_core::cache::CacheTTL;
 
@@ -30,7 +31,12 @@ pub struct GtkLauncherUI {
 
 impl GtkLauncherUI {
     pub fn new(app: &gtk::Application, launcher: WaycastLauncher) -> Self {
+        let ui_start = Instant::now();
+        eprintln!("[PROFILE] Starting UI creation");
+        
         let launcher = Rc::new(std::cell::RefCell::new(launcher));
+        
+        let window_start = Instant::now();
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -38,7 +44,9 @@ impl GtkLauncherUI {
             .default_height(500)
             .resizable(false)
             .build();
+        eprintln!("[PROFILE] Window creation: {:?}", window_start.elapsed());
 
+        let widgets_start = Instant::now();
         let main_box = GtkBox::new(Orientation::Vertical, 0);
 
         let search_input = Entry::new();
@@ -50,13 +58,16 @@ impl GtkLauncherUI {
         scrolled_window.set_min_content_height(300);
 
         // Create the list store with columns: Icon (Pixbuf), Text (String with markup), ID (String)
+        let list_store_start = Instant::now();
         let list_store = ListStore::new(&[
             Pixbuf::static_type(), // Icon
             String::static_type(), // Combined title/description with Pango markup
             String::static_type(), // Hidden ID
         ]);
+        eprintln!("[PROFILE] ListStore creation: {:?}", list_store_start.elapsed());
 
         // Create the TreeView
+        let tree_view_start = Instant::now();
         let tree_view = TreeView::with_model(&list_store);
         tree_view.set_headers_visible(false);
         tree_view.set_enable_search(false);
@@ -65,8 +76,10 @@ impl GtkLauncherUI {
         tree_view.set_can_focus(true);
         tree_view.set_widget_name("results-list");
         tree_view.add_css_class("launcher-list");
+        eprintln!("[PROFILE] TreeView creation: {:?}", tree_view_start.elapsed());
 
         // Create icon column with CellRendererPixbuf
+        let columns_start = Instant::now();
         let icon_renderer = CellRendererPixbuf::new();
         icon_renderer.set_padding(5, 5);
         let icon_column = TreeViewColumn::new();
@@ -83,6 +96,7 @@ impl GtkLauncherUI {
         text_column.pack_start(&text_renderer, true);
         text_column.add_attribute(&text_renderer, "markup", COL_TEXT as i32);
         tree_view.append_column(&text_column);
+        eprintln!("[PROFILE] TreeView columns setup: {:?}", columns_start.elapsed());
 
         // Get the selection model
         let selection = tree_view.selection();
@@ -96,12 +110,14 @@ impl GtkLauncherUI {
         main_box.append(&scrolled_window);
         main_box.set_widget_name("main-container");
         main_box.add_css_class("launcher-main");
+        eprintln!("[PROFILE] Basic widgets creation: {:?}", widgets_start.elapsed());
 
         window.set_child(Some(&main_box));
         window.set_widget_name("launcher-window");
         window.add_css_class("launcher-window");
 
         // Set up layer shell so the launcher can float
+        let layer_shell_start = Instant::now();
         window.init_layer_shell();
         let edges = [
             layerShell::Edge::Top,
@@ -114,6 +130,7 @@ impl GtkLauncherUI {
         }
         window.set_keyboard_mode(layerShell::KeyboardMode::OnDemand);
         window.set_layer(layerShell::Layer::Top);
+        eprintln!("[PROFILE] Layer shell setup: {:?}", layer_shell_start.elapsed());
 
         // Set initial focus to search input so user can start typing immediately
         search_input.grab_focus();
@@ -121,12 +138,27 @@ impl GtkLauncherUI {
         // Helper function to populate the TreeView
         let populate_tree_view =
             |list_store: &ListStore, results: &[Box<dyn waycast_core::LauncherListItem>]| {
+                let populate_start = Instant::now();
+                eprintln!("[PROFILE] Starting to populate TreeView with {} items", results.len());
+                
+                let clear_start = Instant::now();
                 list_store.clear();
+                eprintln!("[PROFILE]   ListStore clear: {:?}", clear_start.elapsed());
 
-                for entry in results.iter() {
+                let mut total_icon_time = std::time::Duration::new(0, 0);
+                let mut total_markup_time = std::time::Duration::new(0, 0);
+                let mut total_insert_time = std::time::Duration::new(0, 0);
+
+                for (idx, entry) in results.iter().enumerate() {
                     // Load icon as Pixbuf (with caching)
+                    let icon_start = Instant::now();
                     let pixbuf = if let Some(icon_path) = find_icon_file(&entry.icon(), "48") {
-                        Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok()
+                        let pixbuf_load_start = Instant::now();
+                        let pixbuf = Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok();
+                        if idx < 5 {
+                            eprintln!("[PROFILE]     Pixbuf::from_file_at_scale: {:?}", pixbuf_load_start.elapsed());
+                        }
+                        pixbuf
                     } else {
                         None
                     }
@@ -147,8 +179,14 @@ impl GtkLauncherUI {
                                 })
                         })
                     });
+                    let icon_elapsed = icon_start.elapsed();
+                    total_icon_time += icon_elapsed;
+                    if idx < 5 || idx % 50 == 0 {
+                        eprintln!("[PROFILE]   Icon {} load: {:?}", idx, icon_elapsed);
+                    }
 
                     // Create Pango markup for title and description
+                    let markup_start = Instant::now();
                     let text_markup = if let Some(desc) = entry.description() {
                         format!(
                             "<b>{}</b>\n<small><i>{}</i></small>",
@@ -158,8 +196,11 @@ impl GtkLauncherUI {
                     } else {
                         format!("<b>{}</b>", glib::markup_escape_text(&entry.title()))
                     };
+                    let markup_elapsed = markup_start.elapsed();
+                    total_markup_time += markup_elapsed;
 
                     // Add row to ListStore
+                    let insert_start = Instant::now();
                     let iter = list_store.append();
                     list_store.set(
                         &iter,
@@ -169,7 +210,20 @@ impl GtkLauncherUI {
                             (COL_ID, &entry.id()),
                         ],
                     );
+                    let insert_elapsed = insert_start.elapsed();
+                    total_insert_time += insert_elapsed;
                 }
+                
+                eprintln!("[PROFILE] TreeView population complete: {:?}", populate_start.elapsed());
+                eprintln!("[PROFILE]   Total icon time: {:?} (avg: {:?})", 
+                    total_icon_time, 
+                    total_icon_time / results.len().max(1) as u32);
+                eprintln!("[PROFILE]   Total markup time: {:?} (avg: {:?})", 
+                    total_markup_time,
+                    total_markup_time / results.len().max(1) as u32);
+                eprintln!("[PROFILE]   Total insert time: {:?} (avg: {:?})", 
+                    total_insert_time,
+                    total_insert_time / results.len().max(1) as u32);
             };
 
         // Set up async search handlers to prevent UI blocking
@@ -181,16 +235,20 @@ impl GtkLauncherUI {
         let search_generation = Rc::new(RefCell::new(0u64));
 
         search_input.connect_changed(move |entry| {
+            let search_start = Instant::now();
             let query = entry.text().to_string();
-            let display = gtk::gdk::Display::default().unwrap();
+            eprintln!("[PROFILE] Search triggered for: '{}'", query);
+            let _display = gtk::gdk::Display::default().unwrap();
 
             // Increment generation to cancel any pending searches
             *search_generation.borrow_mut() += 1;
 
             if query.trim().is_empty() {
                 // Handle empty query synchronously for immediate response
+                let default_start = Instant::now();
                 let mut launcher_ref = launcher_for_search.borrow_mut();
                 let results = launcher_ref.get_default_results();
+                eprintln!("[PROFILE]   Get default results: {:?}", default_start.elapsed());
                 populate_tree_view(&list_store_for_search, &results);
                 drop(launcher_ref);
 
@@ -198,6 +256,7 @@ impl GtkLauncherUI {
                 if let Some(iter) = list_store_for_search.iter_first() {
                     tree_view_for_search.selection().select_iter(&iter);
                 }
+                eprintln!("[PROFILE] Empty query handling total: {:?}", search_start.elapsed());
             } else {
                 // Debounced async search for non-empty queries
                 let launcher_clone = launcher_for_search.clone();
@@ -242,16 +301,22 @@ impl GtkLauncherUI {
         let tree_view_for_enter = tree_view.clone();
         let app_for_enter = app.clone();
         search_input.connect_activate(move |_| {
+            let activate_start = Instant::now();
             let (selected_paths, _) = tree_view_for_enter.selection().selected_rows();
             if let Some(path) = selected_paths.first() {
                 if let Some(iter) = list_store_for_enter.iter(path) {
                     let id: String = list_store_for_enter.get(&iter, COL_ID as i32);
+                    let execute_start = Instant::now();
                     match launcher_for_enter.borrow().execute_item_by_id(&id) {
-                        Ok(_) => app_for_enter.quit(),
+                        Ok(_) => {
+                            eprintln!("[PROFILE] Execute item: {:?}", execute_start.elapsed());
+                            app_for_enter.quit();
+                        },
                         Err(e) => eprintln!("Failed to launch app: {:?}", e),
                     }
                 }
             }
+            eprintln!("[PROFILE] Total activation handling: {:?}", activate_start.elapsed());
         });
 
         // Add key handler for launcher-style navigation
@@ -340,26 +405,48 @@ impl GtkLauncherUI {
         let app_for_activate = app.clone();
         let list_store_for_activate = list_store.clone();
         tree_view.connect_row_activated(move |_, path, _| {
+            let row_activate_start = Instant::now();
             if let Some(iter) = list_store_for_activate.iter(path) {
                 let id: String = list_store_for_activate.get(&iter, COL_ID as i32);
+                let execute_start = Instant::now();
                 match launcher_for_activate.borrow().execute_item_by_id(&id) {
-                    Ok(_) => app_for_activate.quit(),
+                    Ok(_) => {
+                        eprintln!("[PROFILE] Row activation execute: {:?}", execute_start.elapsed());
+                        app_for_activate.quit();
+                    },
                     Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
             }
+            eprintln!("[PROFILE] Row activation total: {:?}", row_activate_start.elapsed());
         });
 
-        // Initialize with default results
-        let mut launcher_ref = launcher.borrow_mut();
-        let results = launcher_ref.get_default_results();
-        populate_tree_view(&list_store, &results);
-        drop(launcher_ref); // Release the borrow
-
-        // Select the first item if available
-        if let Some(iter) = list_store.iter_first() {
-            tree_view.selection().select_iter(&iter);
-        }
-
+        // Don't populate initially - defer until after window is shown
+        eprintln!("[PROFILE] Total UI creation time: {:?}", ui_start.elapsed());
+        eprintln!("[PROFILE] =======================================\n");
+        
+        // Store launcher for deferred population
+        let launcher_for_defer = launcher.clone();
+        let list_store_for_defer = list_store.clone();
+        let tree_view_for_defer = tree_view.clone();
+        
+        // Schedule population after window is shown (like wofi does)
+        glib::idle_add_local(move || {
+            let defer_start = Instant::now();
+            let mut launcher_ref = launcher_for_defer.borrow_mut();
+            let results = launcher_ref.get_default_results();
+            eprintln!("[PROFILE] Deferred: Get default results: {:?}", defer_start.elapsed());
+            populate_tree_view(&list_store_for_defer, &results);
+            drop(launcher_ref);
+            
+            // Select the first item if available
+            if let Some(iter) = list_store_for_defer.iter_first() {
+                tree_view_for_defer.selection().select_iter(&iter);
+            }
+            eprintln!("[PROFILE] Deferred: Population complete: {:?}", defer_start.elapsed());
+            
+            glib::ControlFlow::Break
+        });
+        
         Self {
             window,
             tree_view,
@@ -370,7 +457,22 @@ impl GtkLauncherUI {
 
 impl GtkLauncherUI {
     pub fn show(&self) {
-        self.window.present();
+        let show_start = Instant::now();
+        
+        // Try to minimize GTK's icon processing by showing window first without content
+        let realize_start = Instant::now();
+        gtk::prelude::WidgetExt::realize(&self.window); // Create the GDK resources
+        eprintln!("[PROFILE] Window realize: {:?}", realize_start.elapsed());
+        
+        let show_window_start = Instant::now();
+        self.window.show(); // Show without focusing
+        eprintln!("[PROFILE] Window show: {:?}", show_window_start.elapsed());
+        
+        let present_start = Instant::now();
+        self.window.present(); // Now present (focus)
+        eprintln!("[PROFILE] Window present: {:?}", present_start.elapsed());
+        
+        eprintln!("[PROFILE] Total window display: {:?}", show_start.elapsed());
     }
 
     /// Apply default built-in CSS styles
@@ -429,12 +531,20 @@ impl GtkLauncherUI {
 }
 
 fn find_icon_file(icon_name: &str, size: &str) -> Option<std::path::PathBuf> {
+    let icon_lookup_start = Instant::now();
     let cache_key = format!("icon:{}:{}", icon_name, size);
     let cache = waycast_core::cache::get();
 
+    let _cache_start = Instant::now();
     let result = cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || {
-        freedesktop::get_icon(icon_name)
+        let freedesktop_start = Instant::now();
+        let icon_result = freedesktop::get_icon(icon_name);
+        eprintln!("[PROFILE]     freedesktop::get_icon('{}') uncached: {:?}", icon_name, freedesktop_start.elapsed());
+        icon_result
     });
+    
+    let cached = result.is_ok();
+    eprintln!("[PROFILE]     Icon lookup '{}' (cached={}): {:?}", icon_name, cached, icon_lookup_start.elapsed());
 
     if let Ok(opt_path) = result {
         return opt_path;
