@@ -26,11 +26,19 @@ impl LauncherListItem for DesktopEntry {
             self.icon.to_owned()
         },
         execute: {
-            let app = ApplicationEntry::from_path(&self.path);
-
-            match app.execute() {
-                Ok(_) => Ok(()),
-                Err(_) => Err(LaunchError::CouldNotLaunch("Failed to launch app".into()))
+            match ApplicationEntry::from_path(&self.path) {
+                Ok(app) => {
+                    println!("Found app successfully");
+                    println!("Path: {}", app.path().display());
+                    println!("ID: {}", app.id().unwrap_or("Not found".into()));
+                    match app.execute() {
+                        Ok(_) => Ok(()),
+                        Err(_) => {
+                            Err(LaunchError::CouldNotLaunch("Failed to launch app".into()))
+                        }
+                   }
+                },
+                Err(_) => Err(LaunchError::CouldNotLaunch("Failed to get app from path".into()))
             }
         }
     }

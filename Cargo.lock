@@ -554,34 +554,13 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "freedesktop"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef4b92ffaac125b406c7986ed24071b2821269ea92d41a2559423c99c7534317"
-dependencies = [
- "freedesktop-apps 0.0.2",
- "freedesktop-core 0.0.2",
-]
-
-[[package]]
-name = "freedesktop"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "933c5d2bb9d75ae5f40cf7a961e7306b2343f15dc459a64833b0cb58f814cbba"
 dependencies = [
- "freedesktop-apps 0.0.3",
- "freedesktop-core 0.0.3",
+ "freedesktop-apps",
+ "freedesktop-core",
  "freedesktop-icon",
-]
-
-[[package]]
-name = "freedesktop-apps"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43357582eed763302eb0b6887fc65e0e86e06d2010925dc65d44161b645c5891"
-dependencies = [
- "freedesktop-core 0.0.2",
- "libc",
- "regex",
 ]
 
 [[package]]
@@ -590,18 +569,9 @@ version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38662cf5311656d092f0e37143771a33752dce2c6a80eacf268268622bbe4f8c"
 dependencies = [
- "freedesktop-core 0.0.3",
+ "freedesktop-core",
  "libc",
  "regex",
-]
-
-[[package]]
-name = "freedesktop-core"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28f84e083a0ef86fc6db76efbb5a089b93e4b142aad4cac786c2f4aec5a23128"
-dependencies = [
- "dirs 6.0.0",
 ]
 
 [[package]]
@@ -619,7 +589,7 @@ version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a66b9d3f5dec25f67923e50f74419a11137d4fe0bd2253d2c54196f2eb167bfc"
 dependencies = [
- "freedesktop-core 0.0.3",
+ "freedesktop-core",
  "rust-ini",
 ]
 
@@ -2442,7 +2412,7 @@ dependencies = [
 name = "waycast-gtk"
 version = "0.2.0"
 dependencies = [
- "freedesktop 0.0.3",
+ "freedesktop",
  "gio",
  "glib",
  "gtk4",
@@ -2466,7 +2436,7 @@ name = "waycast-plugins"
 version = "0.2.0"
 dependencies = [
  "directories",
- "freedesktop 0.0.2",
+ "freedesktop",
  "gio",
  "glib",
  "libc",

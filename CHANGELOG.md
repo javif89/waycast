@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+- **Steam launch**: After the previous performance updates, steam would not launch through waycast because it needed a few miliseconds to properly detach from the parent process. This is now fixed by immediately hiding the window, but waiting a few miliseconds before actually stopping the waycast process.
+
 ### Enhanced
 - **UI Performance**: Refactored the UI to start up faster by using simplet GTK widgets
 

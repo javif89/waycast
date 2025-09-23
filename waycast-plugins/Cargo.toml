@@ -28,8 +28,8 @@ tokei = "12.1.2"
 serde = "1.0.219"
 serde_json = "1.0.143"
 libc = "0.2.175"
-freedesktop = { version = "0.0.2", features = ["apps"] }
 nucleo-matcher = "0.3.1"
+freedesktop = "0.0.3"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(rust_analyzer)'] }

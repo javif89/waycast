@@ -221,6 +221,7 @@ impl GtkLauncherUI {
         let launcher_for_enter = launcher.clone();
         let flow_box_for_enter = flow_box.clone();
         let app_for_enter = app.clone();
+        let window_for_enter = window.clone();
         search_input.connect_activate(move |_| {
             if let Some(selected_child) = flow_box_for_enter.selected_children().first()
                 && let Some(item_box) = selected_child.child()
@@ -228,7 +229,12 @@ impl GtkLauncherUI {
                 let id = item_box.widget_name();
                 match launcher_for_enter.borrow().execute_item_by_id(id.as_str()) {
                     Ok(_) => {
-                        app_for_enter.quit();
+                        window_for_enter.set_visible(false);
+                        // Small delay before quitting to allow processes to properly detach
+                        let app_clone = app_for_enter.clone();
+                        glib::timeout_add_local_once(std::time::Duration::from_millis(500), move || {
+                            app_clone.quit();
+                        });
                     }
                     Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
@@ -320,6 +326,7 @@ impl GtkLauncherUI {
         // Connect flow box activation signal
         let launcher_for_activate = launcher.clone();
         let app_for_activate = app.clone();
+        let window_for_activate = window.clone();
         flow_box.connect_child_activated(move |_, child| {
             if let Some(item_box) = child.child() {
                 let id = item_box.widget_name();
@@ -328,7 +335,12 @@ impl GtkLauncherUI {
                     .execute_item_by_id(id.as_str())
                 {
                     Ok(_) => {
-                        app_for_activate.quit();
+                        window_for_activate.set_visible(false);
+                        // Small delay before quitting to allow processes to properly detach
+                        let app_clone = app_for_activate.clone();
+                        glib::timeout_add_local_once(std::time::Duration::from_millis(500), move || {
+                            app_clone.quit();
+                        });
                     }
                     Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
