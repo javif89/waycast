@@ -2,8 +2,8 @@ use gio::prelude::ApplicationExt;
 use glib;
 use gtk::prelude::*;
 use gtk::{
-    ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, FlowBox, FlowBoxChild, Image, Label,
-    Orientation, ScrolledWindow,
+    ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, FlowBox, FlowBoxChild, Image,
+    Label, Orientation, ScrolledWindow,
 };
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
@@ -30,7 +30,7 @@ pub struct FlowBoxItem {
 impl GtkLauncherUI {
     pub fn new(app: &gtk::Application, launcher: WaycastLauncher) -> Self {
         let launcher = Rc::new(std::cell::RefCell::new(launcher));
-        
+
         let window = ApplicationWindow::builder()
             .application(app)
             .title("Waycast")
@@ -113,7 +113,8 @@ impl GtkLauncherUI {
                         image
                     } else {
                         // Fallback to default icon
-                        if let Some(default_path) = find_icon_file("application-x-executable", "48") {
+                        if let Some(default_path) = find_icon_file("application-x-executable", "48")
+                        {
                             let image = Image::from_file(&default_path);
                             image.set_pixel_size(48);
                             image
@@ -176,7 +177,8 @@ impl GtkLauncherUI {
 
                 // Select first item
                 if let Some(first_child) = flow_box_for_search.first_child() {
-                    flow_box_for_search.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
+                    flow_box_for_search
+                        .select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                 }
             } else {
                 // Debounced async search for non-empty queries
@@ -205,7 +207,8 @@ impl GtkLauncherUI {
 
                             // Select first item
                             if let Some(first_child) = flow_box_clone.first_child() {
-                                flow_box_clone.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
+                                flow_box_clone
+                                    .select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                             }
                         });
 
@@ -225,7 +228,7 @@ impl GtkLauncherUI {
                     match launcher_for_enter.borrow().execute_item_by_id(id.as_str()) {
                         Ok(_) => {
                             app_for_enter.quit();
-                        },
+                        }
                         Err(e) => eprintln!("Failed to launch app: {:?}", e),
                     }
                 }
@@ -237,25 +240,24 @@ impl GtkLauncherUI {
         let flow_box_for_keys = flow_box.clone();
         let scrolled_window_for_keys = scrolled_window.clone();
         search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
-            
             // Helper function to scroll to the selected widget
             let scroll_to_selected = || {
                 if let Some(selected_child) = flow_box_for_keys.selected_children().first() {
                     // Get the widget's allocation to determine scroll position
                     let allocation = selected_child.allocation();
                     let _scroll_allocation = scrolled_window_for_keys.allocation();
-                    
+
                     // Get current scroll position
                     let vadjustment = scrolled_window_for_keys.vadjustment();
                     let current_scroll = vadjustment.value();
                     let page_size = vadjustment.page_size();
-                    
+
                     // Calculate if we need to scroll
                     let widget_top = allocation.y() as f64;
                     let widget_bottom = (allocation.y() + allocation.height()) as f64;
                     let visible_top = current_scroll;
                     let visible_bottom = current_scroll + page_size;
-                    
+
                     // Scroll if widget is not fully visible
                     if widget_top < visible_top {
                         // Widget is above visible area, scroll up
@@ -266,19 +268,21 @@ impl GtkLauncherUI {
                     }
                 }
             };
-            
+
             let result = match keyval {
                 gtk::gdk::Key::Down => {
                     // Move to next item in FlowBox
                     if let Some(selected_children) = flow_box_for_keys.selected_children().first() {
                         if let Some(next_child) = selected_children.next_sibling() {
                             flow_box_for_keys.unselect_all();
-                            flow_box_for_keys.select_child(&next_child.downcast::<FlowBoxChild>().unwrap());
+                            flow_box_for_keys
+                                .select_child(&next_child.downcast::<FlowBoxChild>().unwrap());
                             scroll_to_selected();
                         }
                     } else if let Some(first_child) = flow_box_for_keys.first_child() {
                         // No selection, select first item
-                        flow_box_for_keys.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
+                        flow_box_for_keys
+                            .select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                         scroll_to_selected();
                     }
                     gtk::glib::Propagation::Stop
@@ -288,7 +292,8 @@ impl GtkLauncherUI {
                     if let Some(selected_children) = flow_box_for_keys.selected_children().first() {
                         if let Some(prev_child) = selected_children.prev_sibling() {
                             flow_box_for_keys.unselect_all();
-                            flow_box_for_keys.select_child(&prev_child.downcast::<FlowBoxChild>().unwrap());
+                            flow_box_for_keys
+                                .select_child(&prev_child.downcast::<FlowBoxChild>().unwrap());
                             scroll_to_selected();
                         }
                     }
@@ -319,40 +324,40 @@ impl GtkLauncherUI {
         flow_box.connect_child_activated(move |_, child| {
             if let Some(item_box) = child.child() {
                 let id = item_box.widget_name();
-                match launcher_for_activate.borrow().execute_item_by_id(id.as_str()) {
+                match launcher_for_activate
+                    .borrow()
+                    .execute_item_by_id(id.as_str())
+                {
                     Ok(_) => {
                         app_for_activate.quit();
-                    },
+                    }
                     Err(e) => eprintln!("Failed to launch app: {:?}", e),
                 }
             }
         });
 
         // Don't populate initially - defer until after window is shown
-        
+
         // Store launcher for deferred population
         let launcher_for_defer = launcher.clone();
         let flow_box_for_defer = flow_box.clone();
-        
+
         // Schedule population after window is shown (like wofi does)
         glib::idle_add_local(move || {
             let mut launcher_ref = launcher_for_defer.borrow_mut();
             let results = launcher_ref.get_default_results();
             populate_flow_box(&flow_box_for_defer, &results);
             drop(launcher_ref);
-            
+
             // Select the first item if available
             if let Some(first_child) = flow_box_for_defer.first_child() {
                 flow_box_for_defer.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
             }
-            
+
             glib::ControlFlow::Break
         });
-        
-        Self {
-            window,
-            flow_box,
-        }
+
+        Self { window, flow_box }
     }
 }
 
@@ -420,13 +425,19 @@ impl GtkLauncherUI {
 }
 
 fn find_icon_file(icon_name: &str, size: &str) -> Option<std::path::PathBuf> {
+    // If icon_name is already a path and exists, return it directly
+    let path = std::path::Path::new(icon_name);
+    if path.exists() {
+        return Some(path.to_path_buf());
+    }
+
     let cache_key = format!("icon:{}:{}", icon_name, size);
     let cache = waycast_core::cache::get();
 
     let result = cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || {
         freedesktop::get_icon(icon_name)
     });
-    
+
     if let Ok(opt_path) = result {
         return opt_path;
     }

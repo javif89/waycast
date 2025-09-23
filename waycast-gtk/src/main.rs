@@ -11,6 +11,7 @@ fn main() {
         .application_id("dev.thegrind.waycast")
         .build();
 
+
     app.connect_activate(|app| {
         // Create the core launcher
         let launcher = WaycastLauncher::new()
