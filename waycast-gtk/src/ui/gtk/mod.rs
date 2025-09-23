@@ -119,24 +119,20 @@ impl GtkLauncherUI {
         search_input.grab_focus();
 
         // Helper function to populate the TreeView
-        let populate_tree_view = |list_store: &ListStore,
-                                  results: &[Box<dyn waycast_core::LauncherListItem>],
-                                  icon_theme: &IconTheme| {
-            list_store.clear();
+        let populate_tree_view =
+            |list_store: &ListStore, results: &[Box<dyn waycast_core::LauncherListItem>]| {
+                list_store.clear();
 
-            for entry in results.iter() {
-                // Load icon as Pixbuf (with caching)
-                let pixbuf =
-                    if let Some(icon_path) = find_icon_file(&entry.icon(), "48", icon_theme) {
-                        println!("Icon for: {} @ {}", entry.title(), icon_path.display());
+                for entry in results.iter() {
+                    // Load icon as Pixbuf (with caching)
+                    let pixbuf = if let Some(icon_path) = find_icon_file(&entry.icon(), "48") {
                         Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok()
                     } else {
                         None
                     }
                     .unwrap_or_else(|| {
                         // Try to get default icon from theme or create empty pixbuf
-                        if let Some(default_path) =
-                            find_icon_file("application-x-executable", "48", icon_theme)
+                        if let Some(default_path) = find_icon_file("application-x-executable", "48")
                         {
                             Pixbuf::from_file_at_scale(&default_path, 48, 48, true).ok()
                         } else {
@@ -152,29 +148,29 @@ impl GtkLauncherUI {
                         })
                     });
 
-                // Create Pango markup for title and description
-                let text_markup = if let Some(desc) = entry.description() {
-                    format!(
-                        "<b>{}</b>\n<small><i>{}</i></small>",
-                        glib::markup_escape_text(&entry.title()),
-                        glib::markup_escape_text(&desc)
-                    )
-                } else {
-                    format!("<b>{}</b>", glib::markup_escape_text(&entry.title()))
-                };
+                    // Create Pango markup for title and description
+                    let text_markup = if let Some(desc) = entry.description() {
+                        format!(
+                            "<b>{}</b>\n<small><i>{}</i></small>",
+                            glib::markup_escape_text(&entry.title()),
+                            glib::markup_escape_text(&desc)
+                        )
+                    } else {
+                        format!("<b>{}</b>", glib::markup_escape_text(&entry.title()))
+                    };
 
-                // Add row to ListStore
-                let iter = list_store.append();
-                list_store.set(
-                    &iter,
-                    &[
-                        (COL_ICON, &pixbuf),
-                        (COL_TEXT, &text_markup),
-                        (COL_ID, &entry.id()),
-                    ],
-                );
-            }
-        };
+                    // Add row to ListStore
+                    let iter = list_store.append();
+                    list_store.set(
+                        &iter,
+                        &[
+                            (COL_ICON, &pixbuf),
+                            (COL_TEXT, &text_markup),
+                            (COL_ID, &entry.id()),
+                        ],
+                    );
+                }
+            };
 
         // Set up async search handlers to prevent UI blocking
         let launcher_for_search = launcher.clone();
@@ -187,7 +183,6 @@ impl GtkLauncherUI {
         search_input.connect_changed(move |entry| {
             let query = entry.text().to_string();
             let display = gtk::gdk::Display::default().unwrap();
-            let icon_theme = IconTheme::for_display(&display);
 
             // Increment generation to cancel any pending searches
             *search_generation.borrow_mut() += 1;
@@ -196,7 +191,7 @@ impl GtkLauncherUI {
                 // Handle empty query synchronously for immediate response
                 let mut launcher_ref = launcher_for_search.borrow_mut();
                 let results = launcher_ref.get_default_results();
-                populate_tree_view(&list_store_for_search, &results, &icon_theme);
+                populate_tree_view(&list_store_for_search, &results);
                 drop(launcher_ref);
 
                 // Select first item
@@ -222,13 +217,12 @@ impl GtkLauncherUI {
                         let list_store_clone = list_store_clone.clone();
                         let tree_view_clone = tree_view_clone.clone();
                         let query = query.clone();
-                        let icon_theme = icon_theme.clone();
 
                         glib::spawn_future_local(async move {
                             // Run search and populate immediately
                             let mut launcher_ref = launcher_clone.borrow_mut();
                             let results = launcher_ref.search(&query);
-                            populate_tree_view(&list_store_clone, &results, &icon_theme);
+                            populate_tree_view(&list_store_clone, &results);
                             drop(launcher_ref);
 
                             // Select first item
@@ -356,11 +350,9 @@ impl GtkLauncherUI {
         });
 
         // Initialize with default results
-        let display = gtk::gdk::Display::default().unwrap();
-        let icon_theme = IconTheme::for_display(&display);
         let mut launcher_ref = launcher.borrow_mut();
         let results = launcher_ref.get_default_results();
-        populate_tree_view(&list_store, &results, &icon_theme);
+        populate_tree_view(&list_store, &results);
         drop(launcher_ref); // Release the borrow
 
         // Select the first item if available
@@ -436,112 +428,17 @@ impl GtkLauncherUI {
     }
 }
 
-fn find_icon_file(
-    icon_name: &str,
-    size: &str,
-    icon_theme: &IconTheme,
-) -> Option<std::path::PathBuf> {
+fn find_icon_file(icon_name: &str, size: &str) -> Option<std::path::PathBuf> {
     let cache_key = format!("icon:{}:{}", icon_name, size);
     let cache = waycast_core::cache::get();
 
     let result = cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || {
-        search_for_icon(icon_name, size, icon_theme)
+        freedesktop::get_icon(icon_name)
     });
 
     if let Ok(opt_path) = result {
         return opt_path;
     }
 
-    search_for_icon(icon_name, size, icon_theme)
-}
-
-fn search_for_icon(
-    icon_name: &str,
-    size: &str,
-    icon_theme: &IconTheme,
-) -> Option<std::path::PathBuf> {
-    // Before doing everything below, check if it's a path
-    if Path::new(icon_name).exists() {
-        return Some(PathBuf::from(icon_name));
-    }
-
-    let pixmap_paths: Vec<PathBuf> = icon_theme
-        .search_path()
-        .into_iter()
-        .filter(|p| p.to_string_lossy().contains("pixmap"))
-        .collect();
-    let search_paths: Vec<PathBuf> = icon_theme
-        .search_path()
-        .into_iter()
-        .filter(|p| p.to_string_lossy().contains("icons"))
-        .collect();
-
-    let sizes = [size, "scalable"];
-    let categories = ["apps", "applications", "mimetypes"];
-    let extensions = ["svg", "png", "xpm"];
-
-    // Build the search paths
-    let mut search_in: Vec<PathBuf> = Vec::new();
-    // Do all the theme directories first and high color second
-    for base in &search_paths {
-        for size in sizes {
-            for cat in &categories {
-                let path = base
-                    .join(icon_theme.theme_name())
-                    .join(if size != "scalable" {
-                        format!("{}x{}", size, size)
-                    } else {
-                        size.to_string()
-                    })
-                    .join(cat);
-
-                if path.exists() {
-                    search_in.push(path);
-                }
-            }
-        }
-    }
-
-    for base in &search_paths {
-        for size in sizes {
-            for cat in &categories {
-                let path = base
-                    .join("hicolor")
-                    .join(if size != "scalable" {
-                        format!("{}x{}", size, size)
-                    } else {
-                        size.to_string()
-                    })
-                    .join(cat);
-
-                if path.exists() {
-                    search_in.push(path);
-                }
-            }
-        }
-    }
-    // Last resort, search pixmaps directly (no subdirectories)
-    for base in &pixmap_paths {
-        if !base.exists() {
-            continue;
-        }
-
-        for ext in &extensions {
-            let direct_icon = base.join(format!("{}.{}", icon_name, ext));
-            if direct_icon.exists() {
-                return Some(direct_icon);
-            }
-        }
-    }
-
-    for s in &search_in {
-        for ext in &extensions {
-            let icon_path = s.join(format!("{}.{}", icon_name, ext));
-            if icon_path.exists() {
-                return Some(icon_path);
-            }
-        }
-    }
-
-    None
+    freedesktop::get_icon(icon_name)
 }

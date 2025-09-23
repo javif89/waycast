@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Instant;
 
 use freedesktop::ApplicationEntry;
 use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
@@ -44,22 +45,34 @@ impl FuzzySearchable for DesktopEntry {
 
 pub fn get_desktop_entries() -> Vec<DesktopEntry> {
     let mut entries = Vec::new();
+    let mut total_icon_time = std::time::Duration::new(0, 0);
 
     for app in ApplicationEntry::all() {
         if !app.should_show() {
             continue;
         }
 
+        // Benchmark icon lookup
+        let icon_start = Instant::now();
+        let icon = app.icon().unwrap_or("application-x-executable".to_string());
+        let icon_duration = icon_start.elapsed();
+        total_icon_time += icon_duration;
+
         let de = DesktopEntry {
             id: app.id().unwrap_or_default().to_string(),
             name: app.name().unwrap_or("Name not found".into()),
             description: app.comment().map(|d| d.to_string()),
-            icon: app.icon().unwrap_or("application-x-executable".to_string()),
+            icon,
             path: app.path().into(),
         };
 
         entries.push(de);
     }
+
+    eprintln!("Icon lookup benchmark: {} entries processed in {:?} (avg: {:?} per entry)", 
+              entries.len(), 
+              total_icon_time, 
+              total_icon_time / entries.len() as u32);
 
     entries
 }

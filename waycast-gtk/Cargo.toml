@@ -21,3 +21,4 @@ gio = "0.21.1"
 glib = "0.21.1"
 gtk = { version = "0.10.0", package = "gtk4" }
 gtk4-layer-shell = "0.6.1"
+freedesktop = { version = "0.0.3", features = ["icon"] }
