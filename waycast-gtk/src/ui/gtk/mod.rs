@@ -3,9 +3,8 @@ use glib;
 use gtk::gdk_pixbuf::Pixbuf;
 use gtk::prelude::*;
 use gtk::{
-    ApplicationWindow, Box as GtkBox, CellRendererPixbuf, CellRendererText, Entry,
-    EventControllerKey, ListStore, Orientation, ScrolledWindow, TreeView,
-    TreeViewColumn,
+    ApplicationWindow, Box as GtkBox, Entry, EventControllerKey, FlowBox, FlowBoxChild, Image, Label,
+    Orientation, ScrolledWindow,
 };
 use gtk4_layer_shell as layerShell;
 use layerShell::LayerShell;
@@ -16,17 +15,18 @@ use std::time::Instant;
 use waycast_core::WaycastLauncher;
 use waycast_core::cache::CacheTTL;
 
-// Column indices for the ListStore
-const COL_ICON: u32 = 0;
-const COL_TEXT: u32 = 1;
-const COL_ID: u32 = 2;
-
 pub struct GtkLauncherUI {
     window: ApplicationWindow,
-    #[allow(dead_code)]
-    tree_view: TreeView,
-    #[allow(dead_code)]
-    list_store: ListStore,
+    flow_box: FlowBox,
+}
+
+// Store item data in a simple struct
+#[derive(Clone)]
+pub struct FlowBoxItem {
+    id: String,
+    title: String,
+    description: Option<String>,
+    icon: String,
 }
 
 impl GtkLauncherUI {
@@ -57,52 +57,18 @@ impl GtkLauncherUI {
         let scrolled_window = ScrolledWindow::new();
         scrolled_window.set_min_content_height(300);
 
-        // Create the list store with columns: Icon (Pixbuf), Text (String with markup), ID (String)
-        let list_store_start = Instant::now();
-        let list_store = ListStore::new(&[
-            Pixbuf::static_type(), // Icon
-            String::static_type(), // Combined title/description with Pango markup
-            String::static_type(), // Hidden ID
-        ]);
-        eprintln!("[PROFILE] ListStore creation: {:?}", list_store_start.elapsed());
+        // Create FlowBox like wofi (much simpler than TreeView)
+        let flow_box_start = Instant::now();
+        let flow_box = FlowBox::new();
+        flow_box.set_max_children_per_line(1); // Single column like a list
+        flow_box.set_selection_mode(gtk::SelectionMode::Browse);
+        flow_box.set_activate_on_single_click(false);
+        flow_box.set_can_focus(true);
+        flow_box.set_widget_name("results-list");
+        flow_box.add_css_class("launcher-list");
+        eprintln!("[PROFILE] FlowBox creation: {:?}", flow_box_start.elapsed());
 
-        // Create the TreeView
-        let tree_view_start = Instant::now();
-        let tree_view = TreeView::with_model(&list_store);
-        tree_view.set_headers_visible(false);
-        tree_view.set_enable_search(false);
-        tree_view.set_activate_on_single_click(false);
-        tree_view.set_vexpand(true);
-        tree_view.set_can_focus(true);
-        tree_view.set_widget_name("results-list");
-        tree_view.add_css_class("launcher-list");
-        eprintln!("[PROFILE] TreeView creation: {:?}", tree_view_start.elapsed());
-
-        // Create icon column with CellRendererPixbuf
-        let columns_start = Instant::now();
-        let icon_renderer = CellRendererPixbuf::new();
-        icon_renderer.set_padding(5, 5);
-        let icon_column = TreeViewColumn::new();
-        icon_column.pack_start(&icon_renderer, false);
-        icon_column.add_attribute(&icon_renderer, "pixbuf", COL_ICON as i32);
-        tree_view.append_column(&icon_column);
-
-        // Create text column with CellRendererText using Pango markup
-        let text_renderer = CellRendererText::new();
-        text_renderer.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        text_renderer.set_padding(5, 5);
-        let text_column = TreeViewColumn::new();
-        text_column.set_expand(true);
-        text_column.pack_start(&text_renderer, true);
-        text_column.add_attribute(&text_renderer, "markup", COL_TEXT as i32);
-        tree_view.append_column(&text_column);
-        eprintln!("[PROFILE] TreeView columns setup: {:?}", columns_start.elapsed());
-
-        // Get the selection model
-        let selection = tree_view.selection();
-        selection.set_mode(gtk::SelectionMode::Single);
-
-        scrolled_window.set_child(Some(&tree_view));
+        scrolled_window.set_child(Some(&flow_box));
         scrolled_window.set_widget_name("results-container");
         scrolled_window.add_css_class("launcher-results-container");
 
@@ -135,59 +101,64 @@ impl GtkLauncherUI {
         // Set initial focus to search input so user can start typing immediately
         search_input.grab_focus();
 
-        // Helper function to populate the TreeView
-        let populate_tree_view =
-            |list_store: &ListStore, results: &[Box<dyn waycast_core::LauncherListItem>]| {
+        // Helper function to populate the FlowBox with direct GtkImage widgets
+        let populate_flow_box =
+            |flow_box: &FlowBox, results: &[Box<dyn waycast_core::LauncherListItem>]| {
                 let populate_start = Instant::now();
-                eprintln!("[PROFILE] Starting to populate TreeView with {} items", results.len());
+                eprintln!("[PROFILE] Starting to populate FlowBox with {} items", results.len());
                 
                 let clear_start = Instant::now();
-                list_store.clear();
-                eprintln!("[PROFILE]   ListStore clear: {:?}", clear_start.elapsed());
+                // Remove all existing children
+                while let Some(child) = flow_box.first_child() {
+                    flow_box.remove(&child);
+                }
+                eprintln!("[PROFILE]   FlowBox clear: {:?}", clear_start.elapsed());
 
                 let mut total_icon_time = std::time::Duration::new(0, 0);
-                let mut total_markup_time = std::time::Duration::new(0, 0);
-                let mut total_insert_time = std::time::Duration::new(0, 0);
+                let mut total_widget_time = std::time::Duration::new(0, 0);
 
                 for (idx, entry) in results.iter().enumerate() {
-                    // Load icon as Pixbuf (with caching)
+                    let widget_start = Instant::now();
+                    
+                    // Create main horizontal box for this item (like wofi does)
+                    let item_box = GtkBox::new(Orientation::Horizontal, 8);
+                    item_box.set_margin_start(8);
+                    item_box.set_margin_end(8);
+                    item_box.set_margin_top(4);
+                    item_box.set_margin_bottom(4);
+
+                    // Load icon and create GtkImage directly
                     let icon_start = Instant::now();
-                    let pixbuf = if let Some(icon_path) = find_icon_file(&entry.icon(), "48") {
-                        let pixbuf_load_start = Instant::now();
-                        let pixbuf = Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok();
+                    let image = if let Some(icon_path) = find_icon_file(&entry.icon(), "48") {
+                        let image_load_start = Instant::now();
+                        let image = Image::from_file(&icon_path);
+                        image.set_pixel_size(48);
                         if idx < 5 {
-                            eprintln!("[PROFILE]     Pixbuf::from_file_at_scale: {:?}", pixbuf_load_start.elapsed());
+                            eprintln!("[PROFILE]     Image::from_file: {:?}", image_load_start.elapsed());
                         }
-                        pixbuf
+                        image
                     } else {
-                        None
-                    }
-                    .unwrap_or_else(|| {
-                        // Try to get default icon from theme or create empty pixbuf
-                        if let Some(default_path) = find_icon_file("application-x-executable", "48")
-                        {
-                            Pixbuf::from_file_at_scale(&default_path, 48, 48, true).ok()
+                        // Fallback to default icon
+                        if let Some(default_path) = find_icon_file("application-x-executable", "48") {
+                            let image = Image::from_file(&default_path);
+                            image.set_pixel_size(48);
+                            image
                         } else {
-                            None
+                            // Last resort: empty image
+                            let image = Image::new();
+                            image.set_pixel_size(48);
+                            image
                         }
-                        .unwrap_or_else(|| {
-                            // Last resort: create an empty pixbuf
-                            Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 48, 48)
-                                .unwrap_or_else(|| {
-                                    Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 1, 1)
-                                        .unwrap()
-                                })
-                        })
-                    });
+                    };
                     let icon_elapsed = icon_start.elapsed();
                     total_icon_time += icon_elapsed;
                     if idx < 5 || idx % 50 == 0 {
                         eprintln!("[PROFILE]   Icon {} load: {:?}", idx, icon_elapsed);
                     }
 
-                    // Create Pango markup for title and description
-                    let markup_start = Instant::now();
-                    let text_markup = if let Some(desc) = entry.description() {
+                    // Create text label with markup
+                    let label = Label::new(None);
+                    let markup = if let Some(desc) = entry.description() {
                         format!(
                             "<b>{}</b>\n<small><i>{}</i></small>",
                             glib::markup_escape_text(&entry.title()),
@@ -196,40 +167,37 @@ impl GtkLauncherUI {
                     } else {
                         format!("<b>{}</b>", glib::markup_escape_text(&entry.title()))
                     };
-                    let markup_elapsed = markup_start.elapsed();
-                    total_markup_time += markup_elapsed;
+                    label.set_markup(&markup);
+                    label.set_halign(gtk::Align::Start);
+                    label.set_valign(gtk::Align::Center);
+                    label.set_ellipsize(gtk::pango::EllipsizeMode::End);
 
-                    // Add row to ListStore
-                    let insert_start = Instant::now();
-                    let iter = list_store.append();
-                    list_store.set(
-                        &iter,
-                        &[
-                            (COL_ICON, &pixbuf),
-                            (COL_TEXT, &text_markup),
-                            (COL_ID, &entry.id()),
-                        ],
-                    );
-                    let insert_elapsed = insert_start.elapsed();
-                    total_insert_time += insert_elapsed;
+                    // Pack into horizontal box
+                    item_box.append(&image);
+                    item_box.append(&label);
+
+                    // Store the entry ID as widget name (simpler approach)
+                    item_box.set_widget_name(&entry.id());
+
+                    // Add to flow box
+                    flow_box.insert(&item_box, -1);
+                    
+                    let widget_elapsed = widget_start.elapsed();
+                    total_widget_time += widget_elapsed;
                 }
                 
-                eprintln!("[PROFILE] TreeView population complete: {:?}", populate_start.elapsed());
+                eprintln!("[PROFILE] FlowBox population complete: {:?}", populate_start.elapsed());
                 eprintln!("[PROFILE]   Total icon time: {:?} (avg: {:?})", 
                     total_icon_time, 
                     total_icon_time / results.len().max(1) as u32);
-                eprintln!("[PROFILE]   Total markup time: {:?} (avg: {:?})", 
-                    total_markup_time,
-                    total_markup_time / results.len().max(1) as u32);
-                eprintln!("[PROFILE]   Total insert time: {:?} (avg: {:?})", 
-                    total_insert_time,
-                    total_insert_time / results.len().max(1) as u32);
+                eprintln!("[PROFILE]   Total widget time: {:?} (avg: {:?})", 
+                    total_widget_time,
+                    total_widget_time / results.len().max(1) as u32);
             };
 
         // Set up async search handlers to prevent UI blocking
         let launcher_for_search = launcher.clone();
-        let list_store_for_search = list_store.clone();
-        let tree_view_for_search = tree_view.clone();
+        let flow_box_for_search = flow_box.clone();
 
         // Add debouncing to avoid excessive searches with generation counter
         let search_generation = Rc::new(RefCell::new(0u64));
@@ -249,19 +217,18 @@ impl GtkLauncherUI {
                 let mut launcher_ref = launcher_for_search.borrow_mut();
                 let results = launcher_ref.get_default_results();
                 eprintln!("[PROFILE]   Get default results: {:?}", default_start.elapsed());
-                populate_tree_view(&list_store_for_search, &results);
+                populate_flow_box(&flow_box_for_search, &results);
                 drop(launcher_ref);
 
                 // Select first item
-                if let Some(iter) = list_store_for_search.iter_first() {
-                    tree_view_for_search.selection().select_iter(&iter);
+                if let Some(first_child) = flow_box_for_search.first_child() {
+                    flow_box_for_search.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                 }
                 eprintln!("[PROFILE] Empty query handling total: {:?}", search_start.elapsed());
             } else {
                 // Debounced async search for non-empty queries
                 let launcher_clone = launcher_for_search.clone();
-                let list_store_clone = list_store_for_search.clone();
-                let tree_view_clone = tree_view_for_search.clone();
+                let flow_box_clone = flow_box_for_search.clone();
 
                 let current_generation = *search_generation.borrow();
                 let generation_check = search_generation.clone();
@@ -273,21 +240,23 @@ impl GtkLauncherUI {
                         }
 
                         let launcher_clone = launcher_clone.clone();
-                        let list_store_clone = list_store_clone.clone();
-                        let tree_view_clone = tree_view_clone.clone();
+                        let flow_box_clone = flow_box_clone.clone();
                         let query = query.clone();
 
                         glib::spawn_future_local(async move {
                             // Run search and populate immediately
+                            let search_exec_start = Instant::now();
                             let mut launcher_ref = launcher_clone.borrow_mut();
                             let results = launcher_ref.search(&query);
-                            populate_tree_view(&list_store_clone, &results);
+                            eprintln!("[PROFILE]   Search execution for '{}': {:?}", query, search_exec_start.elapsed());
+                            populate_flow_box(&flow_box_clone, &results);
                             drop(launcher_ref);
 
                             // Select first item
-                            if let Some(iter) = list_store_clone.iter_first() {
-                                tree_view_clone.selection().select_iter(&iter);
+                            if let Some(first_child) = flow_box_clone.first_child() {
+                                flow_box_clone.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                             }
+                            eprintln!("[PROFILE] Search + populate total for '{}': {:?}", query, search_exec_start.elapsed());
                         });
 
                         glib::ControlFlow::Break
@@ -297,17 +266,15 @@ impl GtkLauncherUI {
 
         // Connect Enter key activation for search input
         let launcher_for_enter = launcher.clone();
-        let list_store_for_enter = list_store.clone();
-        let tree_view_for_enter = tree_view.clone();
+        let flow_box_for_enter = flow_box.clone();
         let app_for_enter = app.clone();
         search_input.connect_activate(move |_| {
             let activate_start = Instant::now();
-            let (selected_paths, _) = tree_view_for_enter.selection().selected_rows();
-            if let Some(path) = selected_paths.first() {
-                if let Some(iter) = list_store_for_enter.iter(path) {
-                    let id: String = list_store_for_enter.get(&iter, COL_ID as i32);
+            if let Some(selected_child) = flow_box_for_enter.selected_children().first() {
+                if let Some(item_box) = selected_child.child() {
+                    let id = item_box.widget_name();
                     let execute_start = Instant::now();
-                    match launcher_for_enter.borrow().execute_item_by_id(&id) {
+                    match launcher_for_enter.borrow().execute_item_by_id(id.as_str()) {
                         Ok(_) => {
                             eprintln!("[PROFILE] Execute item: {:?}", execute_start.elapsed());
                             app_for_enter.quit();
@@ -321,69 +288,39 @@ impl GtkLauncherUI {
 
         // Add key handler for launcher-style navigation
         let search_key_controller = EventControllerKey::new();
-        let tree_view_for_keys = tree_view.clone();
-        let list_store_for_keys = list_store.clone();
+        let flow_box_for_keys = flow_box.clone();
         search_key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
-            match keyval {
+            let key_start = Instant::now();
+            let result = match keyval {
                 gtk::gdk::Key::Down => {
-                    let selection = tree_view_for_keys.selection();
-                    let (selected_paths, _) = selection.selected_rows();
-
-                    if let Some(path) = selected_paths.first() {
-                        let indices = path.indices();
-                        if let Some(index) = indices.first() {
-                            let next_index = index + 1;
-                            if next_index < list_store_for_keys.iter_n_children(None) {
-                                let next_path = gtk::TreePath::from_indices(&[next_index]);
-                                selection.select_path(&next_path);
-                                tree_view_for_keys.scroll_to_cell(
-                                    Some(&next_path),
-                                    None::<&TreeViewColumn>,
-                                    false,
-                                    0.0,
-                                    0.0,
-                                );
-                            }
+                    // Move to next item in FlowBox
+                    if let Some(selected_children) = flow_box_for_keys.selected_children().first() {
+                        if let Some(next_child) = selected_children.next_sibling() {
+                            flow_box_for_keys.unselect_all();
+                            flow_box_for_keys.select_child(&next_child.downcast::<FlowBoxChild>().unwrap());
                         }
-                    } else if list_store_for_keys.iter_n_children(None) > 0 {
+                    } else if let Some(first_child) = flow_box_for_keys.first_child() {
                         // No selection, select first item
-                        let first_path = gtk::TreePath::from_indices(&[0]);
-                        selection.select_path(&first_path);
-                        tree_view_for_keys.scroll_to_cell(
-                            Some(&first_path),
-                            None::<&TreeViewColumn>,
-                            false,
-                            0.0,
-                            0.0,
-                        );
+                        flow_box_for_keys.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
                     }
                     gtk::glib::Propagation::Stop
                 }
                 gtk::gdk::Key::Up => {
-                    let selection = tree_view_for_keys.selection();
-                    let (selected_paths, _) = selection.selected_rows();
-
-                    if let Some(path) = selected_paths.first() {
-                        let indices = path.indices();
-                        if let Some(index) = indices.first() {
-                            if *index > 0 {
-                                let prev_index = index - 1;
-                                let prev_path = gtk::TreePath::from_indices(&[prev_index]);
-                                selection.select_path(&prev_path);
-                                tree_view_for_keys.scroll_to_cell(
-                                    Some(&prev_path),
-                                    None::<&TreeViewColumn>,
-                                    false,
-                                    0.0,
-                                    0.0,
-                                );
-                            }
+                    // Move to previous item in FlowBox
+                    if let Some(selected_children) = flow_box_for_keys.selected_children().first() {
+                        if let Some(prev_child) = selected_children.prev_sibling() {
+                            flow_box_for_keys.unselect_all();
+                            flow_box_for_keys.select_child(&prev_child.downcast::<FlowBoxChild>().unwrap());
                         }
                     }
                     gtk::glib::Propagation::Stop
                 }
                 _ => gtk::glib::Propagation::Proceed,
+            };
+            if matches!(keyval, gtk::gdk::Key::Down | gtk::gdk::Key::Up) {
+                eprintln!("[PROFILE] Key navigation: {:?}", key_start.elapsed());
             }
+            result
         });
         search_input.add_controller(search_key_controller);
 
@@ -400,16 +337,15 @@ impl GtkLauncherUI {
         });
         window.add_controller(window_key_controller);
 
-        // Connect tree view row activation signal
+        // Connect flow box activation signal
         let launcher_for_activate = launcher.clone();
         let app_for_activate = app.clone();
-        let list_store_for_activate = list_store.clone();
-        tree_view.connect_row_activated(move |_, path, _| {
+        flow_box.connect_child_activated(move |_, child| {
             let row_activate_start = Instant::now();
-            if let Some(iter) = list_store_for_activate.iter(path) {
-                let id: String = list_store_for_activate.get(&iter, COL_ID as i32);
+            if let Some(item_box) = child.child() {
+                let id = item_box.widget_name();
                 let execute_start = Instant::now();
-                match launcher_for_activate.borrow().execute_item_by_id(&id) {
+                match launcher_for_activate.borrow().execute_item_by_id(id.as_str()) {
                     Ok(_) => {
                         eprintln!("[PROFILE] Row activation execute: {:?}", execute_start.elapsed());
                         app_for_activate.quit();
@@ -426,8 +362,7 @@ impl GtkLauncherUI {
         
         // Store launcher for deferred population
         let launcher_for_defer = launcher.clone();
-        let list_store_for_defer = list_store.clone();
-        let tree_view_for_defer = tree_view.clone();
+        let flow_box_for_defer = flow_box.clone();
         
         // Schedule population after window is shown (like wofi does)
         glib::idle_add_local(move || {
@@ -435,12 +370,12 @@ impl GtkLauncherUI {
             let mut launcher_ref = launcher_for_defer.borrow_mut();
             let results = launcher_ref.get_default_results();
             eprintln!("[PROFILE] Deferred: Get default results: {:?}", defer_start.elapsed());
-            populate_tree_view(&list_store_for_defer, &results);
+            populate_flow_box(&flow_box_for_defer, &results);
             drop(launcher_ref);
             
             // Select the first item if available
-            if let Some(iter) = list_store_for_defer.iter_first() {
-                tree_view_for_defer.selection().select_iter(&iter);
+            if let Some(first_child) = flow_box_for_defer.first_child() {
+                flow_box_for_defer.select_child(&first_child.downcast::<FlowBoxChild>().unwrap());
             }
             eprintln!("[PROFILE] Deferred: Population complete: {:?}", defer_start.elapsed());
             
@@ -449,8 +384,7 @@ impl GtkLauncherUI {
         
         Self {
             window,
-            tree_view,
-            list_store,
+            flow_box,
         }
     }
 }
