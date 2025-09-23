@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Enhanced
+- **UI Performance**: Refactored the UI to start up faster by using simplet GTK widgets
+
+### Technical
+- **freedesktop-icon**: Replaced GIO and custom icon lookup function with my own freedesktop-icon crate. This crate does icon lookups in microseconds. When combined with the waycast caching system, lookup performance and accuracy is greatly improved.
+
 ## [0.2.0] - 2025-09-16
 
 ### Added
