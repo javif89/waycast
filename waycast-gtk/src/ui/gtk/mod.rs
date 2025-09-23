@@ -128,6 +128,7 @@ impl GtkLauncherUI {
                 // Load icon as Pixbuf (with caching)
                 let pixbuf =
                     if let Some(icon_path) = find_icon_file(&entry.icon(), "48", icon_theme) {
+                        println!("Icon for: {} @ {}", entry.title(), icon_path.display());
                         Pixbuf::from_file_at_scale(&icon_path, 48, 48, true).ok()
                     } else {
                         None
