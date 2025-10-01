@@ -252,7 +252,7 @@ impl Waycast {
                     .style(if is_selected {
                         button::primary
                     } else {
-                        button::secondary
+                        button::text
                     });
 
                 col = col.push(butt);
