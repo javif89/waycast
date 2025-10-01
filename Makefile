@@ -16,9 +16,18 @@ help: ## Show this help message
 run: ## Run waycast GUI
 	cargo run -p waycast-gtk
 
+BIN := ./target/release/waycast-iced
+RPATH := $(shell nix eval --raw --impure --expr '(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; lib.makeLibraryPath [ libGL wayland libxkbcommon xorg.libXcursor glib pango cairo gdk-pixbuf harfbuzz ])')
+
 ice:
 	cargo build -p waycast-iced --release
-	./target/release/waycast-iced
+	patchelf --set-rpath "$(RPATH)" $(BIN)
+	$(BIN)
+
+# ice:
+# 	cargo build -p waycast-iced --release
+# 	patchelf --set-rpath "$$(nix eval --raw nixpkgs#libGL)/lib:$$(nix eval --raw nixpkgs#wayland)/lib:$$(nix eval --raw nixpkgs#libxkbcommon)/lib:$$(nix eval --raw nixpkgs#xorg.libXcursor)/lib" ./target/release/waycast-iced
+# 	./target/release/waycast-iced
 
 run-daemon: 
 	cargo run -p waycast-daemon
