@@ -4,7 +4,7 @@ use iced::widget::{
     Column, button, column, image, row, scrollable, svg,
     text, text_input,
 };
-use iced::{Element, Length, Size, Subscription, keyboard, event, window};
+use iced::{Element, Length, Size, Subscription, keyboard, event, window, Task};
 use iced::keyboard::key;
 use waycast_core::cache::CacheTTL;
 use waycast_core::WaycastLauncher;
@@ -97,7 +97,7 @@ impl Waycast {
                 }
             }
             Message::KeyPressed(_) => iced::Task::none(),
-            Message::CloseWindow => window::close(window::Id::unique()),
+            Message::CloseWindow => iced::exit(),
         }
     }
 
