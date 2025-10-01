@@ -4,7 +4,7 @@ members = [
     "waycast-macros",
     "waycast-plugins",
     "waycast-gtk",
-    "waycast-config",
+    "waycast-config", "waycast-iced",
 ]
 resolver = "2"
 

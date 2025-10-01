@@ -1,0 +1,17 @@
+[package]
+name = "waycast-iced"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+iced = { version = "0.13.1", features = ["image"] }
+waycast-core = { version = "0.3.0", path = "../waycast-core" }
+waycast-plugins = { version = "0.3.0", path = "../waycast-plugins" }
