@@ -98,6 +98,12 @@
             # Wayland + layer shell (GTK4 variant)
             wayland
             gtk4-layer-shell
+            # Raylib deps
+            glfw
+            cmake
+            clang
+            # Egui deps
+            libxkbcommon
 
             # Icons (so themed icons resolve)
             hicolor-icon-theme
@@ -107,6 +113,19 @@
             linuxKernel.packages.linux_6_6.perf
             valgrind
           ];
+
+          LD_LIBRARY_PATH =
+            with pkgs;
+            lib.makeLibraryPath [
+              libGL
+              xorg.libXrandr
+              xorg.libXinerama
+              xorg.libXcursor
+              xorg.libXi
+              wayland
+              libxkbcommon
+            ];
+          LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
 
           # Ensure display environment variables are available
           shellHook = ''

@@ -12,6 +12,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-iced = { version = "0.13.1", features = ["image"] }
+freedesktop = { version = "0.0.3", features = ["icon"] }
+iced = { version = "0.13.1", features = ["image", "svg"] }
 waycast-core = { version = "0.3.0", path = "../waycast-core" }
 waycast-plugins = { version = "0.3.0", path = "../waycast-plugins" }
