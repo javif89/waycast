@@ -4,7 +4,7 @@ use std::sync::{Mutex, OnceLock};
 
 use iced::border::Radius;
 use iced::keyboard::key;
-use iced::widget::scrollable::Rail;
+use iced::widget::scrollable::{Id as ScrollableId, Rail};
 use iced::widget::text_input::Id as TextInputId;
 use iced::widget::{
     Column, Row, Rule, button, center, column, container, image, row, rule, scrollable, svg, text,
@@ -52,6 +52,7 @@ struct Waycast {
     query: String,
     selected_index: usize,
     search_input_id: TextInputId,
+    scrollable_id: ScrollableId,
 }
 
 #[derive(Clone)]
@@ -81,11 +82,13 @@ impl Application for Waycast {
         ICON_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
 
         let search_input_id = TextInputId::unique();
+        let scrollable_id = ScrollableId::unique();
         let app = Self {
             launcher,
             query,
             selected_index: 0,
             search_input_id: search_input_id.clone(),
+            scrollable_id,
         };
         let focus_task = text_input::focus(search_input_id);
         (app, focus_task)
@@ -216,6 +219,7 @@ impl Application for Waycast {
             },
         };
         let scrollable_list = scrollable(list)
+            .id(self.scrollable_id.clone())
             .height(Length::Fill)
             .width(Length::Fill)
             .style(move |_, _| scrollable::Style {
@@ -318,9 +322,29 @@ impl Waycast {
         match key {
             keyboard::Key::Named(key::Named::ArrowDown) => {
                 self.selected_index = (self.selected_index + 1).min(results_len);
+                // Scroll to make the selected item visible
+                let item_height = 60.0;
+                let scroll_offset = self.selected_index as f32 * item_height;
+                return scrollable::scroll_to(
+                    self.scrollable_id.clone(),
+                    scrollable::AbsoluteOffset {
+                        x: 0.0,
+                        y: scroll_offset,
+                    },
+                );
             }
             keyboard::Key::Named(key::Named::ArrowUp) => {
                 self.selected_index = self.selected_index.saturating_sub(1);
+                // Scroll to make the selected item visible
+                let item_height = 60.0;
+                let scroll_offset = self.selected_index as f32 * item_height;
+                return scrollable::scroll_to(
+                    self.scrollable_id.clone(),
+                    scrollable::AbsoluteOffset {
+                        x: 0.0,
+                        y: scroll_offset,
+                    },
+                );
             }
             keyboard::Key::Named(key::Named::Enter) => {
                 if let Some(item) = self.launcher.current_results().get(self.selected_index) {
