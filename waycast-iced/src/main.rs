@@ -4,7 +4,8 @@ use std::sync::{Mutex, OnceLock};
 
 use iced::keyboard::key;
 use iced::widget::{Column, button, column, image, row, scrollable, svg, text, text_input};
-use iced::{Alignment, Element, Length, Size, Subscription, event, keyboard};
+use iced::{Alignment, Element, Length, Size, Subscription, Task, event, keyboard, window};
+use iced::widget::text_input::Id as TextInputId;
 use waycast_core::WaycastLauncher;
 use waycast_core::cache::CacheTTL;
 
@@ -56,7 +57,7 @@ pub fn main() -> iced::Result {
             level: iced::window::Level::AlwaysOnTop,
             ..iced::window::Settings::default()
         })
-        .run()
+        .run_with(Waycast::init)
 }
 
 #[derive(Debug, Clone)]
@@ -67,12 +68,14 @@ enum Message {
     KeyPressed(keyboard::Key),
     EventOccurred(iced::Event),
     CloseWindow,
+    WindowFocused,
 }
 
 struct Waycast {
     launcher: WaycastLauncher,
     query: String,
     selected_index: usize,
+    search_input_id: TextInputId,
 }
 
 #[derive(Clone)]
@@ -100,11 +103,18 @@ impl Default for Waycast {
             launcher,
             query,
             selected_index: 0,
+            search_input_id: TextInputId::unique(),
         }
     }
 }
 
 impl Waycast {
+    fn init() -> (Self, Task<Message>) {
+        let app = Self::default();
+        let focus_task = text_input::focus(app.search_input_id.clone());
+        (app, focus_task)
+    }
+
     fn subscription(&self) -> Subscription<Message> {
         event::listen().map(Message::EventOccurred)
     }
@@ -143,6 +153,7 @@ impl Waycast {
             }
             Message::KeyPressed(_) => iced::Task::none(),
             Message::CloseWindow => iced::exit(),
+            Message::WindowFocused => text_input::focus(self.search_input_id.clone()),
         }
     }
 
@@ -234,7 +245,9 @@ impl Waycast {
             .width(Length::Fill);
 
         column![
-            text_input("Search...", &self.query).on_input(Message::Search),
+            text_input("Search...", &self.query)
+                .id(self.search_input_id.clone())
+                .on_input(Message::Search),
             scrollable_list
         ]
         .into()
