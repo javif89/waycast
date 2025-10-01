@@ -1,13 +1,45 @@
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
-use iced::widget::{
-    Column, button, column, image, row, scrollable, svg,
-    text, text_input,
-};
-use iced::{Element, Length, Size, Subscription, keyboard, event, window, Task};
 use iced::keyboard::key;
-use waycast_core::cache::CacheTTL;
+use iced::widget::{Column, button, column, image, row, scrollable, svg, text, text_input};
+use iced::{Alignment, Element, Length, Size, Subscription, event, keyboard};
 use waycast_core::WaycastLauncher;
+use waycast_core::cache::CacheTTL;
+
+static ICON_CACHE: OnceLock<Mutex<HashMap<String, IconHandle>>> = OnceLock::new();
+
+fn get_or_load_icon(icon_name: &str) -> IconHandle {
+    let cache = ICON_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let cache_key = format!("icon:{}", icon_name);
+
+    // Check if already cached
+    if let Ok(cache_guard) = cache.lock() {
+        if let Some(handle) = cache_guard.get(&cache_key) {
+            return handle.clone();
+        }
+    }
+
+    // Load the icon
+    let icon_path = if let Some(p) = find_icon_file(icon_name, "48") {
+        p
+    } else {
+        find_icon_file("application-x-executable", "48").unwrap_or_else(|| "notfound.png".into())
+    };
+
+    let handle = match Path::new(&icon_path).extension().and_then(|e| e.to_str()) {
+        Some("svg") => IconHandle::Svg(svg::Handle::from_path(&icon_path)),
+        _ => IconHandle::Image(image::Handle::from_path(&icon_path)),
+    };
+
+    // Store in cache
+    if let Ok(mut cache_guard) = cache.lock() {
+        cache_guard.insert(cache_key, handle.clone());
+    }
+
+    handle
+}
 
 pub fn main() -> iced::Result {
     iced::application("Waycast", Waycast::update, Waycast::view)
@@ -43,6 +75,12 @@ struct Waycast {
     selected_index: usize,
 }
 
+#[derive(Clone)]
+enum IconHandle {
+    Svg(svg::Handle),
+    Image(image::Handle),
+}
+
 impl Default for Waycast {
     fn default() -> Self {
         let mut launcher = WaycastLauncher::new()
@@ -52,8 +90,12 @@ impl Default for Waycast {
             .init();
         launcher.get_default_results();
         let query = String::new();
-        Self { 
-            launcher, 
+
+        // Initialize the icon cache
+        ICON_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+        Self {
+            launcher,
             query,
             selected_index: 0,
         }
@@ -83,14 +125,15 @@ impl Waycast {
                     Ok(_) => println!("Executing app"),
                     Err(e) => println!("Error: {:#?}", e),
                 }
-                iced::Task::none()
+                iced::exit()
             }
             Message::EventOccurred(event) => {
-                if let iced::Event::Keyboard(keyboard::Event::KeyPressed { 
-                    key, 
+                if let iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                    key,
                     modifiers: _,
-                    .. 
-                }) = event {
+                    ..
+                }) = event
+                {
                     self.handle_key_press(key)
                 } else {
                     iced::Task::none()
@@ -103,7 +146,7 @@ impl Waycast {
 
     fn handle_key_press(&mut self, key: keyboard::Key) -> iced::Task<Message> {
         let results_len = self.launcher.current_results().len();
-        
+
         match key {
             keyboard::Key::Named(key::Named::Escape) => {
                 return iced::Task::done(Message::CloseWindow);
@@ -132,48 +175,44 @@ impl Waycast {
             }
             _ => {}
         }
-        
+
         iced::Task::none()
     }
 
     fn view(&self) -> Element<Message> {
         let results = self.launcher.current_results();
+        let icon_size = 32;
 
         let list = if results.is_empty() {
             Column::new().push(text("No results"))
         } else {
-            results.iter().enumerate().fold(Column::new(), |col, (index, i)| {
-                let icon_path = if let Some(p) = find_icon_file(&i.icon(), "48") {
-                    p
-                } else {
-                    find_icon_file("application-x-executable", "48")
-                        .unwrap_or_else(|| "notfound.png".into())
+            let mut col = Column::new();
+            for (index, i) in results.iter().enumerate() {
+                let icon_handle = get_or_load_icon(&i.icon());
+
+                let icon_view: Element<_> = match icon_handle {
+                    IconHandle::Svg(handle) => svg::Svg::new(handle)
+                        .width(icon_size)
+                        .height(icon_size)
+                        .into(),
+                    IconHandle::Image(handle) => image::Image::new(handle)
+                        .width(icon_size)
+                        .height(icon_size)
+                        .into(),
                 };
 
-                // Use SVG or raster image based on extension
-                let icon_view: Element<_> =
-                    match Path::new(&icon_path).extension().and_then(|e| e.to_str()) {
-                        Some("svg") => svg::Svg::new(svg::Handle::from_path(&icon_path))
-                            .width(48)
-                            .height(48)
-                            .into(),
-                        _ => image::Image::new(image::Handle::from_path(&icon_path))
-                            .width(48)
-                            .height(48)
-                            .into(),
-                    };
-
                 let row_ui = row![
-                    column![icon_view].padding(10),
+                    column![icon_view].padding(5),
                     column![
-                        text(i.title()).size(20),
+                        text(i.title()).size(18),
                         text(i.description().unwrap_or_default()).size(14)
                     ]
-                    .padding(10),
-                ];
+                    .padding(5),
+                ]
+                .align_y(Alignment::Center);
 
                 let is_selected = index == self.selected_index;
-                
+
                 let butt = button(row_ui)
                     .on_press(Message::Execute(i.id()))
                     .width(Length::Fill)
@@ -182,9 +221,10 @@ impl Waycast {
                     } else {
                         button::secondary
                     });
-                
-                col.push(butt)
-            })
+
+                col = col.push(butt);
+            }
+            col
         };
 
         let scrollable_list = scrollable(list)
