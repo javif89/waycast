@@ -83,10 +83,12 @@ enum IconHandle {
 
 impl Default for Waycast {
     fn default() -> Self {
+        let mut projects = waycast_plugins::projects::new();
+        let _ = projects.add_search_path("/home/javi/projects");
         let mut launcher = WaycastLauncher::new()
             .add_plugin(Box::new(waycast_plugins::drun::new()))
             .add_plugin(Box::new(waycast_plugins::file_search::new()))
-            .add_plugin(Box::new(waycast_plugins::projects::new()))
+            .add_plugin(Box::new(projects))
             .init();
         launcher.get_default_results();
         let query = String::new();

@@ -16,6 +16,10 @@ help: ## Show this help message
 run: ## Run waycast GUI
 	cargo run -p waycast-gtk
 
+ice:
+	cargo build -p waycast-iced --release
+	./target/release/waycast-iced
+
 run-daemon: 
 	cargo run -p waycast-daemon
 
