@@ -69,6 +69,7 @@ enum Message {
     EventOccurred(iced::Event),
     CloseWindow,
     WindowFocused,
+    SearchSubmit,
 }
 
 struct Waycast {
@@ -154,6 +155,18 @@ impl Waycast {
             Message::KeyPressed(_) => iced::Task::none(),
             Message::CloseWindow => iced::exit(),
             Message::WindowFocused => text_input::focus(self.search_input_id.clone()),
+            Message::SearchSubmit => {
+                // Execute the currently selected item
+                if let Some(item) = self.launcher.current_results().get(self.selected_index) {
+                    match self.launcher.execute_item_by_id(&item.id()) {
+                        Ok(_) => println!("Executing app"),
+                        Err(e) => println!("Error: {:#?}", e),
+                    }
+                    iced::exit()
+                } else {
+                    iced::Task::none()
+                }
+            }
         }
     }
 
@@ -247,7 +260,8 @@ impl Waycast {
         column![
             text_input("Search...", &self.query)
                 .id(self.search_input_id.clone())
-                .on_input(Message::Search),
+                .on_input(Message::Search)
+                .on_submit(Message::SearchSubmit),
             scrollable_list
         ]
         .into()
