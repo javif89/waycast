@@ -177,11 +177,17 @@ impl Application for Waycast {
                         .into(),
                 };
 
+                let mut bold = iced::Font::DEFAULT;
+                let mut italic = iced::Font::DEFAULT;
+                bold.weight = iced::font::Weight::Bold;
+                italic.style = iced::font::Style::Italic;
                 let row_ui = row![
                     column![icon_view].padding(5),
                     column![
-                        text(i.title()).size(18),
-                        text(i.description().unwrap_or_default()).size(14)
+                        text(i.title()).size(18).font(bold),
+                        text(i.description().unwrap_or_default())
+                            .size(14)
+                            .font(italic)
                     ]
                     .padding(5),
                 ]
@@ -192,11 +198,24 @@ impl Application for Waycast {
                 let butt = button(row_ui)
                     .on_press(Message::Execute(i.id()))
                     .width(Length::Fill)
-                    .style(if is_selected {
-                        button::primary
-                    } else {
-                        button::text
+                    .style(move |t, s| {
+                        let base = button::text(t, s);
+
+                        if is_selected {
+                            return button::Style {
+                                background: Some(iced::Background::Color(Color::WHITE)),
+                                text_color: Color::BLACK,
+                                ..base
+                            };
+                        }
+
+                        base
                     });
+                // .style(if is_selected {
+                // button::primary
+                // } else {
+                //     button::text
+                // });
 
                 col = col.push(butt);
             }
@@ -296,8 +315,8 @@ impl Application for Waycast {
             //         fill_mode: rule::FillMode::Full,
             //     }
             // }),
-            vertical_space().height(10),
-            scrollable_list
+            // vertical_space().height(10),
+            container(scrollable_list).padding(20)
         ]
         .into()
     }
