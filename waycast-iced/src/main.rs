@@ -57,7 +57,7 @@ pub fn main() -> iced::Result {
             level: iced::window::Level::AlwaysOnTop,
             ..iced::window::Settings::default()
         })
-        .theme(|_| iced::theme::Theme::GruvboxDark)
+        .theme(|_| iced::theme::Theme::Dark)
         .run_with(Waycast::init)
 }
 
@@ -118,7 +118,16 @@ impl Waycast {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::EventOccurred)
+        Subscription::batch([
+            event::listen().map(Message::EventOccurred),
+            keyboard::on_key_release(|key, _modifiers| {
+                if matches!(key, keyboard::Key::Named(key::Named::Escape)) {
+                    Some(Message::CloseWindow)
+                } else {
+                    None
+                }
+            }),
+        ])
     }
 
     fn update(&mut self, message: Message) -> iced::Task<Message> {
@@ -175,9 +184,6 @@ impl Waycast {
         let results_len = self.launcher.current_results().len();
 
         match key {
-            keyboard::Key::Named(key::Named::Escape) => {
-                return iced::Task::done(Message::CloseWindow);
-            }
             keyboard::Key::Named(key::Named::ArrowDown) => {
                 if results_len > 0 {
                     self.selected_index = (self.selected_index + 1) % results_len;
