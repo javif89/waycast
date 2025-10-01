@@ -3,9 +3,9 @@ use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
 use iced::keyboard::key;
+use iced::widget::text_input::Id as TextInputId;
 use iced::widget::{Column, button, column, image, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Length, Size, Subscription, Task, event, keyboard, window};
-use iced::widget::text_input::Id as TextInputId;
 use waycast_core::WaycastLauncher;
 use waycast_core::cache::CacheTTL;
 
@@ -57,6 +57,7 @@ pub fn main() -> iced::Result {
             level: iced::window::Level::AlwaysOnTop,
             ..iced::window::Settings::default()
         })
+        .theme(|_| iced::theme::Theme::GruvboxDark)
         .run_with(Waycast::init)
 }
 
