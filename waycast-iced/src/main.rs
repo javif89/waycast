@@ -1,15 +1,17 @@
 use std::path::Path;
 
 use iced::widget::{
-    Column, PickList, Text, TextInput, button, column, container, image, row, scrollable, svg,
+    Column, button, column, image, row, scrollable, svg,
     text, text_input,
 };
-use iced::{Center, Element, Length, Size};
+use iced::{Element, Length, Size, Subscription, keyboard, event, Theme};
+use iced::keyboard::key;
 use waycast_core::cache::CacheTTL;
-use waycast_core::{LauncherListItem, WaycastLauncher};
+use waycast_core::WaycastLauncher;
 
 pub fn main() -> iced::Result {
     iced::application("Waycast", Waycast::update, Waycast::view)
+        .subscription(Waycast::subscription)
         .window(iced::window::Settings {
             size: Size {
                 width: 800.,
@@ -30,11 +32,14 @@ enum Message {
     Search(String),
     DefaultList,
     Execute(String),
+    KeyPressed(keyboard::Key),
+    EventOccurred(iced::Event),
 }
 
 struct Waycast {
     launcher: WaycastLauncher,
     query: String,
+    selected_index: usize,
 }
 
 impl Default for Waycast {
@@ -46,25 +51,74 @@ impl Default for Waycast {
             .init();
         launcher.get_default_results();
         let query = String::new();
-        Self { launcher, query }
+        Self { 
+            launcher, 
+            query,
+            selected_index: 0,
+        }
     }
 }
 
 impl Waycast {
+    fn subscription(&self) -> Subscription<Message> {
+        event::listen().map(Message::EventOccurred)
+    }
+
     fn update(&mut self, message: Message) {
         match message {
             Message::DefaultList => {
                 self.launcher.get_default_results();
+                self.selected_index = 0;
             }
             Message::Search(query) => {
                 self.query = query.clone();
                 self.launcher.search(&query);
+                self.selected_index = 0;
             }
             Message::Execute(id) => match self.launcher.execute_item_by_id(&id) {
                 Ok(_) => println!("Executing app"),
                 Err(e) => println!("Error: {:#?}", e),
             },
+            Message::EventOccurred(event) => {
+                if let iced::Event::Keyboard(keyboard::Event::KeyPressed { 
+                    key, 
+                    modifiers: _,
+                    .. 
+                }) = event {
+                    self.handle_key_press(key);
+                }
+            }
+            Message::KeyPressed(_) => {}
         };
+    }
+
+    fn handle_key_press(&mut self, key: keyboard::Key) {
+        let results_len = self.launcher.current_results().len();
+        if results_len == 0 {
+            return;
+        }
+
+        match key {
+            keyboard::Key::Named(key::Named::ArrowDown) => {
+                self.selected_index = (self.selected_index + 1) % results_len;
+            }
+            keyboard::Key::Named(key::Named::ArrowUp) => {
+                if self.selected_index == 0 {
+                    self.selected_index = results_len - 1;
+                } else {
+                    self.selected_index -= 1;
+                }
+            }
+            keyboard::Key::Named(key::Named::Enter) => {
+                if let Some(item) = self.launcher.current_results().get(self.selected_index) {
+                    match self.launcher.execute_item_by_id(&item.id()) {
+                        Ok(_) => println!("Executing app"),
+                        Err(e) => println!("Error: {:#?}", e),
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     fn view(&self) -> Element<Message> {
@@ -73,7 +127,7 @@ impl Waycast {
         let list = if results.is_empty() {
             Column::new().push(text("No results"))
         } else {
-            results.iter().fold(Column::new(), |col, i| {
+            results.iter().enumerate().fold(Column::new(), |col, (index, i)| {
                 let icon_path = if let Some(p) = find_icon_file(&i.icon(), "48") {
                     p
                 } else {
@@ -103,9 +157,20 @@ impl Waycast {
                     .padding(10),
                 ];
 
-                let butt = button(row_ui)
-                    .on_press(Message::Execute(i.id()))
-                    .width(Length::Fill);
+                let is_selected = index == self.selected_index;
+                
+                let butt = if is_selected {
+                    button(row_ui)
+                        .on_press(Message::Execute(i.id()))
+                        .width(Length::Fill)
+                        .style(button::primary)
+                } else {
+                    button(row_ui)
+                        .on_press(Message::Execute(i.id()))
+                        .width(Length::Fill)
+                        .style(button::text)
+                };
+                
                 col.push(butt)
             })
         };
