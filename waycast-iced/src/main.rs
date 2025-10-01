@@ -212,7 +212,7 @@ impl Waycast {
         iced::Task::none()
     }
 
-    fn view(&self) -> Element<Message> {
+    fn view(&self) -> Element<'_, Message> {
         let results = self.launcher.current_results();
         let icon_size = 32;
 
