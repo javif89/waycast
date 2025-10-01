@@ -4,7 +4,7 @@ use iced::widget::{
     Column, button, column, image, row, scrollable, svg,
     text, text_input,
 };
-use iced::{Element, Length, Size, Subscription, keyboard, event, Theme};
+use iced::{Element, Length, Size, Subscription, keyboard, event, window};
 use iced::keyboard::key;
 use waycast_core::cache::CacheTTL;
 use waycast_core::WaycastLauncher;
@@ -34,6 +34,7 @@ enum Message {
     Execute(String),
     KeyPressed(keyboard::Key),
     EventOccurred(iced::Event),
+    CloseWindow,
 }
 
 struct Waycast {
@@ -64,49 +65,61 @@ impl Waycast {
         event::listen().map(Message::EventOccurred)
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> iced::Task<Message> {
         match message {
             Message::DefaultList => {
                 self.launcher.get_default_results();
                 self.selected_index = 0;
+                iced::Task::none()
             }
             Message::Search(query) => {
                 self.query = query.clone();
                 self.launcher.search(&query);
                 self.selected_index = 0;
+                iced::Task::none()
             }
-            Message::Execute(id) => match self.launcher.execute_item_by_id(&id) {
-                Ok(_) => println!("Executing app"),
-                Err(e) => println!("Error: {:#?}", e),
-            },
+            Message::Execute(id) => {
+                match self.launcher.execute_item_by_id(&id) {
+                    Ok(_) => println!("Executing app"),
+                    Err(e) => println!("Error: {:#?}", e),
+                }
+                iced::Task::none()
+            }
             Message::EventOccurred(event) => {
                 if let iced::Event::Keyboard(keyboard::Event::KeyPressed { 
                     key, 
                     modifiers: _,
                     .. 
                 }) = event {
-                    self.handle_key_press(key);
+                    self.handle_key_press(key)
+                } else {
+                    iced::Task::none()
                 }
             }
-            Message::KeyPressed(_) => {}
-        };
+            Message::KeyPressed(_) => iced::Task::none(),
+            Message::CloseWindow => window::close(window::Id::unique()),
+        }
     }
 
-    fn handle_key_press(&mut self, key: keyboard::Key) {
+    fn handle_key_press(&mut self, key: keyboard::Key) -> iced::Task<Message> {
         let results_len = self.launcher.current_results().len();
-        if results_len == 0 {
-            return;
-        }
-
+        
         match key {
+            keyboard::Key::Named(key::Named::Escape) => {
+                return iced::Task::done(Message::CloseWindow);
+            }
             keyboard::Key::Named(key::Named::ArrowDown) => {
-                self.selected_index = (self.selected_index + 1) % results_len;
+                if results_len > 0 {
+                    self.selected_index = (self.selected_index + 1) % results_len;
+                }
             }
             keyboard::Key::Named(key::Named::ArrowUp) => {
-                if self.selected_index == 0 {
-                    self.selected_index = results_len - 1;
-                } else {
-                    self.selected_index -= 1;
+                if results_len > 0 {
+                    if self.selected_index == 0 {
+                        self.selected_index = results_len - 1;
+                    } else {
+                        self.selected_index -= 1;
+                    }
                 }
             }
             keyboard::Key::Named(key::Named::Enter) => {
@@ -119,6 +132,8 @@ impl Waycast {
             }
             _ => {}
         }
+        
+        iced::Task::none()
     }
 
     fn view(&self) -> Element<Message> {
@@ -159,17 +174,14 @@ impl Waycast {
 
                 let is_selected = index == self.selected_index;
                 
-                let butt = if is_selected {
-                    button(row_ui)
-                        .on_press(Message::Execute(i.id()))
-                        .width(Length::Fill)
-                        .style(button::primary)
-                } else {
-                    button(row_ui)
-                        .on_press(Message::Execute(i.id()))
-                        .width(Length::Fill)
-                        .style(button::text)
-                };
+                let butt = button(row_ui)
+                    .on_press(Message::Execute(i.id()))
+                    .width(Length::Fill)
+                    .style(if is_selected {
+                        button::primary
+                    } else {
+                        button::secondary
+                    });
                 
                 col.push(butt)
             })
