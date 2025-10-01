@@ -317,18 +317,10 @@ impl Waycast {
 
         match key {
             keyboard::Key::Named(key::Named::ArrowDown) => {
-                if results_len > 0 {
-                    self.selected_index = (self.selected_index + 1) % results_len;
-                }
+                self.selected_index = (self.selected_index + 1).min(results_len);
             }
             keyboard::Key::Named(key::Named::ArrowUp) => {
-                if results_len > 0 {
-                    if self.selected_index == 0 {
-                        self.selected_index = results_len - 1;
-                    } else {
-                        self.selected_index -= 1;
-                    }
-                }
+                self.selected_index = self.selected_index.saturating_sub(1);
             }
             keyboard::Key::Named(key::Named::Enter) => {
                 if let Some(item) = self.launcher.current_results().get(self.selected_index) {
