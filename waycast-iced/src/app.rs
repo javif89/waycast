@@ -39,11 +39,12 @@ impl Application for Waycast {
     type Executor = iced::executor::Default;
 
     fn new(_flags: ()) -> (Self, Command<Message>) {
-        let launcher = init_launcher();
+        let mut launcher = init_launcher();
         let search_input_id = TextInputId::unique();
         let scrollable_id = ScrollableId::unique();
 
-        icons::init_cache();
+        // Get default results like GTK UI does
+        launcher.get_default_results();
 
         let app = Self {
             launcher,
@@ -78,7 +79,12 @@ impl Application for Waycast {
         match message {
             Message::Search(query) => {
                 self.query = query.clone();
-                self.launcher.search(&query);
+                if query.trim().is_empty() {
+                    // Like GTK UI: show default results when query is empty
+                    self.launcher.get_default_results();
+                } else {
+                    self.launcher.search(&query);
+                }
                 self.selected_index = 0;
                 Command::none()
             }
@@ -242,19 +248,13 @@ impl Waycast {
 }
 
 fn init_launcher() -> WaycastLauncher {
-    // // TODO: Make project path configurable
-    // let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
-    // let projects_path = format!("{}/projects", home_dir);
-
-    let mut projects = waycast_plugins::projects::new();
-
-    let mut launcher = WaycastLauncher::new()
+    // Initialize launcher exactly like the GTK UI does
+    let launcher = WaycastLauncher::new()
         .add_plugin(Box::new(waycast_plugins::drun::new()))
         .add_plugin(Box::new(waycast_plugins::file_search::new()))
-        .add_plugin(Box::new(projects))
+        .add_plugin(Box::new(waycast_plugins::projects::new()))
         .init();
 
-    launcher.get_default_results();
     launcher
 }
 
