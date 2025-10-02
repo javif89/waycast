@@ -7,19 +7,12 @@ help: ## Show this help message
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Examples:"
-	@echo "  make dev          # Start development"
-	@echo "  make build-all    # Build everything"
-	@echo "  make install      # Install to system"
 
 # Development
-run: ## Run waycast GUI
-	cargo run -p waycast-ui
-
 BIN := ./target/release/waycast
 RPATH := $(shell nix eval --raw --impure --expr '(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; lib.makeLibraryPath [ libGL wayland libxkbcommon xorg.libXcursor glib pango cairo gdk-pixbuf harfbuzz ])')
 
-ice:
+run: ## Run waycast GUI
 	cargo build -p waycast-ui --release
 	patchelf --set-rpath "$(RPATH)" $(BIN)
 	$(BIN)
