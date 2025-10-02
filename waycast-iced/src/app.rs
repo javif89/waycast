@@ -1,7 +1,10 @@
 use iced::keyboard::key;
 use iced::widget::scrollable::{self, Id as ScrollableId};
 use iced::widget::text_input::{self, Id as TextInputId};
-use iced::widget::{button, column, container, image, row, scrollable as scrollable_widget, svg, text, text_input as text_input_widget};
+use iced::widget::{
+    button, column, container, image, row, scrollable as scrollable_widget, svg, text,
+    text_input as text_input_widget,
+};
 use iced::{Alignment, Element, Length, Subscription, Task as Command, Theme, event, keyboard};
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
@@ -39,9 +42,9 @@ impl Application for Waycast {
         let launcher = init_launcher();
         let search_input_id = TextInputId::unique();
         let scrollable_id = ScrollableId::unique();
-        
+
         icons::init_cache();
-        
+
         let app = Self {
             launcher,
             query: String::new(),
@@ -49,7 +52,7 @@ impl Application for Waycast {
             search_input_id: search_input_id.clone(),
             scrollable_id,
         };
-        
+
         let focus_task = text_input::focus(search_input_id);
         (app, focus_task)
     }
@@ -185,7 +188,7 @@ impl Waycast {
 
     fn build_results_list(&self) -> Element<'_, Message> {
         let results = self.launcher.current_results();
-        
+
         if results.is_empty() {
             return column![text("No results")].into();
         }
@@ -195,11 +198,15 @@ impl Waycast {
             let result_item = self.build_result_item(item, index == self.selected_index);
             col = col.push(result_item);
         }
-        
+
         col.into()
     }
 
-    fn build_result_item(&self, item: &Box<dyn waycast_core::LauncherListItem>, is_selected: bool) -> Element<'_, Message> {
+    fn build_result_item(
+        &self,
+        item: &Box<dyn waycast_core::LauncherListItem>,
+        is_selected: bool,
+    ) -> Element<'_, Message> {
         let icon_handle = icons::get_or_load_icon(&item.icon());
         let icon_view = build_icon_view(icon_handle);
 
@@ -235,19 +242,18 @@ impl Waycast {
 }
 
 fn init_launcher() -> WaycastLauncher {
-    // TODO: Make project path configurable
-    let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
-    let projects_path = format!("{}/projects", home_dir);
-    
+    // // TODO: Make project path configurable
+    // let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+    // let projects_path = format!("{}/projects", home_dir);
+
     let mut projects = waycast_plugins::projects::new();
-    let _ = projects.add_search_path(&projects_path);
-    
+
     let mut launcher = WaycastLauncher::new()
         .add_plugin(Box::new(waycast_plugins::drun::new()))
         .add_plugin(Box::new(waycast_plugins::file_search::new()))
         .add_plugin(Box::new(projects))
         .init();
-    
+
     launcher.get_default_results();
     launcher
 }

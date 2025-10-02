@@ -22,12 +22,6 @@ pub fn project_dirs() -> Option<ProjectDirs> {
 }
 
 pub fn config_dir() -> Option<PathBuf> {
-    if is_development_mode() {
-        return env::current_dir()
-            .map(|d| d.join("xdg").join(".config").join("waycast"))
-            .ok();
-    }
-
     if let Some(dirs) = project_dirs() {
         return Some(dirs.config_dir().to_path_buf());
     }
