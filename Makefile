@@ -14,20 +14,20 @@ help: ## Show this help message
 
 # Development
 run: ## Run waycast GUI
-	cargo run -p waycast-gtk
+	cargo run -p waycast-ui
 
-BIN := ./target/release/waycast-iced
+BIN := ./target/release/waycast
 RPATH := $(shell nix eval --raw --impure --expr '(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; lib.makeLibraryPath [ libGL wayland libxkbcommon xorg.libXcursor glib pango cairo gdk-pixbuf harfbuzz ])')
 
 ice:
-	cargo build -p waycast-iced --release
+	cargo build -p waycast-ui --release
 	patchelf --set-rpath "$(RPATH)" $(BIN)
 	$(BIN)
 
 # ice:
-# 	cargo build -p waycast-iced --release
-# 	patchelf --set-rpath "$$(nix eval --raw nixpkgs#libGL)/lib:$$(nix eval --raw nixpkgs#wayland)/lib:$$(nix eval --raw nixpkgs#libxkbcommon)/lib:$$(nix eval --raw nixpkgs#xorg.libXcursor)/lib" ./target/release/waycast-iced
-# 	./target/release/waycast-iced
+# 	cargo build -p waycast-ui --release
+# 	patchelf --set-rpath "$$(nix eval --raw nixpkgs#libGL)/lib:$$(nix eval --raw nixpkgs#wayland)/lib:$$(nix eval --raw nixpkgs#libxkbcommon)/lib:$$(nix eval --raw nixpkgs#xorg.libXcursor)/lib" ./target/release/waycast
+# 	./target/release/waycast
 
 run-daemon: 
 	cargo run -p waycast-daemon
@@ -37,7 +37,7 @@ call-daemon:
 
 # Building
 build: ## Build waycast GUI (debug)
-	cargo build -p waycast-gtk
+	cargo build -p waycast-ui
 
 build-all: ## Build all crates (debug)
 	cargo build --workspace
@@ -50,7 +50,7 @@ build-plugins: ## Build plugins only
 
 # Release builds
 build-release: ## Build waycast GUI (optimized)
-	cargo build -p waycast-gtk --release
+	cargo build -p waycast-ui --release
 
 release-all: ## Build all crates (optimized)
 	cargo build --workspace --release
@@ -87,7 +87,7 @@ deps-unused: ## Check for unused dependencies (requires cargo-machete)
 
 # Installation & Packaging
 install: release ## Install waycast to system
-	cargo install --path waycast-gtk --force
+	cargo install --path waycast-ui --force
 
 install-deps: ## Install required system dependencies (Debian/Ubuntu)
 	sudo apt update
@@ -116,7 +116,7 @@ bench: ## Run benchmarks
 	cargo bench --workspace
 
 profile: ## Profile the application (requires cargo-flamegraph)
-	cargo flamegraph -p waycast-iced
+	cargo flamegraph -p waycast-ui
 	brave flamegraph.svg
 
 size: ## Check binary size

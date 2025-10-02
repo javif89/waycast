@@ -25,7 +25,7 @@ Waycast is an application launcher built for Wayland desktops. It's fast, extens
 - Search files in your home directories (Documents, Pictures, Music, Videos)
 - Fuzzy search that actually works
 - Fast startup with background file indexing
-- GTK4 with proper layer shell integration
+- Iced UI with proper layer shell integration
 
 **Planned features:**
 - Background daemon for instant launches
@@ -40,7 +40,7 @@ This is a Cargo workspace with three main crates:
 
 - **waycast-core** - The launcher engine (traits, logic, no UI)
 - **waycast-plugins** - Plugin implementations (desktop apps, file search)
-- **waycast-gtk** - GTK4 UI and main binary
+- **waycast-ui** - Iced UI and main binary
 
 ### Common Commands
 
@@ -58,7 +58,7 @@ make install        # Install to system
 waycast/
 ├── waycast-core/           # Core launcher logic
 ├── waycast-plugins/        # Plugin implementations
-└── waycast-gtk/           # GTK UI (main app)
+└── waycast-ui/            # Iced UI (main app)
 ```
 
 The core is deliberately minimal and UI-agnostic. Plugins depend on core. UI depends on both core and plugins. Nothing depends on the UI.

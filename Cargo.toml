@@ -3,8 +3,8 @@ members = [
     "waycast-core",
     "waycast-macros",
     "waycast-plugins",
-    "waycast-gtk",
-    "waycast-config", "waycast-iced",
+    "waycast-config",
+    "waycast-ui",
 ]
 resolver = "2"
 
