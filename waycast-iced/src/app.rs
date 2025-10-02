@@ -158,11 +158,6 @@ impl Waycast {
         }
     }
 
-    fn hide(id: window::Id) -> Task<Message> {
-        println!("Sup hide");
-        window::close(id)
-    }
-
     fn execute_item(&self) -> Command<Message> {
         println!("Executing");
         if let Some(item) = self.launcher.current_results().get(self.selected_index) {
