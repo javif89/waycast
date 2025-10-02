@@ -31,7 +31,7 @@ pub fn main() -> Result<(), iced_layershell::Error> {
     // immediately for good UX, but the
     // process will wait a little bit
     // before closing.
-    std::thread::sleep(Duration::from_millis(100));
+    std::thread::sleep(Duration::from_millis(1000));
 
     result
 }
