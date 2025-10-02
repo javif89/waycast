@@ -167,12 +167,11 @@ impl Waycast {
         println!("Executing");
         if let Some(item) = self.launcher.current_results().get(self.selected_index) {
             // TODO: Show some error in the UI if launching fails
-            if let Err(e) = self.launcher.execute_item_by_id(&item.id()) {
+            if let Err(e) = item.execute() {
                 eprintln!("Error executing app {} | {:#?}", item.id(), e);
             }
         }
 
-        // std::thread::sleep(std::time::Duration::from_millis(500));
         iced::exit()
     }
 
