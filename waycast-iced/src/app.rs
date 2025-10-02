@@ -46,7 +46,6 @@ impl Application for Waycast {
         let search_input_id = TextInputId::unique();
         let scrollable_id = ScrollableId::unique();
 
-        // Get default results like GTK UI does
         launcher.get_default_results();
 
         let app = Self {
