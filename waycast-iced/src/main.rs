@@ -4,9 +4,9 @@ mod icons;
 mod theme;
 mod ui;
 
+use iced_layershell::Application;
 use iced_layershell::reexport::Anchor;
 use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
-use iced_layershell::Application;
 
 use app::Waycast;
 

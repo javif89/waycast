@@ -32,6 +32,7 @@ pub struct Waycast {
     selected_index: usize,
     search_input_id: TextInputId,
     scrollable_id: ScrollableId,
+    should_hide: bool,
 }
 
 impl Application for Waycast {
@@ -54,6 +55,7 @@ impl Application for Waycast {
             selected_index: 0,
             search_input_id: search_input_id.clone(),
             scrollable_id,
+            should_hide: false,
         };
 
         let focus_task = text_input::focus(search_input_id);
@@ -90,7 +92,7 @@ impl Application for Waycast {
                 self.selected_index = 0;
                 Command::none()
             }
-            Message::Execute(id) => self.execute_item_and_exit(&id),
+            Message::Execute(id) => self.execute_item(),
             Message::EventOccurred(event) => {
                 if let iced::Event::Keyboard(keyboard::Event::KeyPressed {
                     key,
@@ -103,19 +105,18 @@ impl Application for Waycast {
                     Command::none()
                 }
             }
-            Message::CloseWindow => std::process::exit(0),
-            Message::SearchSubmit => {
-                if let Some(item) = self.launcher.current_results().get(self.selected_index) {
-                    self.execute_item_and_exit(&item.id())
-                } else {
-                    Command::none()
-                }
-            }
+            Message::CloseWindow => iced::exit(),
+            Message::SearchSubmit => self.execute_item(),
             _ => Command::none(),
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
+        if self.should_hide {
+            // Return empty view to hide window content immediately
+            return column![].into();
+        }
+
         let results_list = self.build_results_list();
         let scrollable_list = self.build_scrollable(results_list);
         let search_input = self.build_search_input();
@@ -152,14 +153,27 @@ impl Waycast {
                 }
                 self.scroll_to_selected()
             }
-            keyboard::Key::Named(key::Named::Enter) => {
-                if let Some(item) = self.launcher.current_results().get(self.selected_index) {
-                    return self.execute_item_and_exit(&item.id());
-                }
-                Command::none()
-            }
+            keyboard::Key::Named(key::Named::Enter) => self.execute_item(),
             _ => Command::none(),
         }
+    }
+
+    fn hide(id: window::Id) -> Task<Message> {
+        println!("Sup hide");
+        window::close(id)
+    }
+
+    fn execute_item(&self) -> Command<Message> {
+        println!("Executing");
+        if let Some(item) = self.launcher.current_results().get(self.selected_index) {
+            // TODO: Show some error in the UI if launching fails
+            if let Err(e) = self.launcher.execute_item_by_id(&item.id()) {
+                eprintln!("Error executing app {} | {:#?}", item.id(), e);
+            }
+        }
+
+        // std::thread::sleep(std::time::Duration::from_millis(500));
+        iced::exit()
     }
 
     fn scroll_to_selected(&self) -> Command<Message> {
@@ -171,31 +185,6 @@ impl Waycast {
                 y: scroll_offset,
             },
         )
-    }
-
-    fn close(id: window::Id) -> Task<Message> {
-        window::close(id)
-    }
-
-    fn execute_item_and_exit(&self, id: &str) -> Command<Message> {
-        if let Err(e) = self.launcher.execute_item_by_id(id) {
-            eprintln!("Failed to launch app: {:?}", e);
-            Command::none()
-        } else {
-            // Hide window immediately, then delay before exiting
-            window::get_latest().and_then(Self::close);
-            Command::perform(
-                async move {
-                    use std::time::{Duration, Instant};
-                    let start = Instant::now();
-                    while start.elapsed() < Duration::from_millis(500) {
-                        // Yield control to allow other tasks to run
-                        std::future::ready(()).await;
-                    }
-                },
-                |_| Message::CloseWindow,
-            )
-        }
     }
 
     fn build_search_input(&self) -> Element<'_, Message> {
