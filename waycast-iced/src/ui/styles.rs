@@ -1,8 +1,8 @@
 use iced::border::Radius;
-use iced::widget::{button, container, scrollable, text_input};
+use iced::widget::{button, scrollable, text_input};
 use iced::{Background, Border, Color, Font, Theme};
 
-use crate::config;
+use crate::theme::WaycastTheme;
 
 pub fn bold_font() -> Font {
     Font {
@@ -20,27 +20,29 @@ pub fn italic_font() -> Font {
 
 pub fn search_input_style(_theme: &Theme, _status: text_input::Status) -> text_input::Style {
     text_input::Style {
-        background: Background::Color(Color::TRANSPARENT),
+        background: Background::Color(WaycastTheme::search_bg_color()),
         border: Border {
             color: Color::TRANSPARENT,
             width: 0.0,
             radius: Radius::default(),
         },
-        icon: Color::WHITE,
-        placeholder: config::PLACEHOLDER_COLOR,
-        selection: Color::BLACK,
-        value: Color::WHITE,
+        icon: WaycastTheme::icon_color(),
+        placeholder: WaycastTheme::placeholder_color(),
+        selection: WaycastTheme::search_selection_color(),
+        value: WaycastTheme::search_text_color(),
     }
 }
 
-pub fn result_button_style(is_selected: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
+pub fn result_button_style(
+    is_selected: bool,
+) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |theme: &Theme, status: button::Status| {
         let base = button::text(theme, status);
 
         if is_selected {
             button::Style {
-                background: Some(Background::Color(config::SELECTED_BG_COLOR)),
-                text_color: config::SELECTED_TEXT_COLOR,
+                background: Some(Background::Color(WaycastTheme::selected_bg_color())),
+                text_color: WaycastTheme::selected_text_color(),
                 ..base
             }
         } else {
@@ -70,7 +72,7 @@ pub fn transparent_scrollbar() -> scrollable::Rail {
 pub fn scrollable_style(_theme: &Theme, _status: scrollable::Status) -> scrollable::Style {
     let rail = transparent_scrollbar();
     scrollable::Style {
-        container: container::Style::default(),
+        container: Default::default(),
         gap: None,
         horizontal_rail: rail.clone(),
         vertical_rail: rail,

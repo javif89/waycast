@@ -1,6 +1,7 @@
 mod app;
 mod config;
 mod icons;
+mod theme;
 mod ui;
 
 use iced_layershell::reexport::Anchor;

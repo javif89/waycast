@@ -1,5 +1,3 @@
-use iced::Color;
-
 pub const APP_NAME: &str = "Waycast";
 pub const WINDOW_WIDTH: u32 = 800;
 pub const WINDOW_HEIGHT: u32 = 500;
@@ -17,7 +15,3 @@ pub const SEARCH_PLACEHOLDER: &str = "Search...";
 
 pub const PADDING_SMALL: u16 = 5;
 pub const PADDING_LARGE: u16 = 20;
-
-pub const PLACEHOLDER_COLOR: Color = Color::from_rgba(1.0, 1.0, 1.0, 0.3);
-pub const SELECTED_BG_COLOR: Color = Color::WHITE;
-pub const SELECTED_TEXT_COLOR: Color = Color::BLACK;
