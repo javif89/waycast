@@ -10,7 +10,7 @@ help: ## Show this help message
 
 # Development
 BIN := ./target/release/waycast
-RPATH := $(shell nix eval --raw --impure --expr '(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; lib.makeLibraryPath [ libGL wayland libxkbcommon xorg.libXcursor glib pango cairo gdk-pixbuf harfbuzz ])')
+RPATH := $(shell nix eval --raw --impure --expr '(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; lib.makeLibraryPath [ libGL wayland libxkbcommon xorg.libXcursor xorg.libX11 xorg.libXi xorg.libXrandr vulkan-loader expat fontconfig freetype ])')
 
 run: ## Run waycast GUI
 	cargo build -p waycast-ui --release

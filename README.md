@@ -75,6 +75,25 @@ Waycast aims to be:
 
 ## Installation
 
+### Dependencies
+
+WayCast's depencencies are entirely based on [Iced's dependencies](https://github.com/iced-rs/iced/blob/master/DEPENDENCIES.md).
+For development and nix installations, the flake.nix takes care of these. If you're installing WayCast on a 
+different system, make sure you has the following libraries available:
+
+- expat
+- fontconfig
+- freetype
+- freetype.dev
+- libGL
+- pkg-config
+- xorg.libX11
+- xorg.libXcursor
+- xorg.libXi
+- xorg.libXrandr
+- wayland
+- libxkbcommon
+
 ### Nix Flakes
 
 Add to your `flake.nix` inputs:

@@ -43,22 +43,18 @@
           ];
 
           buildInputs = with pkgs; [
-            # Iced dependencies
+            # Iced dependencies (from official docs)
+            expat
+            fontconfig
+            freetype
             libGL
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
             wayland
             libxkbcommon
-            xorg.libXcursor
-            xorg.libX11
-            xorg.libXrandr
-            xorg.libXi
             vulkan-loader
-
-            # For icons (still needed for desktop entries)
-            glib
-            pango
-            cairo
-            gdk-pixbuf
-            harfbuzz
           ];
 
           # Install custom icons and patch binary
@@ -68,19 +64,17 @@
 
             # Patch the binary with required library paths for Iced
             patchelf --set-rpath "${pkgs.lib.makeLibraryPath [
+              pkgs.expat
+              pkgs.fontconfig
+              pkgs.freetype
               pkgs.libGL
+              pkgs.xorg.libX11
+              pkgs.xorg.libXcursor
+              pkgs.xorg.libXi
+              pkgs.xorg.libXrandr
               pkgs.wayland
               pkgs.libxkbcommon
-              pkgs.xorg.libXcursor
-              pkgs.xorg.libX11
-              pkgs.xorg.libXrandr
-              pkgs.xorg.libXi
               pkgs.vulkan-loader
-              pkgs.glib
-              pkgs.pango
-              pkgs.cairo
-              pkgs.gdk-pixbuf
-              pkgs.harfbuzz
             ]}:$out/lib" $out/bin/waycast
           '';
 
@@ -89,10 +83,16 @@
             wrapProgram $out/bin/waycast \
               --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share" \
               --set LD_LIBRARY_PATH "${pkgs.lib.makeLibraryPath [
+                pkgs.expat
+                pkgs.fontconfig
+                pkgs.freetype
                 pkgs.libGL
+                pkgs.xorg.libX11
+                pkgs.xorg.libXcursor
+                pkgs.xorg.libXi
+                pkgs.xorg.libXrandr
                 pkgs.wayland
                 pkgs.libxkbcommon
-                pkgs.xorg.libXcursor
                 pkgs.vulkan-loader
               ]}"
           '';
@@ -115,24 +115,21 @@
             cmake
             clang
 
-            # Iced dependencies
+            # Iced dependencies (from official docs)
+            expat
+            fontconfig
+            freetype
+            freetype.dev
             libGL
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
             wayland
             libxkbcommon
-            xorg.libXcursor
-            xorg.libX11
-            xorg.libXrandr
-            xorg.libXi
             vulkan-loader
             vulkan-headers
             vulkan-validation-layers
-
-            # For icon support (still needed for desktop entries)
-            glib
-            pango
-            cairo
-            gdk-pixbuf
-            harfbuzz
 
             # Icons (so themed icons resolve)
             hicolor-icon-theme
