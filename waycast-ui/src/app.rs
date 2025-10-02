@@ -5,9 +5,7 @@ use iced::widget::{
     button, column, container, image, row, scrollable as scrollable_widget, svg, text,
     text_input as text_input_widget,
 };
-use iced::{
-    Alignment, Element, Length, Subscription, Task as Command, Task, Theme, event, keyboard, window,
-};
+use iced::{Alignment, Element, Length, Subscription, Task as Command, Theme, event, keyboard};
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
 use waycast_core::WaycastLauncher;
@@ -91,7 +89,7 @@ impl Application for Waycast {
                 self.selected_index = 0;
                 Command::none()
             }
-            Message::Execute(id) => self.execute_item(),
+            Message::Execute(_id) => self.execute_item(),
             Message::EventOccurred(event) => {
                 if let iced::Event::Keyboard(keyboard::Event::KeyPressed {
                     key,
@@ -200,7 +198,7 @@ impl Waycast {
 
         let mut col = column![];
         for (index, item) in results.iter().enumerate() {
-            let result_item = self.build_result_item(item, index == self.selected_index);
+            let result_item = self.build_result_item(item.as_ref(), index == self.selected_index);
             col = col.push(result_item);
         }
 
@@ -209,7 +207,7 @@ impl Waycast {
 
     fn build_result_item(
         &self,
-        item: &Box<dyn waycast_core::LauncherListItem>,
+        item: &dyn waycast_core::LauncherListItem,
         is_selected: bool,
     ) -> Element<'_, Message> {
         let icon_handle = icons::get_or_load_icon(&item.icon());
@@ -248,13 +246,12 @@ impl Waycast {
 
 fn init_launcher() -> WaycastLauncher {
     // Initialize launcher exactly like the GTK UI does
-    let launcher = WaycastLauncher::new()
+
+    WaycastLauncher::new()
         .add_plugin(Box::new(waycast_plugins::drun::new()))
         .add_plugin(Box::new(waycast_plugins::file_search::new()))
         .add_plugin(Box::new(waycast_plugins::projects::new()))
-        .init();
-
-    launcher
+        .init()
 }
 
 fn build_icon_view(icon_handle: IconHandle) -> Element<'static, Message> {

@@ -21,11 +21,10 @@ pub fn get_or_load_icon(icon_name: &str) -> IconHandle {
     
     // Tier 1: Check in-memory cache first
     let cache = ICON_HANDLE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Ok(cache_guard) = cache.lock() {
-        if let Some(handle) = cache_guard.get(&cache_key) {
+    if let Ok(cache_guard) = cache.lock()
+        && let Some(handle) = cache_guard.get(&cache_key) {
             return handle.clone();
         }
-    }
 
     // Tier 2: Not in memory, get from disk cache via find_icon_file
     let icon_path = find_icon_file(icon_name, config::ICON_SIZE_STR)

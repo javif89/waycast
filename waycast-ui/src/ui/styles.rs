@@ -74,7 +74,7 @@ pub fn scrollable_style(_theme: &Theme, _status: scrollable::Status) -> scrollab
     scrollable::Style {
         container: Default::default(),
         gap: None,
-        horizontal_rail: rail.clone(),
+        horizontal_rail: rail,
         vertical_rail: rail,
     }
 }
