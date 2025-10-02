@@ -5,7 +5,9 @@ use iced::widget::{
     button, column, container, image, row, scrollable as scrollable_widget, svg, text,
     text_input as text_input_widget,
 };
-use iced::{Alignment, Element, Length, Subscription, Task as Command, Theme, event, keyboard};
+use iced::{
+    Alignment, Element, Length, Subscription, Task as Command, Task, Theme, event, keyboard, window,
+};
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
 use waycast_core::WaycastLauncher;
@@ -88,10 +90,7 @@ impl Application for Waycast {
                 self.selected_index = 0;
                 Command::none()
             }
-            Message::Execute(id) => {
-                self.execute_item(&id);
-                std::process::exit(0)
-            }
+            Message::Execute(id) => self.execute_item_and_exit(&id),
             Message::EventOccurred(event) => {
                 if let iced::Event::Keyboard(keyboard::Event::KeyPressed {
                     key,
@@ -107,8 +106,7 @@ impl Application for Waycast {
             Message::CloseWindow => std::process::exit(0),
             Message::SearchSubmit => {
                 if let Some(item) = self.launcher.current_results().get(self.selected_index) {
-                    self.execute_item(&item.id());
-                    std::process::exit(0)
+                    self.execute_item_and_exit(&item.id())
                 } else {
                     Command::none()
                 }
@@ -156,7 +154,7 @@ impl Waycast {
             }
             keyboard::Key::Named(key::Named::Enter) => {
                 if let Some(item) = self.launcher.current_results().get(self.selected_index) {
-                    self.execute_item(&item.id());
+                    return self.execute_item_and_exit(&item.id());
                 }
                 Command::none()
             }
@@ -175,9 +173,28 @@ impl Waycast {
         )
     }
 
-    fn execute_item(&self, id: &str) {
+    fn close(id: window::Id) -> Task<Message> {
+        window::close(id)
+    }
+
+    fn execute_item_and_exit(&self, id: &str) -> Command<Message> {
         if let Err(e) = self.launcher.execute_item_by_id(id) {
-            eprintln!("Error executing item: {:#?}", e);
+            eprintln!("Failed to launch app: {:?}", e);
+            Command::none()
+        } else {
+            // Hide window immediately, then delay before exiting
+            window::get_latest().and_then(Self::close);
+            Command::perform(
+                async move {
+                    use std::time::{Duration, Instant};
+                    let start = Instant::now();
+                    while start.elapsed() < Duration::from_millis(500) {
+                        // Yield control to allow other tasks to run
+                        std::future::ready(()).await;
+                    }
+                },
+                |_| Message::CloseWindow,
+            )
         }
     }
 
