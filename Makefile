@@ -10,23 +10,37 @@ help: ## Show this help message
 
 # Development
 BIN := ./target/release/waycast
-RPATH := $(shell nix eval --raw --impure --expr '(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; lib.makeLibraryPath [ libGL wayland libxkbcommon xorg.libXcursor xorg.libX11 xorg.libXi xorg.libXrandr vulkan-loader expat fontconfig freetype ])')
+RPATH := $(shell nix eval --raw --impure --expr \
+	'(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; \
+	lib.makeLibraryPath [ \
+		pkgs.expat \
+		pkgs.fontconfig \
+		pkgs.freetype \
+		pkgs.libGL \
+		pkgs.xorg.libX11 \
+		pkgs.xorg.libXcursor \
+		pkgs.xorg.libXi \
+		pkgs.xorg.libXrandr \
+		pkgs.wayland \
+		pkgs.libxkbcommon \
+		pkgs.vulkan-loader \
+		pkgs.glib \
+	])')
 
 run: ## Run waycast GUI
 	cargo build -p waycast-ui --release
-	patchelf --set-rpath "$(RPATH)" $(BIN)
+	# Don't replace RPATH, just run as-is since it already works
 	$(BIN)
 
-# ice:
-# 	cargo build -p waycast-ui --release
-# 	patchelf --set-rpath "$$(nix eval --raw nixpkgs#libGL)/lib:$$(nix eval --raw nixpkgs#wayland)/lib:$$(nix eval --raw nixpkgs#libxkbcommon)/lib:$$(nix eval --raw nixpkgs#xorg.libXcursor)/lib" ./target/release/waycast
-# 	./target/release/waycast
+clean-run: clean build-release
+	./target/release/waycast
 
-run-daemon: 
-	cargo run -p waycast-daemon
+build-flake:
+	rm -rf result
+	nix build .#default
 
-call-daemon:
-	busctl --user call dev.waycast.Daemon /dev/waycast/Daemon dev.waycast.Daemon $(METHOD) $(PARAMS)
+run-flake:
+	./result/bin/waycast
 
 # Building
 build: ## Build waycast GUI (debug)

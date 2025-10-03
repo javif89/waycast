@@ -55,46 +55,23 @@
             wayland
             libxkbcommon
             vulkan-loader
+
+            # Still needed by waycast-plugins for file icons and launching
+            glib
           ];
 
-          # Install custom icons and patch binary
+          # Install custom icons
           postInstall = ''
             mkdir -p $out/share/waycast/icons
             cp -r assets/icons/* $out/share/waycast/icons/
-
-            # Patch the binary with required library paths for Iced
-            patchelf --set-rpath "${pkgs.lib.makeLibraryPath [
-              pkgs.expat
-              pkgs.fontconfig
-              pkgs.freetype
-              pkgs.libGL
-              pkgs.xorg.libX11
-              pkgs.xorg.libXcursor
-              pkgs.xorg.libXi
-              pkgs.xorg.libXrandr
-              pkgs.wayland
-              pkgs.libxkbcommon
-              pkgs.vulkan-loader
-            ]}:$out/lib" $out/bin/waycast
+            # Don't patch RPATH - the binary already works with Cargo's RPATH
           '';
 
           # Wrap the binary with necessary environment variables
           preFixup = ''
             wrapProgram $out/bin/waycast \
-              --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share" \
-              --set LD_LIBRARY_PATH "${pkgs.lib.makeLibraryPath [
-                pkgs.expat
-                pkgs.fontconfig
-                pkgs.freetype
-                pkgs.libGL
-                pkgs.xorg.libX11
-                pkgs.xorg.libXcursor
-                pkgs.xorg.libXi
-                pkgs.xorg.libXrandr
-                pkgs.wayland
-                pkgs.libxkbcommon
-                pkgs.vulkan-loader
-              ]}"
+              --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share"
+            # Don't set LD_LIBRARY_PATH - let the binary use its original RPATH
           '';
 
           meta = with pkgs.lib; {
@@ -110,7 +87,6 @@
           buildInputs = with pkgs; [
             # Build tools
             pkg-config
-            oranda
             patchelf
             cmake
             clang
@@ -131,9 +107,11 @@
             vulkan-headers
             vulkan-validation-layers
 
+            # Still needed by waycast-plugins
+            glib
+
             # Icons (so themed icons resolve)
             hicolor-icon-theme
-            adwaita-icon-theme
 
             # Benchmarking / Profiling
             linuxKernel.packages.linux_6_6.perf
