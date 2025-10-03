@@ -109,3 +109,10 @@ release:
 	git push --force origin v$(VERSION)
 	@echo "✅ Release v$(VERSION) created!"
 	@echo "🔗 Go to your Gitea instance to add release notes"
+
+push-release:
+	git tag -fa v$(VERSION) -m "Release v$(VERSION)"
+	@git push origin master
+	git push --force origin v$(VERSION)
+	@echo "✅ Release v$(VERSION) created!"
+	@echo "🔗 Go to your Gitea instance to add release notes"
