@@ -78,8 +78,18 @@
             wrapProgram $out/bin/waycast \
               --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share" \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [
+                pkgs.expat
+                pkgs.fontconfig
+                pkgs.freetype
+                pkgs.libGL
+                pkgs.xorg.libX11
+                pkgs.xorg.libXcursor
+                pkgs.xorg.libXi
+                pkgs.xorg.libXrandr
                 pkgs.wayland
                 pkgs.libxkbcommon
+                pkgs.vulkan-loader
+                pkgs.glib
               ]}"
           '';
 
