@@ -42,7 +42,7 @@ fmt: ## Format all code
 	cargo fmt --all
 
 lint: ## Run clippy lints
-	cargo clippy --workspace --all-targets --all-features --pedantic
+	cargo clippy --workspace --all-targets --all-features
 
 lint-fix: ## Auto-fix linting issues
 	cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
