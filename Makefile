@@ -9,28 +9,9 @@ help: ## Show this help message
 	@echo ""
 
 # Development
-BIN := ./target/release/waycast
-RPATH := $(shell nix eval --raw --impure --expr \
-	'(with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; \
-	lib.makeLibraryPath [ \
-		pkgs.expat \
-		pkgs.fontconfig \
-		pkgs.freetype \
-		pkgs.libGL \
-		pkgs.xorg.libX11 \
-		pkgs.xorg.libXcursor \
-		pkgs.xorg.libXi \
-		pkgs.xorg.libXrandr \
-		pkgs.wayland \
-		pkgs.libxkbcommon \
-		pkgs.vulkan-loader \
-		pkgs.glib \
-	])')
-
 run: ## Run waycast GUI
 	cargo build -p waycast-ui --release
-	# Don't replace RPATH, just run as-is since it already works
-	$(BIN)
+	./target/release/waycast
 
 clean-run: clean build-release
 	./target/release/waycast
@@ -46,28 +27,13 @@ run-flake:
 build: ## Build waycast GUI (debug)
 	cargo build -p waycast-ui
 
-build-all: ## Build all crates (debug)
-	cargo build --workspace
-
-build-core: ## Build core library only
-	cargo build -p waycast-core
-
-build-plugins: ## Build plugins only
-	cargo build -p waycast-plugins
-
 # Release builds
 build-release: ## Build waycast GUI (optimized)
 	cargo build -p waycast-ui --release
 
-release-all: ## Build all crates (optimized)
-	cargo build --workspace --release
-
 # Testing & Quality
 test: ## Run all tests
 	cargo test --workspace
-
-test-core: ## Run core tests only
-	cargo test -p waycast-core
 
 check: ## Quick compile check
 	cargo check --workspace
@@ -76,7 +42,7 @@ fmt: ## Format all code
 	cargo fmt --all
 
 lint: ## Run clippy lints
-	cargo clippy --workspace --all-targets --all-features
+	cargo clippy --workspace --all-targets --all-features --pedantic
 
 lint-fix: ## Auto-fix linting issues
 	cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
@@ -91,24 +57,6 @@ deps-audit: ## Check for security vulnerabilities
 
 deps-unused: ## Check for unused dependencies (requires cargo-machete)
 	cargo machete
-
-# Installation & Packaging
-install: release ## Install waycast to system
-	cargo install --path waycast-ui --force
-
-install-deps: ## Install required system dependencies (Debian/Ubuntu)
-	sudo apt update
-	sudo apt install -y build-essential libgtk-4-dev libadwaita-1-dev pkg-config
-
-uninstall: ## Remove waycast from system
-	cargo uninstall waycast
-
-# Development Environment
-setup: install-deps ## Set up development environment
-	rustup update
-	rustup component add rustfmt clippy
-	cargo install cargo-watch cargo-audit cargo-machete
-	@echo "Development environment ready!"
 
 # Cleaning
 clean: ## Clean build artifacts
@@ -129,22 +77,6 @@ profile: ## Profile the application (requires cargo-flamegraph)
 size: ## Check binary size
 	@echo "Binary sizes:"
 	@ls -lh target/release/waycast 2>/dev/null || echo "Run 'make release' first"
-
-# Git hooks
-hooks: ## Install git hooks
-	@echo "#!/bin/sh" > .git/hooks/pre-commit
-	@echo "make fmt lint" >> .git/hooks/pre-commit
-	@chmod +x .git/hooks/pre-commit
-	@echo "Git hooks installed!"
-
-# Documentation
-docs: ## Build and open documentation
-	cargo doc --workspace --open
-
-# Development tools installation
-tools: ## Install useful development tools
-	cargo install cargo-watch cargo-audit cargo-machete cargo-flamegraph cargo-deb cargo-outdated
-	@echo "Development tools installed!"
 
 devicon-theme: DEVICON_DIR = ./assets/icons/devicons
 devicon-theme: 
