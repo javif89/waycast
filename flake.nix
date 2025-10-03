@@ -76,11 +76,20 @@
             # Don't patch RPATH - the binary already works with Cargo's RPATH
           '';
 
-          # Wrap the binary with necessary environment variables
+          # Wrap the binary with necessary environment variables (same libs as devShell)
           preFixup = ''
             wrapProgram $out/bin/waycast \
-              --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share"
-            # propagatedBuildInputs handles library availability
+              --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share" \
+              --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [
+                pkgs.libGL
+                pkgs.xorg.libXrandr
+                pkgs.xorg.libXinerama
+                pkgs.xorg.libXcursor
+                pkgs.xorg.libXi
+                pkgs.wayland
+                pkgs.libxkbcommon
+                pkgs.glib
+              ]}"
           '';
 
           meta = with pkgs.lib; {
