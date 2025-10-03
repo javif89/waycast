@@ -98,6 +98,24 @@ If you're installing WayCast on a different system, make sure you have the follo
 **Plugin requirements:**
 - glib (for file type detection and launching)
 
+### IMPORTANT NOTE FOR HYPRLAND
+
+If you want waycast to start up even faster, remove the default "fade" animation hyprland adds to layer shell windows:
+
+**Nix**
+
+```nix
+layerrule = [
+  "noanim, Waycast"
+];
+```
+
+**Other**
+
+```
+layerrule = "noanim, Waycast";
+```
+
 ### Nix Flakes
 
 Add to your `flake.nix` inputs:

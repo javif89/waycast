@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-10-03
+
+### A whole new world
+
+Replaced the GTK UI with a whole new UI based on [Iced](https://iced.rs/), a rust native UI framework.
+
+The GTK UI was taking too long to start up for my taste. I want waycast to be as fast as possible, since I believe that's how
+a launcher should be. After much profiling and trying to optimize GTK, I realized there wasn't much more I could do. GTK
+is full featured, but that also means it does a lot of things in the background that I cannot control such as loading
+themes, checking for icons, and other tasks that take CPU cycles.
+
+GTK also wasn't fun to work with, so it made it difficult for me to add all the cool features I have planned for the
+future to the UI.
+
+Iced is still in beta, but I'm very excited to support such a cool project by at least using it. And the iced UI is
+an order of magnitude faster than the GTK one. Not to mention it's safe and ergonomic since it's rust native.
+
 ## [0.3.0] - 2025-09-23
 
 ### Fixes

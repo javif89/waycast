@@ -25,7 +25,7 @@
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "waycast";
-          version = "0.3.0";
+          version = "0.4.0";
           src = self;
 
           cargoLock.lockFile = ./Cargo.lock;

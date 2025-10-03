@@ -19,5 +19,5 @@ path = "src/main.rs"
 freedesktop = { version = "0.0.3", features = ["icon"] }
 iced = { version = "0.13.1", features = ["image", "svg"] }
 iced_layershell = "0.13.7"
-waycast-core = { version = "0.3.0", path = "../waycast-core" }
-waycast-plugins = { version = "0.3.0", path = "../waycast-plugins" }
+waycast-core = { path = "../waycast-core" }
+waycast-plugins = { path = "../waycast-plugins" }
