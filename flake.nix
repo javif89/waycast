@@ -60,6 +60,12 @@
             glib
           ];
 
+          # CRITICAL: We need wayland libs at runtime!
+          propagatedBuildInputs = with pkgs; [
+            wayland
+            libxkbcommon
+          ];
+
           # Install custom icons
           postInstall = ''
             mkdir -p $out/share/waycast/icons
@@ -70,8 +76,11 @@
           # Wrap the binary with necessary environment variables
           preFixup = ''
             wrapProgram $out/bin/waycast \
-              --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share"
-            # Don't set LD_LIBRARY_PATH - let the binary use its original RPATH
+              --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share" \
+              --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [
+                pkgs.wayland
+                pkgs.libxkbcommon
+              ]}"
           '';
 
           meta = with pkgs.lib; {
