@@ -5005,6 +5005,7 @@ dependencies = [
  "freedesktop",
  "iced",
  "iced_layershell",
+ "mathengine",
  "waycast-core",
  "waycast-plugins",
 ]

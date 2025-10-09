@@ -118,11 +118,19 @@ impl Application for Waycast {
         let scrollable_list = self.build_scrollable(results_list);
         let search_input = self.build_search_input();
 
-        column![
-            container(search_input).padding(config::PADDING_LARGE),
-            container(scrollable_list).padding(config::PADDING_LARGE)
-        ]
-        .into()
+        let mut col = column![container(search_input).padding(config::PADDING_LARGE),];
+
+        if let Ok(calc_result) = mathengine::evaluate_expression(&self.query) {
+            col = col.push(
+                text(format!("= {}", calc_result))
+                    .size(20)
+                    .font(styles::bold_font()),
+            );
+        }
+
+        col = col.push(container(scrollable_list).padding(config::PADDING_LARGE));
+
+        col.into()
     }
 
     fn theme(&self) -> Self::Theme {
@@ -179,14 +187,17 @@ impl Waycast {
     }
 
     fn build_search_input(&self) -> Element<'_, Message> {
-        text_input_widget(config::SEARCH_PLACEHOLDER, &self.query)
-            .id(self.search_input_id.clone())
-            .size(config::SEARCH_INPUT_SIZE)
-            .padding(config::PADDING_SMALL)
-            .style(styles::search_input_style)
-            .on_input(Message::Search)
-            .on_submit(Message::SearchSubmit)
-            .into()
+        row![
+            text_input_widget(config::SEARCH_PLACEHOLDER, &self.query)
+                .id(self.search_input_id.clone())
+                .size(config::SEARCH_INPUT_SIZE)
+                .padding(config::PADDING_SMALL)
+                .style(styles::search_input_style)
+                .on_input(Message::Search)
+                .width(Length::Fill)
+                .on_submit(Message::SearchSubmit),
+        ]
+        .into()
     }
 
     fn build_results_list(&self) -> Element<'_, Message> {
@@ -251,7 +262,6 @@ fn init_launcher() -> WaycastLauncher {
         .add_plugin(Box::new(waycast_plugins::drun::new()))
         .add_plugin(Box::new(waycast_plugins::file_search::new()))
         .add_plugin(Box::new(waycast_plugins::projects::new()))
-        .add_plugin(Box::new(waycast_plugins::calculator::new()))
         .init()
 }
 
