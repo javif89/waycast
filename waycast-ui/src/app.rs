@@ -5,7 +5,9 @@ use iced::widget::{
     button, column, container, image, row, scrollable as scrollable_widget, svg, text,
     text_input as text_input_widget,
 };
-use iced::{Alignment, Element, Length, Subscription, Task as Command, Theme, event, keyboard};
+use iced::{
+    Alignment, Color, Element, Length, Subscription, Task as Command, Theme, event, keyboard,
+};
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
 use waycast_core::WaycastLauncher;
@@ -121,10 +123,18 @@ impl Application for Waycast {
         let mut col = column![container(search_input).padding(config::PADDING_LARGE),];
 
         if let Ok(calc_result) = mathengine::evaluate_expression(&self.query) {
+            let disp = match calc_result {
+                mathengine::Value::Number(n) => format!("{:.2}", n.0),
+                mathengine::Value::UnitValue(uv) => format!("{:.2} {}", uv.value(), uv.unit()),
+            };
             col = col.push(
-                text(format!("= {}", calc_result))
-                    .size(20)
-                    .font(styles::bold_font()),
+                container(
+                    text(format!("= {}", disp))
+                        .size(20)
+                        .font(styles::bold_font())
+                        .color(Color::from_rgba(1.0, 1.0, 1.0, 0.7)),
+                )
+                .padding(config::PADDING_LARGE),
             );
         }
 
