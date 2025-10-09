@@ -136,9 +136,9 @@ impl Application for Waycast {
                 )
                 .padding(config::PADDING_LARGE),
             );
+        } else {
+            col = col.push(container(scrollable_list).padding(config::PADDING_LARGE));
         }
-
-        col = col.push(container(scrollable_list).padding(config::PADDING_LARGE));
 
         col.into()
     }
