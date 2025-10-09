@@ -4948,7 +4948,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-config"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "config",
  "directories",
@@ -4959,7 +4959,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bincode",
  "redb",
@@ -4970,7 +4970,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-macros"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4979,7 +4979,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-plugins"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "directories",
  "freedesktop",
@@ -5000,7 +5000,7 @@ dependencies = [
 
 [[package]]
 name = "waycast-ui"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "freedesktop",
  "iced",

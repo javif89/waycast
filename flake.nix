@@ -17,83 +17,87 @@
     let
       # Define the package as a function that takes pkgs as an argument
       # This allows it to be built with any nixpkgs instance
-      mkWaycastPackage = pkgs: pkgs.rustPlatform.buildRustPackage {
-        pname = "waycast";
-        version = "0.4.0";
-        src = self;
+      mkWaycastPackage =
+        pkgs:
+        pkgs.rustPlatform.buildRustPackage {
+          pname = "waycast";
+          version = "0.5.0";
+          src = self;
 
-        cargoLock.lockFile = ./Cargo.lock;
+          cargoLock.lockFile = ./Cargo.lock;
 
-        doCheck = true;
-        cargoTestFlags = [
-          "--bins"
-          "--tests"
-        ];
+          doCheck = true;
+          cargoTestFlags = [
+            "--bins"
+            "--tests"
+          ];
 
-        nativeBuildInputs = with pkgs; [
-          pkg-config
-          makeWrapper
-          patchelf
-        ];
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            makeWrapper
+            patchelf
+          ];
 
-        buildInputs = with pkgs; [
-          # Iced dependencies (from official docs)
-          expat
-          fontconfig
-          freetype
-          libGL
-          xorg.libX11
-          xorg.libXcursor
-          xorg.libXi
-          xorg.libXrandr
-          wayland
-          libxkbcommon
-          vulkan-loader
+          buildInputs = with pkgs; [
+            # Iced dependencies (from official docs)
+            expat
+            fontconfig
+            freetype
+            libGL
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
+            wayland
+            libxkbcommon
+            vulkan-loader
 
-          # Still needed by waycast-plugins for file icons and launching
-          glib
-        ];
+            # Still needed by waycast-plugins for file icons and launching
+            glib
+          ];
 
-        # These will be automatically available when waycast is installed
-        propagatedBuildInputs = with pkgs; [
-          libGL
-          vulkan-loader
-          wayland
-          libxkbcommon
-          glib
-        ];
+          # These will be automatically available when waycast is installed
+          propagatedBuildInputs = with pkgs; [
+            libGL
+            vulkan-loader
+            wayland
+            libxkbcommon
+            glib
+          ];
 
-        # Install custom icons
-        postInstall = ''
-          mkdir -p $out/share/waycast/icons
-          cp -r assets/icons/* $out/share/waycast/icons/
-          # Don't patch RPATH - the binary already works with Cargo's RPATH
-        '';
+          # Install custom icons
+          postInstall = ''
+            mkdir -p $out/share/waycast/icons
+            cp -r assets/icons/* $out/share/waycast/icons/
+            # Don't patch RPATH - the binary already works with Cargo's RPATH
+          '';
 
-        # Wrap the binary with necessary environment variables (same libs as devShell)
-        preFixup = ''
-          wrapProgram $out/bin/waycast \
-            --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share" \
-            --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath [
-              pkgs.libGL
-              pkgs.xorg.libXrandr
-              pkgs.xorg.libXinerama
-              pkgs.xorg.libXcursor
-              pkgs.xorg.libXi
-              pkgs.wayland
-              pkgs.libxkbcommon
-              pkgs.glib
-            ]}"
-        '';
+          # Wrap the binary with necessary environment variables (same libs as devShell)
+          preFixup = ''
+            wrapProgram $out/bin/waycast \
+              --prefix XDG_DATA_DIRS : "${pkgs.hicolor-icon-theme}/share:${pkgs.adwaita-icon-theme}/share" \
+              --prefix LD_LIBRARY_PATH : "${
+                pkgs.lib.makeLibraryPath [
+                  pkgs.libGL
+                  pkgs.xorg.libXrandr
+                  pkgs.xorg.libXinerama
+                  pkgs.xorg.libXcursor
+                  pkgs.xorg.libXi
+                  pkgs.wayland
+                  pkgs.libxkbcommon
+                  pkgs.glib
+                ]
+              }"
+          '';
 
-        meta = with pkgs.lib; {
-          description = "Iced-based application launcher for Wayland compositors";
-          homepage = "https://gitgud.foo/thegrind/waycast";
-          license = licenses.mit;
-          maintainers = [ "Javier Feliz" ];
-          platforms = platforms.linux;
+          meta = with pkgs.lib; {
+            description = "Iced-based application launcher for Wayland compositors";
+            homepage = "https://gitgud.foo/thegrind/waycast";
+            license = licenses.mit;
+            maintainers = [ "Javier Feliz" ];
+            platforms = platforms.linux;
+          };
         };
-      };
     in
     (flake-utils.lib.eachDefaultSystem (
       system:
