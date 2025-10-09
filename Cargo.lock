@@ -2634,6 +2634,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "mathengine"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b16850bfb1502cd5b8939556d7e8efd532b50b33ec7f61b578aafb1ad7bddf3"
+dependencies = [
+ "mathengine-evaluator",
+ "mathengine-lexer",
+ "mathengine-parser",
+ "mathengine-units",
+]
+
+[[package]]
+name = "mathengine-evaluator"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "708a79010c6b90cb2fe6e1d2865ea52b6f7c33644c816659e2348276cd6aecd6"
+dependencies = [
+ "mathengine-lexer",
+ "mathengine-parser",
+ "mathengine-units",
+]
+
+[[package]]
+name = "mathengine-lexer"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33db458d883cf2e46b4b4b78e6f88c5e2d5336702acd59156fcd82c267a32676"
+
+[[package]]
+name = "mathengine-parser"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33630b04f2bc36e157c058609753cae7d657dd03ec71bf58fed311910332db93"
+dependencies = [
+ "mathengine-lexer",
+ "mathengine-units",
+]
+
+[[package]]
+name = "mathengine-units"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3afc5766ea437585592305a60be82b5492c6048d2be7f6dda91b3aa1e7daa927"
+
+[[package]]
 name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4941,6 +4986,7 @@ dependencies = [
  "gio",
  "glib",
  "libc",
+ "mathengine",
  "nucleo-matcher",
  "serde",
  "serde_json",

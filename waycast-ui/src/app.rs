@@ -251,6 +251,7 @@ fn init_launcher() -> WaycastLauncher {
         .add_plugin(Box::new(waycast_plugins::drun::new()))
         .add_plugin(Box::new(waycast_plugins::file_search::new()))
         .add_plugin(Box::new(waycast_plugins::projects::new()))
+        .add_plugin(Box::new(waycast_plugins::calculator::new()))
         .init()
 }
 
