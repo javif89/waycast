@@ -15,6 +15,7 @@ Who knows how many it will end up being. So I'll be keeping track below.
 
 - [FreeDesktop](https://github.com/javif89/freedesktop). A rust implementation of the freedesktop spec (in progress). I was relying on GIO for these kinds of things, but the library is very annoying to use and some times not reliable.
 - [Devicon CLI](https://gitgud.foo/javif89/devicon-cli). Needed an easy way to manage and remix the devicon set for this project.
+- [mathengine](https://github.com/javif89/mathengine). For the calculator functionality
 
 ## What is this?
 
