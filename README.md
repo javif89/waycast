@@ -2,8 +2,6 @@
 
 A launcher for Wayland that doesn't suck. Think Raycast but for Linux.
 
-I already ordered the programmer socks.
-
 ## Special Thanks
 
 - [DevIcon](https://devicon.dev/). Used for the project folder icons
