@@ -113,14 +113,14 @@ plan-release:
 tag-release version:
     @echo "Tagging release {{version}}"
     git add -A
-	git commit -m "chore(release): v{{version}}"
-	git tag -fa v{{version}} -m "Release v{{version}}"
-	@echo "Release v{{version}} created!"
+    git commit -m "chore(release): v{{version}}"
+    git tag -fa v{{version}} -m "Release v{{version}}"
+    @echo "Release v{{version}} created!"
 
 [group('Releasing & publishing')]
-push-release:
+push-release version:
     git push origin master
-	git push --force origin v{{version}}
+    git push --force origin v{{version}}
     git push --tags
     @echo "Release pushed to origin"
 
