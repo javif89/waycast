@@ -115,8 +115,10 @@
             # Build tools
             pkg-config
             patchelf
-            cmake
             clang
+            cargo-dist
+            cargo-release
+            just
 
             # Iced dependencies (from official docs)
             expat

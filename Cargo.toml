@@ -16,6 +16,11 @@ rust-version = "1.89"
 license = "MIT"
 description = "Feature-rich application launcher for Wayland compositors"
 homepage = "https://waycast.dev"
-repository = "https://gitgud.foo/thegrind/waycast"
+repository = "https://github.com/javif89/waycast"
 categories = ["gui", "os::unix-apis"]
 keywords = ["launcher", "wayland", "gtk4", "application-launcher", "desktop"]
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
