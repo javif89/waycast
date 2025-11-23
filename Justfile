@@ -121,7 +121,6 @@ tag-release version:
 push-release version:
     git push origin master
     git push --force origin v{{version}}
-    git push --tags
     @echo "Release pushed to origin"
 
 [group('Releasing & publishing')]
