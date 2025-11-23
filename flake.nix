@@ -117,7 +117,6 @@
             patchelf
             clang
             cargo-dist
-            cargo-release
             just
 
             # Iced dependencies (from official docs)
