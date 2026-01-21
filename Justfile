@@ -7,6 +7,9 @@ run:
 	cargo build -p waycast-ui --release
 	./target/release/waycast
 
+daemon:
+	cargo run -p waycast-daemon
+
 [group('Development')]
 clean-run: clean build-release
 	./target/release/waycast
@@ -127,3 +130,11 @@ push-release version:
 release version: 
     just tag-release {{version}}
     just push-release {{version}}
+
+[group('DB')]
+reset-db:
+	rm waycast.db -f
+	rm waycast.db-shm -f
+	rm waycast.db-wal -f
+	touch waycast.db
+	sqlx migrate run --source ./waycast-data/migrations --database-url sqlite://waycast.db

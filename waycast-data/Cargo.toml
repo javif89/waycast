@@ -1,0 +1,24 @@
+[package]
+name = "waycast-data"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+serde = "1.0.228"
+sqlx = { version = "0.8.6", features = [
+    "tls-rustls",
+    "runtime-tokio",
+    "any",
+    "sqlite",
+    "derive",
+    "migrate",
+] }
+thiserror = "2.0.18"

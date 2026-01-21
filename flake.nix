@@ -138,6 +138,9 @@
             # Still needed by waycast-plugins
             glib
 
+            # CLI Utils
+            sqlx-cli
+
             # Icons (so themed icons resolve)
             hicolor-icon-theme
 

@@ -122,7 +122,7 @@ pub struct FileSearchPlugin {
     search_paths: HashSet<PathBuf>,
     skip_dirs: HashSet<String>,
     // Running list of files in memory
-    files: Arc<Mutex<Vec<FileEntry>>>,
+    pub files: Arc<Mutex<Vec<FileEntry>>>,
 }
 
 impl Default for FileSearchPlugin {
