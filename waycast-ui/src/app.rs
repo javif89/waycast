@@ -11,7 +11,6 @@ use iced::{
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
 use waycast_core::WaycastLauncher;
-use waycast_data::{DB, ro_connection};
 
 use crate::config;
 use crate::icons::{self, IconHandle};
