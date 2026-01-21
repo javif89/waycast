@@ -1,22 +1,9 @@
-use waycast_core::{LauncherListItem, LauncherPlugin};
+use waycast_core::{LauncherItem, LauncherPlugin};
 use waycast_macros::{launcher_entry, plugin};
 
 #[derive(Debug, Clone)]
 pub struct CalculatorResult {
     value: String,
-}
-
-impl LauncherListItem for CalculatorResult {
-    launcher_entry! {
-        id: "calculator_result".into(),
-        title: self.value.to_owned(),
-        icon: {
-           "accessories-calculator".into()
-        },
-        execute: {
-            Ok(())
-        }
-    }
 }
 
 pub struct CalculatorPlugin;
@@ -41,7 +28,7 @@ impl LauncherPlugin for CalculatorPlugin {
         prefix: "calc"
     }
 
-    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+    fn filter(&self, query: &str) -> Vec<LauncherItem> {
         if query.is_empty() {
             return self.default_list();
         }
@@ -50,9 +37,13 @@ impl LauncherPlugin for CalculatorPlugin {
         // before wasting valuable CPU cycles trying to evaluate
 
         if let Ok(result) = mathengine::evaluate_expression(query) {
-            return vec![Box::new(CalculatorResult {
-                value: format!("{}", result),
-            })];
+            return vec![LauncherItem {
+                id: "calculator_result".into(),
+                kind: waycast_core::ItemKind::Unknown,
+                title: format!("{}", result),
+                description: None,
+                icon: { "accessories-calculator".into() },
+            }];
         }
 
         Vec::new()

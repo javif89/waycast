@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use freedesktop::ApplicationEntry;
-use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
-use waycast_macros::{launcher_entry, plugin};
+use waycast_core::{ItemKind, LauncherItem, LauncherPlugin};
+use waycast_macros::plugin;
 
 use crate::util::{FuzzyMatcher, FuzzySearchable};
 
@@ -15,31 +15,18 @@ pub struct DesktopEntry {
     path: PathBuf,
 }
 
-impl LauncherListItem for DesktopEntry {
-    launcher_entry! {
-        id: self.id.clone(),
-        title: self.name.to_owned(),
-        description: {
-            self.description.as_ref().map(|glib_string| glib_string.to_string().to_owned())
-        },
-        icon: {
-            self.icon.to_owned()
-        },
-        execute: {
-            match ApplicationEntry::from_path(&self.path) {
-                Ok(app) => {
-                    println!("Found app successfully");
-                    println!("Path: {}", app.path().display());
-                    println!("ID: {}", app.id().unwrap_or("Not found".into()));
-                    match app.execute() {
-                        Ok(_) => Ok(()),
-                        Err(_) => {
-                            Err(LaunchError::CouldNotLaunch("Failed to launch app".into()))
-                        }
-                   }
-                },
-                Err(_) => Err(LaunchError::CouldNotLaunch("Failed to get app from path".into()))
-            }
+impl Into<LauncherItem> for DesktopEntry {
+    fn into(self) -> LauncherItem {
+        LauncherItem {
+            id: self.id.clone(),
+            kind: ItemKind::DesktopEntry,
+            title: self.name.to_owned(),
+            description: {
+                self.description
+                    .as_ref()
+                    .map(|glib_string| glib_string.to_string().to_owned())
+            },
+            icon: self.icon.to_owned(),
         }
     }
 }
@@ -94,17 +81,17 @@ impl LauncherPlugin for DrunPlugin {
         prefix: "app"
     }
 
-    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>> {
-        let mut entries: Vec<Box<dyn LauncherListItem>> = Vec::new();
+    fn default_list(&self) -> Vec<LauncherItem> {
+        let mut entries: Vec<LauncherItem> = Vec::new();
 
         for e in get_desktop_entries() {
-            entries.push(Box::new(e));
+            entries.push(e.into());
         }
 
         entries
     }
 
-    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+    fn filter(&self, query: &str) -> Vec<LauncherItem> {
         if query.is_empty() {
             return self.default_list();
         }
@@ -113,10 +100,7 @@ impl LauncherPlugin for DrunPlugin {
         let entries = get_desktop_entries();
         let matches = fm.match_items(query, &entries, 5);
 
-        matches
-            .into_iter()
-            .map(|de| Box::new(de.clone()) as Box<dyn LauncherListItem>)
-            .collect()
+        matches.into_iter().map(|de| de.to_owned().into()).collect()
     }
 }
 

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
 pub mod cache;
 
 #[derive(Debug)]
@@ -8,12 +10,21 @@ pub enum LaunchError {
     CouldNotLaunch(String),
 }
 
-pub trait LauncherListItem: Send + Sync {
-    fn id(&self) -> String;
-    fn title(&self) -> String;
-    fn description(&self) -> Option<String>;
-    fn execute(&self) -> Result<(), LaunchError>;
-    fn icon(&self) -> String;
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum ItemKind {
+    DesktopEntry,
+    File,
+    Project,
+    Unknown,
+}
+
+#[derive(Debug, Clone)]
+pub struct LauncherItem {
+    pub id: String,
+    pub kind: ItemKind,
+    pub title: String,
+    pub description: Option<String>,
+    pub icon: String,
 }
 
 pub trait LauncherPlugin: Send + Sync {
@@ -28,18 +39,18 @@ pub trait LauncherPlugin: Send + Sync {
     // Only search/use this plugin if the prefix was typed
     fn by_prefix_only(&self) -> bool;
     // Actual item searching functions
-    fn default_list(&self) -> Vec<Box<dyn LauncherListItem>> {
+    fn default_list(&self) -> Vec<LauncherItem> {
         // Default empty list - plugins can override this
         Vec::new()
     }
-    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>>;
+    fn filter(&self, query: &str) -> Vec<LauncherItem>;
 }
 
 pub struct WaycastLauncher {
     plugins: Vec<Arc<dyn LauncherPlugin>>,
     plugins_show_always: Vec<Arc<dyn LauncherPlugin>>,
     plugins_by_prefix: HashMap<String, Arc<dyn LauncherPlugin>>,
-    current_results: Vec<Box<dyn LauncherListItem>>,
+    current_results: Vec<LauncherItem>,
     current_results_by_id: HashMap<String, usize>,
 }
 
@@ -87,8 +98,8 @@ impl WaycastLauncher {
         self
     }
 
-    fn add_current_item(&mut self, item: Box<dyn LauncherListItem>) {
-        let id = item.id();
+    fn add_current_item(&mut self, item: LauncherItem) {
+        let id = item.clone().id;
         let index = self.current_results.len();
         self.current_results.push(item);
         self.current_results_by_id.insert(id, index);
@@ -99,7 +110,7 @@ impl WaycastLauncher {
         self.current_results_by_id.clear();
     }
 
-    pub fn get_default_results(&mut self) -> &Vec<Box<dyn LauncherListItem>> {
+    pub fn get_default_results(&mut self) -> &Vec<LauncherItem> {
         self.clear_current_results();
         let mut all_entries = Vec::new();
         for plugin in &self.plugins_show_always {
@@ -111,7 +122,7 @@ impl WaycastLauncher {
         &self.current_results
     }
 
-    pub fn search(&mut self, query: &str) -> &Vec<Box<dyn LauncherListItem>> {
+    pub fn search(&mut self, query: &str) -> &Vec<LauncherItem> {
         self.clear_current_results();
 
         let mut all_entries = Vec::new();
@@ -126,28 +137,30 @@ impl WaycastLauncher {
     }
 
     pub fn execute_item(&self, index: usize) -> Result<(), LaunchError> {
-        if let Some(item) = self.current_results.get(index) {
-            item.execute()
-        } else {
-            Err(LaunchError::CouldNotLaunch("Invalid index".into()))
-        }
+        Ok(())
+        // if let Some(item) = self.current_results.get(index) {
+        //     item.execute()
+        // } else {
+        //     Err(LaunchError::CouldNotLaunch("Invalid index".into()))
+        // }
     }
 
     pub fn execute_item_by_id(&self, id: &str) -> Result<(), LaunchError> {
-        if let Some(&index) = self.current_results_by_id.get(id) {
-            if let Some(item) = self.current_results.get(index) {
-                item.execute()
-            } else {
-                Err(LaunchError::CouldNotLaunch(
-                    "Item index out of bounds".into(),
-                ))
-            }
-        } else {
-            Err(LaunchError::CouldNotLaunch("Item not found".into()))
-        }
+        Ok(())
+        // if let Some(&index) = self.current_results_by_id.get(id) {
+        //     if let Some(item) = self.current_results.get(index) {
+        //         item.execute()
+        //     } else {
+        //         Err(LaunchError::CouldNotLaunch(
+        //             "Item index out of bounds".into(),
+        //         ))
+        //     }
+        // } else {
+        //     Err(LaunchError::CouldNotLaunch("Item not found".into()))
+        // }
     }
 
-    pub fn current_results(&self) -> &Vec<Box<dyn LauncherListItem>> {
+    pub fn current_results(&self) -> &Vec<LauncherItem> {
         &self.current_results
     }
 

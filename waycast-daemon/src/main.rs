@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use directories::UserDirs;
@@ -11,7 +11,7 @@ use ignore::Walk;
 use tokio::time;
 use tracing::{Instrument, error, info, info_span};
 use tracing_subscriber::fmt;
-use waycast_data::{DB, DataError, ItemRow, wal_connection};
+use waycast_data::{DB, DataError, ItemKind, ItemRow, wal_connection};
 
 #[tokio::main]
 async fn main() {
@@ -23,20 +23,32 @@ async fn main() {
 
     let db = DB::open(wal_connection("waycast.db")).await;
 
-    let mut cadence = time::interval(Duration::from_secs(20));
+    let start = Instant::now();
+    let items = db
+        .get_items(Some(ItemKind::DesktopEntry))
+        .await
+        .expect("Failed to get items");
+    let elapsed = start.elapsed();
+    println!("Fetch took {:?}", elapsed);
 
-    loop {
-        cadence.tick().await;
+    // for i in items {
+    //     println!("{:#?}", i);
+    // }
 
-        let scan_span = info_span!("scan_and_update");
+    // let mut cadence = time::interval(Duration::from_secs(20));
 
-        let result = scan_and_update(&db).instrument(scan_span).await;
+    // loop {
+    //     cadence.tick().await;
 
-        match result {
-            Ok(_) => info!("Items inserted successfully"),
-            Err(e) => error!("Error: {e}"),
-        }
-    }
+    //     let scan_span = info_span!("scan_and_update");
+
+    //     let result = scan_and_update(&db).instrument(scan_span).await;
+
+    //     match result {
+    //         Ok(_) => info!("Items inserted successfully"),
+    //         Err(e) => error!("Error: {e}"),
+    //     }
+    // }
 }
 
 async fn scan_and_update(db: &DB) -> Result<(), DataError> {

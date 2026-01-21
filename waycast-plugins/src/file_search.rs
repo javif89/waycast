@@ -10,7 +10,7 @@ use walkdir::{DirEntry, WalkDir};
 use waycast_macros::{launcher_entry, plugin};
 
 use crate::util::{FuzzyMatcher, FuzzySearchable, spawn_detached};
-use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin};
+use waycast_core::{LaunchError, LauncherItem, LauncherPlugin};
 
 #[derive(Clone)]
 struct FileEntry {
@@ -25,53 +25,59 @@ impl FileEntry {
     }
 }
 
-impl LauncherListItem for FileEntry {
-    launcher_entry! {
-        id: self.path.to_string_lossy().to_string(),
-        title: String::from(self.path.file_name().unwrap().to_string_lossy()),
-        description: Some(self.path.to_string_lossy().to_string()),
-        icon: {
-            let (content_type, _) = gio::content_type_guess(Some(&self.path), None);
-            let icon = gio::content_type_get_icon(&content_type);
-            if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>()
-                && let Some(icon_name) = themed_icon.names().first() {
-                    return icon_name.to_string();
+impl Into<LauncherItem> for FileEntry {
+    fn into(self) -> LauncherItem {
+        LauncherItem {
+            id: self.path.to_string_lossy().to_string(),
+            title: String::from(self.path.file_name().unwrap().to_string_lossy()),
+            kind: waycast_core::ItemKind::File,
+            description: Some(self.path.to_string_lossy().to_string()),
+            icon: {
+                let (content_type, _) = gio::content_type_guess(Some(&self.path), None);
+                let icon = gio::content_type_get_icon(&content_type);
+                if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>()
+                    && let Some(icon_name) = themed_icon.names().first()
+                {
+                    icon_name.to_string()
+                } else {
+                    String::from("text-x-generic")
                 }
-            String::from("text-x-generic")
-        },
-        execute: {
-            println!("Executing: {}", self.path.display());
-
-            // Use xdg-open directly since it works properly with music files
-            // Detach the process so it doesn't die when daemon is killed
-            match spawn_detached("xdg-open", &[self.path.to_str().unwrap()]) {
-                Ok(_) => {
-                    println!("Successfully launched with xdg-open");
-                    Ok(())
-                }
-                Err(e) => {
-                    println!("xdg-open failed: {}", e);
-                    // Fallback to GIO method
-                    let file_gio = gio::File::for_path(&self.path);
-                    let ctx = gio::AppLaunchContext::new();
-                    match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
-                        Ok(()) => {
-                            println!("Successfully launched with GIO fallback");
-                            Ok(())
-                        }
-                        Err(e2) => {
-                            println!("GIO fallback also failed: {}", e2);
-                            Err(LaunchError::CouldNotLaunch(format!(
-                                "Both xdg-open and GIO failed: {} / {}",
-                                e, e2
-                            )))
-                        }
-                    }
-                }
-            }
+            },
         }
     }
 }
+
+// pub fn launch() {
+//     println!("Executing: {}", self.path.display());
+
+//     // Use xdg-open directly since it works properly with music files
+//     // Detach the process so it doesn't die when daemon is killed
+//     match spawn_detached("xdg-open", &[self.path.to_str().unwrap()]) {
+//         Ok(_) => {
+//             println!("Successfully launched with xdg-open");
+//             Ok(())
+//         }
+//         Err(e) => {
+//             println!("xdg-open failed: {}", e);
+//             // Fallback to GIO method
+//             let file_gio = gio::File::for_path(&self.path);
+//             let ctx = gio::AppLaunchContext::new();
+//             match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
+//                 Ok(()) => {
+//                     println!("Successfully launched with GIO fallback");
+//                     Ok(())
+//                 }
+//                 Err(e2) => {
+//                     println!("GIO fallback also failed: {}", e2);
+//                     Err(LaunchError::CouldNotLaunch(format!(
+//                         "Both xdg-open and GIO failed: {} / {}",
+//                         e, e2
+//                     )))
+//                 }
+//             }
+//         }
+//     }
+// }
 
 impl FuzzySearchable for FileEntry {
     fn primary_key(&self) -> String {
@@ -248,7 +254,7 @@ impl LauncherPlugin for FileSearchPlugin {
         });
     }
 
-    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+    fn filter(&self, query: &str) -> Vec<LauncherItem> {
         if query.is_empty() {
             return self.default_list();
         }
@@ -266,7 +272,7 @@ impl LauncherPlugin for FileSearchPlugin {
         // Convert to LauncherListItem
         matches
             .into_iter()
-            .map(|file_entry| Box::new(file_entry.clone()) as Box<dyn LauncherListItem>)
+            .map(|file_entry| file_entry.to_owned().into())
             .collect()
     }
 }

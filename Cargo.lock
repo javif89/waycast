@@ -5700,6 +5700,7 @@ dependencies = [
  "bincode",
  "redb",
  "serde",
+ "serde_json",
  "tempfile",
  "waycast-config",
 ]
@@ -5766,7 +5767,9 @@ dependencies = [
  "iced",
  "iced_layershell",
  "mathengine",
+ "tokio",
  "waycast-core",
+ "waycast-data",
  "waycast-plugins",
 ]
 

@@ -10,7 +10,7 @@ use std::{
 
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
-use waycast_core::{LaunchError, LauncherListItem, LauncherPlugin, cache::CacheTTL};
+use waycast_core::{LaunchError, LauncherItem, LauncherPlugin, cache::CacheTTL};
 use waycast_macros::{launcher_entry, plugin};
 
 use crate::util::{FuzzyMatcher, spawn_detached};
@@ -29,50 +29,60 @@ pub struct ProjectEntry {
     project_type: Option<String>,
 }
 
-impl LauncherListItem for ProjectEntry {
-    launcher_entry! {
-        id: self.path.to_string_lossy().to_string(),
-        title: String::from(self.path.file_name().unwrap().to_string_lossy()),
-        description: Some(self.path.to_string_lossy().to_string()),
-        icon: {
-            if let Some(t) = &self.project_type {
-                // Try XDG data directory first, fall back to development path
-                let icon_name = format!("{}.svg", t.to_lowercase());
+fn get_icon(p: &ProjectEntry) -> String {
+    if let Some(t) = &p.project_type {
+        // Try XDG data directory first, fall back to development path
+        let icon_name = format!("{}.svg", t.to_lowercase());
 
-                if let Some(data_dir) = waycast_config::data_dir() {
-                    let xdg_icon_path = data_dir.join("icons").join("devicons").join(&icon_name);
-                    if xdg_icon_path.exists() {
-                        return xdg_icon_path.to_string_lossy().to_string();
-                    }
-                }
-
-                // Fall back to development path
-                let dev_icon_path = PathBuf::from("./assets/icons/devicons").join(&icon_name);
-                if dev_icon_path.exists() {
-                    return dev_icon_path.to_string_lossy().to_string();
-                }
+        if let Some(data_dir) = waycast_config::data_dir() {
+            let xdg_icon_path = data_dir.join("icons").join("devicons").join(&icon_name);
+            if xdg_icon_path.exists() {
+                return xdg_icon_path.to_string_lossy().to_string();
             }
+        }
 
-            String::from("vscode")
-        },
-        execute: {
-            let project_path = self.path.to_string_lossy().to_string();
-            let exec_cmd = self.exec_command.replace("{path}", &project_path);
-            let parts: Vec<&str> = exec_cmd.split_whitespace().collect();
-            if let Some((program, args)) = parts.split_first() {
-                match spawn_detached(program, args) {
-                    Ok(_) => {
-                        println!("Successfully opened with code");
-                        Ok(())
-                    }
-                    Err(_) => Err(LaunchError::CouldNotLaunch("Failed to open project folder".into())),
-                }
-            } else {
-                Err(LaunchError::CouldNotLaunch("No program found in exec_command".into()))
-            }
+        // Fall back to development path
+        let dev_icon_path = PathBuf::from("./assets/icons/devicons").join(&icon_name);
+        if dev_icon_path.exists() {
+            return dev_icon_path.to_string_lossy().to_string();
+        }
+    }
+
+    String::from("vscode")
+}
+
+impl Into<LauncherItem> for ProjectEntry {
+    fn into(self) -> LauncherItem {
+        LauncherItem {
+            id: self.path.to_string_lossy().to_string(),
+            title: String::from(self.path.file_name().unwrap().to_string_lossy()),
+            kind: waycast_core::ItemKind::Project,
+            description: Some(self.path.to_string_lossy().to_string()),
+            icon: get_icon(&self),
         }
     }
 }
+
+// pub fn launch() {
+//     let project_path = self.path.to_string_lossy().to_string();
+//     let exec_cmd = self.exec_command.replace("{path}", &project_path);
+//     let parts: Vec<&str> = exec_cmd.split_whitespace().collect();
+//     if let Some((program, args)) = parts.split_first() {
+//         match spawn_detached(program, args) {
+//             Ok(_) => {
+//                 println!("Successfully opened with code");
+//                 Ok(())
+//             }
+//             Err(_) => Err(LaunchError::CouldNotLaunch(
+//                 "Failed to open project folder".into(),
+//             )),
+//         }
+//     } else {
+//         Err(LaunchError::CouldNotLaunch(
+//             "No program found in exec_command".into(),
+//         ))
+//     }
+// }
 
 impl FuzzySearchable for ProjectEntry {
     fn primary_key(&self) -> String {
@@ -182,7 +192,7 @@ impl LauncherPlugin for ProjectsPlugin {
         });
     }
 
-    fn filter(&self, query: &str) -> Vec<Box<dyn LauncherListItem>> {
+    fn filter(&self, query: &str) -> Vec<LauncherItem> {
         if query.is_empty() {
             return self.default_list();
         }
@@ -200,7 +210,7 @@ impl LauncherPlugin for ProjectsPlugin {
         // Convert to LauncherListItem
         matches
             .into_iter()
-            .map(|project_entry| Box::new(project_entry.clone()) as Box<dyn LauncherListItem>)
+            .map(|project_entry| project_entry.to_owned().into())
             .collect()
     }
 }

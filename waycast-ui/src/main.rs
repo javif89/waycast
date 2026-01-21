@@ -11,8 +11,10 @@ use iced_layershell::reexport::Anchor;
 use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 
 use app::Waycast;
+use waycast_data::{DB, ro_connection};
 
-pub fn main() -> Result<(), iced_layershell::Error> {
+#[tokio::main]
+pub async fn main() -> Result<(), iced_layershell::Error> {
     println!("Waycast v{}", env!("CARGO_PKG_VERSION"));
 
     let result = Waycast::run(Settings {

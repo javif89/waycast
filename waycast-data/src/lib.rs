@@ -32,12 +32,32 @@ pub fn wal_connection(path: impl AsRef<Path>) -> SqliteConnectOptions {
         .busy_timeout(Duration::from_secs(10));
 }
 
+pub fn ro_connection(path: impl AsRef<Path>) -> SqliteConnectOptions {
+    return SqliteConnectOptions::from_str(path.as_ref().to_string_lossy().as_ref())
+        .expect("Failed lol")
+        .read_only(true)
+        .foreign_keys(true)
+        .busy_timeout(Duration::from_secs(10));
+}
+
 #[derive(Debug, sqlx::Type, Deserialize, Serialize)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum ItemKind {
     DesktopEntry,
     File,
     Project,
+    Unknown,
+}
+
+impl From<String> for ItemKind {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "desktopentry" => Self::DesktopEntry,
+            "file" => Self::File,
+            "project" => Self::Project,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Debug)]
@@ -161,5 +181,26 @@ impl DB {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn get_items(&self, kind: Option<ItemKind>) -> Result<Vec<ItemRow>, DataError> {
+        let items = sqlx::query_as!(
+            ItemRow,
+            r#"
+            select
+                item_id as id,
+                kind,
+                title,
+                description,
+                icon
+            from items 
+            where (?1 is null or kind = ?1)
+        "#,
+            kind
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(items)
     }
 }
