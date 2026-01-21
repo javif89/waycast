@@ -101,10 +101,12 @@ impl DB {
     }
 
     /// Insert items into the database. Steps are as follows:
+    ///
     /// 1. Truncate the items_staging table
     /// 2. Add items to items_staging
     /// 3. Delete any items in items not found in items_staging (by item_id + kind)
     /// 4. Add any items to the items table present in items_staging and not in items
+    ///
     /// This approach prevents having a situation where the user
     /// opens waycast to find no items while we're in the middle
     /// of this operation.
