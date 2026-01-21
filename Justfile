@@ -7,6 +7,9 @@ run:
 	cargo build -p waycast-ui --release
 	./target/release/waycast
 
+run-nocomp:
+	./target/release/waycast
+
 daemon:
 	cargo run -p waycast-daemon
 

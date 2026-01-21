@@ -2211,6 +2211,7 @@ dependencies = [
  "iced_core",
  "log",
  "rustc-hash 2.1.1",
+ "tokio",
  "wasm-bindgen-futures",
  "wasm-timer",
 ]
@@ -5716,6 +5717,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "waycast-core",
  "waycast-data",
  "waycast-plugins",
 ]
@@ -5727,6 +5729,7 @@ dependencies = [
  "serde",
  "sqlx",
  "thiserror 2.0.18",
+ "waycast-core",
 ]
 
 [[package]]
@@ -5742,10 +5745,12 @@ dependencies = [
 name = "waycast-plugins"
 version = "0.5.1"
 dependencies = [
+ "crossbeam-channel",
  "directories",
  "freedesktop",
  "gio",
  "glib",
+ "ignore",
  "libc",
  "mathengine",
  "nucleo-matcher",

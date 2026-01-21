@@ -22,3 +22,4 @@ sqlx = { version = "0.8.6", features = [
     "migrate",
 ] }
 thiserror = "2.0.18"
+waycast-core = { version = "0.5.1", path = "../waycast-core" }

@@ -73,6 +73,13 @@ impl DrunPlugin {
     }
 }
 
+pub fn all() -> Vec<LauncherItem> {
+    get_desktop_entries()
+        .iter()
+        .map(|de| de.to_owned().into())
+        .collect()
+}
+
 impl LauncherPlugin for DrunPlugin {
     plugin! {
         name: "drun",

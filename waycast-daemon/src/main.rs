@@ -1,16 +1,19 @@
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use directories::UserDirs;
 use freedesktop::ApplicationEntry;
 use gio::glib::object::Cast;
 use ignore::Walk;
-use tracing::info;
+use tokio::time;
+use tracing::{Instrument, error, info, info_span};
 use tracing_subscriber::fmt;
+use waycast_core::LauncherItem;
 use waycast_data::{DB, DataError, ItemKind, ItemRow, wal_connection};
+use waycast_plugins::{drun::DrunPlugin, file_search};
 
 #[tokio::main]
 async fn main() {
@@ -22,126 +25,53 @@ async fn main() {
 
     let db = DB::open(wal_connection("waycast.db")).await;
 
-    let start = Instant::now();
-    let items = db
-        .get_items(Some(ItemKind::DesktopEntry))
-        .await
-        .expect("Failed to get items");
-    let elapsed = start.elapsed();
-    println!("Fetch took {:?}", elapsed);
+    let mut cadence = time::interval(Duration::from_secs(20));
 
-    // for i in items {
-    //     println!("{:#?}", i);
-    // }
+    loop {
+        cadence.tick().await;
 
-    // let mut cadence = time::interval(Duration::from_secs(20));
+        let scan_span = info_span!("scan_and_update");
 
-    // loop {
-    //     cadence.tick().await;
+        let result = scan_and_update(&db).instrument(scan_span).await;
 
-    //     let scan_span = info_span!("scan_and_update");
-
-    //     let result = scan_and_update(&db).instrument(scan_span).await;
-
-    //     match result {
-    //         Ok(_) => info!("Items inserted successfully"),
-    //         Err(e) => error!("Error: {e}"),
-    //     }
-    // }
+        match result {
+            Ok(_) => info!("Items inserted successfully"),
+            Err(e) => error!("Error: {e}"),
+        }
+    }
 }
 
 async fn scan_and_update(db: &DB) -> Result<(), DataError> {
     info!("Gathering data");
-    let (desktop_entries, files) = tokio::join!(get_desktop_entries(), get_file_entries());
+    let start = Instant::now();
+    let (de, f, p) = tokio::join!(
+        tokio::task::spawn_blocking(|| waycast_plugins::drun::all()),
+        tokio::task::spawn_blocking(|| waycast_plugins::file_search::all()),
+        tokio::task::spawn_blocking(|| waycast_plugins::projects::all()),
+    );
 
-    info!("Found {} desktop entries", desktop_entries.len());
-    info!("Found {} files", files.len());
+    let desktop_entries = de.unwrap_or(Vec::new());
+    let files = f.unwrap_or(Vec::new());
+    let projects = p.unwrap_or(Vec::new());
+    let elapsed = start.elapsed();
+    info!("Scan all took {:?}", elapsed);
+    info!(
+        "{} DE | {} Files | {} Projects",
+        desktop_entries.len(),
+        files.len(),
+        projects.len()
+    );
 
-    let mut items = Vec::with_capacity(desktop_entries.len() + files.len());
+    let mut items: Vec<LauncherItem> =
+        Vec::with_capacity(desktop_entries.len() + files.len() + projects.len());
+
     items.extend(desktop_entries);
     items.extend(files);
+    items.extend(projects);
 
     info!("Inserting {} items", items.len());
-    db.insert_items(items).await?;
+    db.insert_items(items.iter().map(|i| i.to_owned().into()).collect())
+        .await?;
 
     Ok(())
-}
-
-async fn get_desktop_entries() -> Vec<ItemRow> {
-    let mut entries = Vec::new();
-
-    for app in ApplicationEntry::all() {
-        if !app.should_show() {
-            continue;
-        }
-
-        let de = ItemRow {
-            id: app.id().unwrap_or_default().to_string(),
-            kind: waycast_data::ItemKind::DesktopEntry,
-            title: app.name().unwrap_or("Name not found".into()),
-            description: app.comment().map(|d| d.to_string()),
-            icon: app.icon().unwrap_or("application-x-executable".to_string()),
-        };
-
-        entries.push(de);
-    }
-
-    entries
-}
-
-pub fn default_search_list() -> HashSet<PathBuf> {
-    if let Some(ud) = UserDirs::new() {
-        let mut paths: HashSet<PathBuf> = HashSet::new();
-        let user_dirs = [
-            ud.document_dir(),
-            ud.picture_dir(),
-            ud.audio_dir(),
-            ud.video_dir(),
-        ];
-
-        for path in user_dirs.into_iter().flatten() {
-            paths.insert(path.to_path_buf());
-        }
-
-        return paths;
-    }
-
-    HashSet::new()
-}
-
-fn icon_from_path(path: impl AsRef<Path>) -> String {
-    let (content_type, _) = gio::content_type_guess(Some(path.as_ref()), None);
-    let icon = gio::content_type_get_icon(&content_type);
-    if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>()
-        && let Some(icon_name) = themed_icon.names().first()
-    {
-        return icon_name.to_string();
-    }
-    String::from("text-x-generic")
-}
-
-async fn get_file_entries() -> Vec<ItemRow> {
-    let mut items: Vec<ItemRow> = Vec::new();
-    let paths = default_search_list();
-
-    for p in paths {
-        for result in Walk::new(p) {
-            match result {
-                Ok(entry) => {
-                    let item = ItemRow {
-                        id: entry.path().to_string_lossy().to_string(),
-                        kind: waycast_data::ItemKind::File,
-                        title: String::from(entry.path().file_name().unwrap().to_string_lossy()),
-                        description: Some(entry.path().to_string_lossy().to_string()),
-                        icon: icon_from_path(entry.path()),
-                    };
-
-                    items.push(item);
-                }
-                Err(_) => continue,
-            }
-        }
-    }
-
-    items
 }

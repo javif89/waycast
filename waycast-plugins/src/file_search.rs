@@ -1,6 +1,8 @@
+use crossbeam_channel::unbounded;
 use directories::UserDirs;
 use gio::prelude::FileExt;
 use glib::object::Cast;
+use ignore::{WalkBuilder, WalkState};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,10 +19,18 @@ struct FileEntry {
     path: PathBuf,
 }
 
-impl FileEntry {
-    fn from(entry: DirEntry) -> Self {
+impl From<ignore::DirEntry> for FileEntry {
+    fn from(value: ignore::DirEntry) -> Self {
         FileEntry {
-            path: entry.into_path(),
+            path: value.into_path(),
+        }
+    }
+}
+
+impl From<walkdir::DirEntry> for FileEntry {
+    fn from(value: walkdir::DirEntry) -> Self {
+        FileEntry {
+            path: value.into_path(),
         }
     }
 }
@@ -218,6 +228,81 @@ impl FileSearchPlugin {
             eprintln!("File indexing timed out after {:?}", timeout);
         }
     }
+}
+
+struct Collector {
+    tx: crossbeam_channel::Sender<Vec<FileEntry>>,
+    local: Vec<FileEntry>,
+}
+
+impl Drop for Collector {
+    fn drop(&mut self) {
+        if !self.local.is_empty() {
+            let _ = self.tx.send(std::mem::take(&mut self.local));
+        }
+    }
+}
+
+pub fn all() -> Vec<LauncherItem> {
+    let mut search_paths = default_search_list();
+    let mut skip_dirs = default_skip_list();
+
+    if let Ok(paths) =
+        waycast_config::config_file().get::<Vec<PathBuf>>("plugins.file_search.search_paths")
+    {
+        search_paths.extend(paths);
+    }
+
+    if let Ok(paths) =
+        waycast_config::config_file().get::<Vec<String>>("plugins.file_search.ignore_dirs")
+    {
+        skip_dirs.extend(paths);
+    }
+
+    let mut walker = WalkBuilder::new(search_paths.iter().next().unwrap());
+
+    for path in &search_paths {
+        walker.add(path);
+    }
+
+    for dir in &skip_dirs {
+        walker.add_ignore(dir);
+    }
+
+    let (tx, rx) = unbounded::<Vec<FileEntry>>();
+    walker
+        .threads(4)
+        .git_ignore(true)
+        .git_exclude(true)
+        .build_parallel()
+        .run(|| {
+            let mut collector = Collector {
+                tx: tx.clone(),
+                local: Vec::new(),
+            };
+
+            Box::new(move |result| {
+                let entry = match result {
+                    Ok(e) => e,
+                    Err(_) => return WalkState::Continue,
+                };
+
+                collector.local.push(FileEntry::from(entry));
+
+                WalkState::Continue
+            })
+        });
+
+    // Drop the original sender so rx closes once all threads finish
+    drop(tx);
+
+    // ---- FAN-IN PHASE ----
+    let mut all: Vec<FileEntry> = Vec::new();
+    for mut chunk in rx.iter() {
+        all.append(&mut chunk);
+    }
+
+    all.iter().map(|f| f.to_owned().into()).collect()
 }
 
 fn skip_hidden(entry: &DirEntry) -> bool {

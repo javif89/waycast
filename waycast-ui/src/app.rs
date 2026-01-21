@@ -10,7 +10,8 @@ use iced::{
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
-use waycast_core::WaycastLauncher;
+use waycast_core::{LauncherItem, WaycastLauncher};
+use waycast_data::{ItemKind, ItemRow, ro_connection};
 
 use crate::config;
 use crate::icons::{self, IconHandle};
@@ -22,12 +23,13 @@ pub enum Message {
     Search(String),
     Execute(String),
     EventOccurred(iced::Event),
+    Loaded(Vec<LauncherItem>),
     CloseWindow,
     SearchSubmit,
 }
 
 pub struct Waycast {
-    launcher: WaycastLauncher,
+    items: Vec<LauncherItem>,
     query: String,
     selected_index: usize,
     search_input_id: TextInputId,
@@ -49,7 +51,7 @@ impl Application for Waycast {
         launcher.get_default_results();
 
         let app = Self {
-            launcher,
+            items: Vec::new(),
             query: String::new(),
             selected_index: 0,
             search_input_id: search_input_id.clone(),
@@ -58,7 +60,8 @@ impl Application for Waycast {
         };
 
         let focus_task = text_input::focus(search_input_id);
-        (app, focus_task)
+        let load_task = Command::perform(Waycast::load_initial_data(), Message::Loaded);
+        (app, Command::batch([focus_task, load_task]))
     }
 
     fn namespace(&self) -> String {
@@ -84,11 +87,15 @@ impl Application for Waycast {
                 self.query = query.clone();
                 if query.trim().is_empty() {
                     // Like GTK UI: show default results when query is empty
-                    self.launcher.get_default_results();
+                    // self.launcher.get_default_results();
                 } else {
-                    self.launcher.search(&query);
+                    // self.launcher.search(&query);
                 }
                 self.selected_index = 0;
+                Command::none()
+            }
+            Message::Loaded(results) => {
+                self.items = results;
                 Command::none()
             }
             Message::Execute(_id) => self.execute_item(),
@@ -149,11 +156,24 @@ impl Application for Waycast {
 }
 
 impl Waycast {
+    async fn load_initial_data() -> Vec<LauncherItem> {
+        println!("Loading data baybeee");
+        let db = waycast_data::DB::open(ro_connection("waycast.db")).await;
+
+        let items = db
+            .get_items(Some(ItemKind::DesktopEntry))
+            .await
+            .unwrap_or(Vec::new());
+
+        items.into_iter().map(|i| i.into()).collect()
+    }
+
     fn handle_key_press(&mut self, key: keyboard::Key) -> Command<Message> {
-        let results_len = self.launcher.current_results().len();
-        if results_len == 0 {
-            return Command::none();
-        }
+        // let results_len = self.launcher.current_results().len();
+        let results_len = self.items.len();
+        // if results_len == 0 {
+        //     return Command::none();
+        // }
 
         match key {
             keyboard::Key::Named(key::Named::ArrowDown) => {
@@ -175,7 +195,7 @@ impl Waycast {
 
     fn execute_item(&self) -> Command<Message> {
         println!("Executing");
-        if let Some(item) = self.launcher.current_results().get(self.selected_index) {
+        if let Some(item) = self.items.get(self.selected_index) {
             println!("We will execute eventually man");
             // // TODO: Show some error in the UI if launching fails
             // if let Err(e) = item.execute() {
@@ -212,7 +232,7 @@ impl Waycast {
     }
 
     fn build_results_list(&self) -> Element<'_, Message> {
-        let results = self.launcher.current_results();
+        let results = self.items.clone();
 
         if results.is_empty() {
             return column![text("No results")].into();

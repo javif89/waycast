@@ -128,6 +128,47 @@ impl ProjectsPlugin {
     }
 }
 
+pub fn all() -> Vec<LauncherItem> {
+    let mut project_entries = Vec::new();
+    let search_paths = waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths")
+        .unwrap_or_default();
+
+    for search_path in &search_paths {
+        if let Ok(entries) = fs::read_dir(search_path) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type()
+                    && file_type.is_dir()
+                {
+                    let path = entry.path();
+
+                    // Skip hidden directories (starting with .)
+                    if let Some(file_name) = path.file_name()
+                        && let Some(name_str) = file_name.to_str()
+                    {
+                        // Skip hidden directories
+                        if name_str.starts_with('.') {
+                            continue;
+                        }
+
+                        let project_type =
+                            detect_project_type(path.to_string_lossy().to_string().as_str());
+                        project_entries.push(ProjectEntry {
+                            path,
+                            exec_command: "code -n".into(),
+                            project_type,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    project_entries
+        .iter()
+        .map(|p| p.to_owned().into())
+        .collect()
+}
+
 impl LauncherPlugin for ProjectsPlugin {
     plugin! {
         name: "Projects",

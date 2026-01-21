@@ -1,5 +1,6 @@
 pub use sqlx;
 use thiserror::Error;
+use waycast_core::LauncherItem;
 
 use std::{path::Path, str::FromStr, time::Duration};
 
@@ -60,6 +61,28 @@ impl From<String> for ItemKind {
     }
 }
 
+impl From<waycast_core::ItemKind> for ItemKind {
+    fn from(value: waycast_core::ItemKind) -> Self {
+        match value {
+            waycast_core::ItemKind::DesktopEntry => Self::DesktopEntry,
+            waycast_core::ItemKind::File => Self::File,
+            waycast_core::ItemKind::Project => Self::Project,
+            waycast_core::ItemKind::Unknown => Self::Unknown,
+        }
+    }
+}
+
+impl From<ItemKind> for waycast_core::ItemKind {
+    fn from(value: ItemKind) -> Self {
+        match value {
+            ItemKind::DesktopEntry => waycast_core::ItemKind::DesktopEntry,
+            ItemKind::File => waycast_core::ItemKind::File,
+            ItemKind::Project => waycast_core::ItemKind::Project,
+            ItemKind::Unknown => waycast_core::ItemKind::Unknown,
+        }
+    }
+}
+
 #[derive(sqlx::FromRow, Debug)]
 pub struct ItemRow {
     pub id: String,
@@ -67,6 +90,30 @@ pub struct ItemRow {
     pub title: String,
     pub description: Option<String>,
     pub icon: String,
+}
+
+impl From<LauncherItem> for ItemRow {
+    fn from(value: LauncherItem) -> Self {
+        Self {
+            id: value.id,
+            kind: value.kind.into(),
+            title: value.title,
+            description: value.description,
+            icon: value.icon,
+        }
+    }
+}
+
+impl From<ItemRow> for LauncherItem {
+    fn from(value: ItemRow) -> Self {
+        Self {
+            id: value.id,
+            kind: value.kind.into(),
+            title: value.title,
+            description: value.description,
+            icon: value.icon,
+        }
+    }
 }
 
 impl DB {

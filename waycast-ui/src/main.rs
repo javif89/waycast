@@ -12,8 +12,7 @@ use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 
 use app::Waycast;
 
-#[tokio::main]
-pub async fn main() -> Result<(), iced_layershell::Error> {
+pub fn main() -> Result<(), iced_layershell::Error> {
     println!("Waycast v{}", env!("CARGO_PKG_VERSION"));
 
     let result = Waycast::run(Settings {
