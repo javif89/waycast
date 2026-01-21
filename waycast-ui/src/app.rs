@@ -11,6 +11,7 @@ use iced::{
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
 use waycast_core::WaycastLauncher;
+use waycast_data::{DB, ro_connection};
 
 use crate::config;
 use crate::icons::{self, IconHandle};
@@ -176,10 +177,11 @@ impl Waycast {
     fn execute_item(&self) -> Command<Message> {
         println!("Executing");
         if let Some(item) = self.launcher.current_results().get(self.selected_index) {
-            // TODO: Show some error in the UI if launching fails
-            if let Err(e) = item.execute() {
-                eprintln!("Error executing app {} | {:#?}", item.id(), e);
-            }
+            println!("We will execute eventually man");
+            // // TODO: Show some error in the UI if launching fails
+            // if let Err(e) = item.execute() {
+            //     eprintln!("Error executing app {} | {:#?}", item.id(), e);
+            // }
         }
 
         iced::exit()
@@ -219,7 +221,7 @@ impl Waycast {
 
         let mut col = column![];
         for (index, item) in results.iter().enumerate() {
-            let result_item = self.build_result_item(item.as_ref(), index == self.selected_index);
+            let result_item = self.build_result_item(item.clone(), index == self.selected_index);
             col = col.push(result_item);
         }
 
@@ -228,19 +230,19 @@ impl Waycast {
 
     fn build_result_item(
         &self,
-        item: &dyn waycast_core::LauncherListItem,
+        item: waycast_core::LauncherItem,
         is_selected: bool,
     ) -> Element<'_, Message> {
-        let icon_handle = icons::get_or_load_icon(&item.icon());
+        let icon_handle = icons::get_or_load_icon(&item.icon);
         let icon_view = build_icon_view(icon_handle);
 
         let content = row![
             column![icon_view].padding(config::PADDING_SMALL),
             column![
-                text(item.title())
+                text(item.title)
                     .size(config::TITLE_FONT_SIZE)
                     .font(styles::bold_font()),
-                text(item.description().unwrap_or_default())
+                text(item.description.unwrap_or_default())
                     .size(config::DESCRIPTION_FONT_SIZE)
                     .font(styles::italic_font())
             ]
@@ -249,7 +251,7 @@ impl Waycast {
         .align_y(Alignment::Center);
 
         button(content)
-            .on_press(Message::Execute(item.id()))
+            .on_press(Message::Execute(item.id))
             .width(Length::Fill)
             .style(styles::result_button_style(is_selected))
             .into()
