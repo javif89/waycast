@@ -1,5 +1,5 @@
 use waycast_core::{LauncherItem, LauncherPlugin};
-use waycast_macros::{launcher_entry, plugin};
+use waycast_macros::plugin;
 
 #[derive(Debug, Clone)]
 pub struct CalculatorResult {

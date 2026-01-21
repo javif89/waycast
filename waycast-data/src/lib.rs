@@ -23,21 +23,21 @@ pub struct DB {
 }
 
 pub fn wal_connection(path: impl AsRef<Path>) -> SqliteConnectOptions {
-    return SqliteConnectOptions::from_str(path.as_ref().to_string_lossy().as_ref())
+    SqliteConnectOptions::from_str(path.as_ref().to_string_lossy().as_ref())
         .expect("Failed lol")
         .create_if_missing(true)
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
         .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
         .foreign_keys(true)
-        .busy_timeout(Duration::from_secs(10));
+        .busy_timeout(Duration::from_secs(10))
 }
 
 pub fn ro_connection(path: impl AsRef<Path>) -> SqliteConnectOptions {
-    return SqliteConnectOptions::from_str(path.as_ref().to_string_lossy().as_ref())
+    SqliteConnectOptions::from_str(path.as_ref().to_string_lossy().as_ref())
         .expect("Failed lol")
         .read_only(true)
         .foreign_keys(true)
-        .busy_timeout(Duration::from_secs(10));
+        .busy_timeout(Duration::from_secs(10))
 }
 
 #[derive(Debug, sqlx::Type, Deserialize, Serialize)]

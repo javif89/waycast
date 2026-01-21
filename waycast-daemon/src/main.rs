@@ -1,15 +1,14 @@
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use directories::UserDirs;
 use freedesktop::ApplicationEntry;
 use gio::glib::object::Cast;
 use ignore::Walk;
-use tokio::time;
-use tracing::{Instrument, error, info, info_span};
+use tracing::info;
 use tracing_subscriber::fmt;
 use waycast_data::{DB, DataError, ItemKind, ItemRow, wal_connection};
 

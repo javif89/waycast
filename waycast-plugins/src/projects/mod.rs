@@ -10,10 +10,10 @@ use std::{
 
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
-use waycast_core::{LaunchError, LauncherItem, LauncherPlugin, cache::CacheTTL};
-use waycast_macros::{launcher_entry, plugin};
+use waycast_core::{LauncherItem, LauncherPlugin, cache::CacheTTL};
+use waycast_macros::plugin;
 
-use crate::util::{FuzzyMatcher, spawn_detached};
+use crate::util::FuzzyMatcher;
 use crate::{
     projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner},
     util::FuzzySearchable,
@@ -51,14 +51,14 @@ fn get_icon(p: &ProjectEntry) -> String {
     String::from("vscode")
 }
 
-impl Into<LauncherItem> for ProjectEntry {
-    fn into(self) -> LauncherItem {
+impl From<ProjectEntry> for LauncherItem {
+    fn from(val: ProjectEntry) -> Self {
         LauncherItem {
-            id: self.path.to_string_lossy().to_string(),
-            title: String::from(self.path.file_name().unwrap().to_string_lossy()),
+            id: val.path.to_string_lossy().to_string(),
+            title: String::from(val.path.file_name().unwrap().to_string_lossy()),
             kind: waycast_core::ItemKind::Project,
-            description: Some(self.path.to_string_lossy().to_string()),
-            icon: get_icon(&self),
+            description: Some(val.path.to_string_lossy().to_string()),
+            icon: get_icon(&val),
         }
     }
 }

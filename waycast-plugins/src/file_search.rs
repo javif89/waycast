@@ -7,10 +7,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use walkdir::{DirEntry, WalkDir};
-use waycast_macros::{launcher_entry, plugin};
+use waycast_macros::plugin;
 
-use crate::util::{FuzzyMatcher, FuzzySearchable, spawn_detached};
-use waycast_core::{LaunchError, LauncherItem, LauncherPlugin};
+use crate::util::{FuzzyMatcher, FuzzySearchable};
+use waycast_core::{LauncherItem, LauncherPlugin};
 
 #[derive(Clone)]
 struct FileEntry {
@@ -25,15 +25,15 @@ impl FileEntry {
     }
 }
 
-impl Into<LauncherItem> for FileEntry {
-    fn into(self) -> LauncherItem {
+impl From<FileEntry> for LauncherItem {
+    fn from(val: FileEntry) -> Self {
         LauncherItem {
-            id: self.path.to_string_lossy().to_string(),
-            title: String::from(self.path.file_name().unwrap().to_string_lossy()),
+            id: val.path.to_string_lossy().to_string(),
+            title: String::from(val.path.file_name().unwrap().to_string_lossy()),
             kind: waycast_core::ItemKind::File,
-            description: Some(self.path.to_string_lossy().to_string()),
+            description: Some(val.path.to_string_lossy().to_string()),
             icon: {
-                let (content_type, _) = gio::content_type_guess(Some(&self.path), None);
+                let (content_type, _) = gio::content_type_guess(Some(&val.path), None);
                 let icon = gio::content_type_get_icon(&content_type);
                 if let Some(themed_icon) = icon.downcast_ref::<gio::ThemedIcon>()
                     && let Some(icon_name) = themed_icon.names().first()

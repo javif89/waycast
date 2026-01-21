@@ -15,18 +15,18 @@ pub struct DesktopEntry {
     path: PathBuf,
 }
 
-impl Into<LauncherItem> for DesktopEntry {
-    fn into(self) -> LauncherItem {
+impl From<DesktopEntry> for LauncherItem {
+    fn from(val: DesktopEntry) -> Self {
         LauncherItem {
-            id: self.id.clone(),
+            id: val.id.clone(),
             kind: ItemKind::DesktopEntry,
-            title: self.name.to_owned(),
+            title: val.name.to_owned(),
             description: {
-                self.description
+                val.description
                     .as_ref()
                     .map(|glib_string| glib_string.to_string().to_owned())
             },
-            icon: self.icon.to_owned(),
+            icon: val.icon.to_owned(),
         }
     }
 }
