@@ -31,3 +31,29 @@ create table if not exists items_staging (
 
 create index if not exists idx_items_staging_kind on items_staging(kind);
 create index if not exists idx_items_staging_item_id_kind on items(item_id,kind);
+
+-- Search index
+CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+  title,
+  description,
+  content='items',
+  content_rowid='id'
+);
+
+CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON items BEGIN
+  INSERT INTO items_fts(rowid, title, description)
+  VALUES (new.id, new.title, new.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
+  delete from items_fts
+  where items_fts.rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
+  delete from items_fts
+  where items_fts.rowid = old.id;
+
+  INSERT INTO items_fts(rowid, title, description)
+  VALUES (new.id, new.title, new.description);
+END;
