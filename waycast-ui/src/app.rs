@@ -11,7 +11,7 @@ use iced::{
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
-use waycast_core::{LauncherItem, WaycastLauncher};
+use waycast_core::LauncherItem;
 use waycast_data::{ItemKind, ItemRow, ro_connection};
 
 use crate::config;
@@ -44,11 +44,8 @@ impl Application for Waycast {
     type Executor = iced::executor::Default;
 
     fn new(_flags: ()) -> (Self, Command<Message>) {
-        let mut launcher = init_launcher();
         let search_input_id = TextInputId::unique();
         let scrollable_id = ScrollableId::unique();
-
-        launcher.get_default_results();
 
         let app = Self {
             items: Vec::new(),
@@ -84,14 +81,13 @@ impl Application for Waycast {
         match message {
             Message::Search(query) => {
                 self.query = query.clone();
-                if query.trim().is_empty() {
-                    // Like GTK UI: show default results when query is empty
-                    // self.launcher.get_default_results();
-                } else {
-                    // self.launcher.search(&query);
-                }
                 self.selected_index = 0;
-                Command::none()
+
+                if query.is_empty() {
+                    return Command::perform(Waycast::load_initial_data(), Message::Loaded);
+                }
+
+                Command::perform(Waycast::search(query), Message::Loaded)
             }
             Message::Loaded(results) => {
                 self.items = results;
@@ -158,6 +154,14 @@ impl Waycast {
             .get_items(Some(ItemKind::DesktopEntry))
             .await
             .unwrap_or(Vec::new());
+
+        items.into_iter().map(|i| i.into()).collect()
+    }
+
+    async fn search(query: String) -> Vec<LauncherItem> {
+        let db = waycast_data::DB::open(ro_connection("waycast.db")).await;
+
+        let items = db.search(query).await.unwrap_or(Vec::new());
 
         items.into_iter().map(|i| i.into()).collect()
     }
@@ -278,16 +282,6 @@ impl Waycast {
             .style(styles::scrollable_style)
             .into()
     }
-}
-
-fn init_launcher() -> WaycastLauncher {
-    // Initialize launcher exactly like the GTK UI does
-
-    WaycastLauncher::new()
-        .add_plugin(Box::new(waycast_plugins::drun::new()))
-        .add_plugin(Box::new(waycast_plugins::file_search::new()))
-        .add_plugin(Box::new(waycast_plugins::projects::new()))
-        .init()
 }
 
 fn build_icon_view(icon_handle: IconHandle) -> Element<'static, Message> {

@@ -12,7 +12,100 @@ use walkdir::{DirEntry, WalkDir};
 use waycast_macros::plugin;
 
 use crate::util::{FuzzyMatcher, FuzzySearchable};
-use waycast_core::{LauncherItem, LauncherPlugin};
+use waycast_core::{LauncherItem, WaycastScanner};
+
+pub struct FileScanner {
+    paths: HashSet<PathBuf>,
+    ignore_dirs: HashSet<String>,
+}
+
+impl Default for FileScanner {
+    fn default() -> Self {
+        Self {
+            paths: default_search_list(),
+            ignore_dirs: HashSet::new(),
+        }
+    }
+}
+
+impl FileScanner {
+    pub fn new() -> Self {
+        Self {
+            paths: HashSet::new(),
+            ignore_dirs: HashSet::new(),
+        }
+    }
+    pub fn with_paths(mut self, paths: HashSet<PathBuf>) -> Self {
+        self.paths.extend(paths);
+        self
+    }
+
+    pub fn with_ignore_dirs(mut self, ignore_dirs: HashSet<String>) -> Self {
+        self.ignore_dirs.extend(ignore_dirs);
+        self
+    }
+}
+struct Collector {
+    tx: crossbeam_channel::Sender<Vec<FileEntry>>,
+    local: Vec<FileEntry>,
+}
+
+impl Drop for Collector {
+    fn drop(&mut self) {
+        if !self.local.is_empty() {
+            let _ = self.tx.send(std::mem::take(&mut self.local));
+        }
+    }
+}
+
+impl WaycastScanner for FileScanner {
+    fn scan(&self) -> Vec<LauncherItem> {
+        let mut walker = WalkBuilder::new(&self.paths.iter().next().unwrap());
+
+        for path in &self.paths {
+            walker.add(path);
+        }
+
+        for dir in &self.ignore_dirs {
+            walker.add_ignore(dir);
+        }
+
+        let (tx, rx) = unbounded::<Vec<FileEntry>>();
+        walker
+            .threads(4)
+            .git_ignore(true)
+            .git_exclude(true)
+            .build_parallel()
+            .run(|| {
+                let mut collector = Collector {
+                    tx: tx.clone(),
+                    local: Vec::new(),
+                };
+
+                Box::new(move |result| {
+                    let entry = match result {
+                        Ok(e) => e,
+                        Err(_) => return WalkState::Continue,
+                    };
+
+                    collector.local.push(FileEntry::from(entry));
+
+                    WalkState::Continue
+                })
+            });
+
+        // Drop the original sender so rx closes once all threads finish
+        drop(tx);
+
+        // ---- FAN-IN PHASE ----
+        let mut all: Vec<FileEntry> = Vec::new();
+        for mut chunk in rx.iter() {
+            all.append(&mut chunk);
+        }
+
+        all.iter().map(|f| f.to_owned().into()).collect()
+    }
+}
 
 #[derive(Clone)]
 struct FileEntry {
@@ -89,22 +182,6 @@ impl From<FileEntry> for LauncherItem {
 //     }
 // }
 
-impl FuzzySearchable for FileEntry {
-    fn primary_key(&self) -> String {
-        // Primary: filename (most common search case)
-        self.path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string()
-    }
-
-    fn secondary_keys(&self) -> Vec<String> {
-        // Secondary: full path (for directory-based searches)
-        vec![self.path.to_string_lossy().to_string()]
-    }
-}
-
 pub fn default_search_list() -> HashSet<PathBuf> {
     if let Some(ud) = UserDirs::new() {
         let mut paths: HashSet<PathBuf> = HashSet::new();
@@ -123,245 +200,4 @@ pub fn default_search_list() -> HashSet<PathBuf> {
     }
 
     HashSet::new()
-}
-
-pub fn default_skip_list() -> HashSet<String> {
-    HashSet::from([
-        String::from("vendor"),
-        String::from("node_modules"),
-        String::from("cache"),
-        String::from("zig-cache"),
-    ])
-}
-
-pub struct FileSearchPlugin {
-    search_paths: HashSet<PathBuf>,
-    skip_dirs: HashSet<String>,
-    // Running list of files in memory
-    pub files: Arc<Mutex<Vec<FileEntry>>>,
-}
-
-impl Default for FileSearchPlugin {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl FileSearchPlugin {
-    pub fn new() -> Self {
-        let mut search_paths = default_search_list();
-        let mut skip_dirs = default_skip_list();
-
-        if let Ok(paths) =
-            waycast_config::config_file().get::<Vec<PathBuf>>("plugins.file_search.search_paths")
-        {
-            search_paths.extend(paths);
-        }
-
-        if let Ok(paths) =
-            waycast_config::config_file().get::<Vec<String>>("plugins.file_search.ignore_dirs")
-        {
-            skip_dirs.extend(paths);
-        }
-
-        FileSearchPlugin {
-            search_paths,
-            skip_dirs,
-            files: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    pub fn add_search_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
-        let p = path.as_ref();
-
-        if !p.exists() {
-            return Err(format!("Path does not exist: {}", p.display()));
-        }
-
-        if !p.is_dir() {
-            return Err(format!("Path is not a directory: {}", p.display()));
-        }
-
-        self.search_paths.insert(p.to_path_buf());
-        Ok(())
-    }
-
-    pub fn add_skip_dir(&mut self, directory_name: String) -> Result<(), String> {
-        self.skip_dirs.insert(directory_name);
-        Ok(())
-    }
-
-    async fn init_with_timeout(&self, timeout: Duration) {
-        let files_clone = Arc::clone(&self.files);
-        let skip_dirs_clone = self.skip_dirs.clone();
-
-        let scan_task = async move {
-            let mut local_files = Vec::new();
-
-            for path in &self.search_paths {
-                let walker = WalkDir::new(path).into_iter();
-                for entry in walker
-                    .filter_entry(|e| {
-                        !skip_hidden(e)
-                            && !skip_dirs_clone.contains(e.file_name().to_string_lossy().as_ref())
-                    })
-                    .filter_map(|e| e.ok())
-                {
-                    if entry.path().is_file() {
-                        local_files.push(FileEntry::from(entry));
-                    }
-
-                    // Yield control periodically to check for timeout
-                    if local_files.len() % 1000 == 0 {
-                        tokio::task::yield_now().await;
-                    }
-                }
-            }
-
-            // Update the shared files collection
-            let mut files_guard = files_clone.lock().await;
-            *files_guard = local_files;
-        };
-
-        // Run the scan with a timeout
-        if tokio::time::timeout(timeout, scan_task).await.is_err() {
-            eprintln!("File indexing timed out after {:?}", timeout);
-        }
-    }
-}
-
-struct Collector {
-    tx: crossbeam_channel::Sender<Vec<FileEntry>>,
-    local: Vec<FileEntry>,
-}
-
-impl Drop for Collector {
-    fn drop(&mut self) {
-        if !self.local.is_empty() {
-            let _ = self.tx.send(std::mem::take(&mut self.local));
-        }
-    }
-}
-
-pub fn all() -> Vec<LauncherItem> {
-    let mut search_paths = default_search_list();
-    let mut skip_dirs = default_skip_list();
-
-    if let Ok(paths) =
-        waycast_config::config_file().get::<Vec<PathBuf>>("plugins.file_search.search_paths")
-    {
-        search_paths.extend(paths);
-    }
-
-    if let Ok(paths) =
-        waycast_config::config_file().get::<Vec<String>>("plugins.file_search.ignore_dirs")
-    {
-        skip_dirs.extend(paths);
-    }
-
-    let mut walker = WalkBuilder::new(search_paths.iter().next().unwrap());
-
-    for path in &search_paths {
-        walker.add(path);
-    }
-
-    for dir in &skip_dirs {
-        walker.add_ignore(dir);
-    }
-
-    let (tx, rx) = unbounded::<Vec<FileEntry>>();
-    walker
-        .threads(4)
-        .git_ignore(true)
-        .git_exclude(true)
-        .build_parallel()
-        .run(|| {
-            let mut collector = Collector {
-                tx: tx.clone(),
-                local: Vec::new(),
-            };
-
-            Box::new(move |result| {
-                let entry = match result {
-                    Ok(e) => e,
-                    Err(_) => return WalkState::Continue,
-                };
-
-                collector.local.push(FileEntry::from(entry));
-
-                WalkState::Continue
-            })
-        });
-
-    // Drop the original sender so rx closes once all threads finish
-    drop(tx);
-
-    // ---- FAN-IN PHASE ----
-    let mut all: Vec<FileEntry> = Vec::new();
-    for mut chunk in rx.iter() {
-        all.append(&mut chunk);
-    }
-
-    all.iter().map(|f| f.to_owned().into()).collect()
-}
-
-fn skip_hidden(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| s.starts_with("."))
-        .unwrap_or(false)
-}
-
-impl LauncherPlugin for FileSearchPlugin {
-    plugin! {
-        name: "Files",
-        priority: 500,
-        description: "Search and open files",
-        prefix: "f"
-    }
-
-    fn init(&self) {
-        // Start async file scanning with 2000ms timeout
-        let self_clone = FileSearchPlugin {
-            search_paths: self.search_paths.clone(),
-            skip_dirs: self.skip_dirs.clone(),
-            files: Arc::clone(&self.files),
-        };
-
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                self_clone
-                    .init_with_timeout(Duration::from_millis(2000))
-                    .await;
-            });
-        });
-    }
-
-    fn filter(&self, query: &str) -> Vec<LauncherItem> {
-        if query.is_empty() {
-            return self.default_list();
-        }
-
-        // Try to get files without blocking - if indexing is still in progress, return empty
-        let Ok(files) = self.files.try_lock() else {
-            return Vec::new();
-        };
-
-        let mut fuzzy_matcher = FuzzyMatcher::new();
-
-        // Get fuzzy matches directly on FileEntry slice
-        let matches = fuzzy_matcher.match_items(query, &files, 10);
-
-        // Convert to LauncherListItem
-        matches
-            .into_iter()
-            .map(|file_entry| file_entry.to_owned().into())
-            .collect()
-    }
-}
-
-pub fn new() -> FileSearchPlugin {
-    FileSearchPlugin::new()
 }

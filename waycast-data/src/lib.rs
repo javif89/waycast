@@ -1,5 +1,6 @@
 pub use sqlx;
 use thiserror::Error;
+use tracing::info;
 use waycast_core::LauncherItem;
 
 use std::{path::Path, str::FromStr, time::Duration};
@@ -160,7 +161,7 @@ impl DB {
     pub async fn insert_items(&self, items: Vec<ItemRow>) -> Result<(), DataError> {
         self.reset_items_staging().await?;
 
-        let tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin().await?;
         for item in items {
             sqlx::query!(
                 r#"
@@ -183,7 +184,7 @@ impl DB {
                 item.description,
                 item.icon
             )
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
         tx.commit().await?;
@@ -194,7 +195,7 @@ impl DB {
             delete from items
             where not exists (
                 select 1 from items_staging iss 
-                where iss.item_id = items.id
+                where iss.item_id = items.item_id
                 and iss.kind = items.kind
             );
             "#
@@ -252,4 +253,46 @@ impl DB {
 
         Ok(items)
     }
+
+    pub async fn search(&self, query: String) -> Result<Vec<ItemRow>, DataError> {
+        let fts_query = build_fts_query(&query);
+
+        info!("Searching fts index for {}", fts_query);
+
+        let results = sqlx::query_as!(
+            ItemRow,
+            r#"
+                select
+                    i.item_id as id,
+                    i.kind,
+                    i.title,
+                    i.description,
+                    i.icon
+                from items_fts
+                join items i on i.id = items_fts.rowid
+                where items_fts match ?1
+                order by bm25(items_fts, 10.0, 3.0) desc 
+            "#,
+            fts_query
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        info!("Found {} items", results.len());
+
+        Ok(results)
+    }
+}
+
+fn build_fts_query(input: &str) -> String {
+    let cleaned = input
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect::<String>();
+
+    cleaned
+        .split_whitespace()
+        .map(|t| format!("{t}*"))
+        .collect::<Vec<_>>()
+        .join(" ")
 }

@@ -64,44 +64,52 @@ pub fn main() {
     });
 
     let ui_thread_handle = std::thread::spawn(move || {
-        loop {
-            let sock = runtime_dir().join("waycast.sock");
-            let _ = std::fs::remove_file(&sock);
+        let _ = Waycast::run(Settings {
+            id: Some(config::APP_NAME.into()),
+            layer_settings: LayerShellSettings {
+                size: Some((config::WINDOW_WIDTH, config::WINDOW_HEIGHT)),
+                exclusive_zone: 0,
+                anchor: Anchor::Bottom | Anchor::Left | Anchor::Right | Anchor::Top,
+                start_mode: StartMode::Active,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        println!("App exited");
+        // loop {
+        //     let sock = runtime_dir().join("waycast.sock");
+        //     let _ = std::fs::remove_file(&sock);
 
-            let listener = UnixListener::bind(&sock).unwrap();
+        //     let listener = UnixListener::bind(&sock).unwrap();
 
-            println!("Waiting for signal...");
-            let (mut conn, _addr) = listener.accept().unwrap();
-            let mut buf = [0u8; 4096];
-            let n = conn.read(&mut buf).unwrap_or(0);
+        //     println!("Waiting for signal...");
+        //     let (mut conn, _addr) = listener.accept().unwrap();
+        //     let mut buf = [0u8; 4096];
+        //     let n = conn.read(&mut buf).unwrap_or(0);
 
-            let msg = std::str::from_utf8(&buf[..n])
-                .unwrap_or("<non-utf8>")
-                .trim();
+        //     let msg = std::str::from_utf8(&buf[..n])
+        //         .unwrap_or("<non-utf8>")
+        //         .trim();
 
-            if msg == "show" {
-                println!("Launching UI");
-                let _ = Waycast::run(Settings {
-                    id: Some(config::APP_NAME.into()),
-                    layer_settings: LayerShellSettings {
-                        size: Some((config::WINDOW_WIDTH, config::WINDOW_HEIGHT)),
-                        exclusive_zone: 0,
-                        anchor: Anchor::Bottom | Anchor::Left | Anchor::Right | Anchor::Top,
-                        start_mode: StartMode::Active,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                });
-                println!("App exited");
-            }
-        }
+        //     if msg == "show" {
+        //         println!("Launching UI");
+        //         let _ = Waycast::run(Settings {
+        //             id: Some(config::APP_NAME.into()),
+        //             layer_settings: LayerShellSettings {
+        //                 size: Some((config::WINDOW_WIDTH, config::WINDOW_HEIGHT)),
+        //                 exclusive_zone: 0,
+        //                 anchor: Anchor::Bottom | Anchor::Left | Anchor::Right | Anchor::Top,
+        //                 start_mode: StartMode::Active,
+        //                 ..Default::default()
+        //             },
+        //             ..Default::default()
+        //         });
+        //         println!("App exited");
+        //     }
+        // }
     });
 
     ui_thread_handle.join().unwrap();
-
-    // scanner_thread_handle.join().unwrap();
-
-    // Ok(())
 
     // Some apps (like steam) need a bit of a grace period
     // to properly detach from the parent process. By

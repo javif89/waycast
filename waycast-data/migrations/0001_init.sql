@@ -30,7 +30,7 @@ create table if not exists items_staging (
 );
 
 create index if not exists idx_items_staging_kind on items_staging(kind);
-create index if not exists idx_items_staging_item_id_kind on items(item_id,kind);
+create index if not exists idx_items_staging_item_id_kind on items_staging(item_id,kind);
 
 -- Search index
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(

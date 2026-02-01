@@ -10,7 +10,7 @@ use std::{
 
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
-use waycast_core::{LauncherItem, LauncherPlugin, cache::CacheTTL};
+use waycast_core::{LauncherItem, WaycastScanner, cache::CacheTTL};
 use waycast_macros::plugin;
 
 use crate::util::FuzzyMatcher;
@@ -98,182 +98,70 @@ impl FuzzySearchable for ProjectEntry {
     }
 }
 
+pub struct ProjectScanner {
+    search_paths: HashSet<PathBuf>,
+}
+
+impl ProjectScanner {
+    pub fn new() -> Self {
+        Self {
+            search_paths: HashSet::new(),
+        }
+    }
+
+    pub fn with_search_paths(mut self, paths: HashSet<PathBuf>) -> Self {
+        self.search_paths = paths;
+        self
+    }
+}
+
+impl WaycastScanner for ProjectScanner {
+    fn scan(&self) -> Vec<LauncherItem> {
+        let mut project_entries = Vec::new();
+
+        for search_path in &self.search_paths {
+            if let Ok(entries) = fs::read_dir(search_path) {
+                for entry in entries.flatten() {
+                    if let Ok(file_type) = entry.file_type()
+                        && file_type.is_dir()
+                    {
+                        let path = entry.path();
+
+                        // Skip hidden directories (starting with .)
+                        if let Some(file_name) = path.file_name()
+                            && let Some(name_str) = file_name.to_str()
+                        {
+                            // Skip hidden directories
+                            if name_str.starts_with('.') {
+                                continue;
+                            }
+
+                            let project_type =
+                                detect_project_type(path.to_string_lossy().to_string().as_str());
+                            project_entries.push(ProjectEntry {
+                                path,
+                                exec_command: "code -n".into(),
+                                project_type,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        project_entries
+            .iter()
+            .map(|p| p.to_owned().into())
+            .collect()
+    }
+}
+
 pub struct ProjectsPlugin {
     search_paths: HashSet<PathBuf>,
     skip_dirs: HashSet<String>,
     open_command: String,
     // Running list of files in memory
     files: Arc<Mutex<Vec<ProjectEntry>>>,
-}
-
-impl ProjectsPlugin {
-    pub fn add_search_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
-        let p = path.as_ref();
-
-        if !p.exists() {
-            return Err(format!("Path does not exist: {}", p.display()));
-        }
-
-        if !p.is_dir() {
-            return Err(format!("Path is not a directory: {}", p.display()));
-        }
-
-        self.search_paths.insert(p.to_path_buf());
-        Ok(())
-    }
-
-    pub fn add_skip_dir(&mut self, directory_name: String) -> Result<(), String> {
-        self.skip_dirs.insert(directory_name);
-        Ok(())
-    }
-}
-
-pub fn all() -> Vec<LauncherItem> {
-    let mut project_entries = Vec::new();
-    let search_paths = waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths")
-        .unwrap_or_default();
-
-    for search_path in &search_paths {
-        if let Ok(entries) = fs::read_dir(search_path) {
-            for entry in entries.flatten() {
-                if let Ok(file_type) = entry.file_type()
-                    && file_type.is_dir()
-                {
-                    let path = entry.path();
-
-                    // Skip hidden directories (starting with .)
-                    if let Some(file_name) = path.file_name()
-                        && let Some(name_str) = file_name.to_str()
-                    {
-                        // Skip hidden directories
-                        if name_str.starts_with('.') {
-                            continue;
-                        }
-
-                        let project_type =
-                            detect_project_type(path.to_string_lossy().to_string().as_str());
-                        project_entries.push(ProjectEntry {
-                            path,
-                            exec_command: "code -n".into(),
-                            project_type,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    project_entries
-        .iter()
-        .map(|p| p.to_owned().into())
-        .collect()
-}
-
-impl LauncherPlugin for ProjectsPlugin {
-    plugin! {
-        name: "Projects",
-        priority: 800,
-        description: "Search and open code projects",
-        prefix: "proj"
-    }
-
-    fn init(&self) {
-        let files_clone = Arc::clone(&self.files);
-        let search_paths = self.search_paths.clone();
-        let skip_dirs = self.skip_dirs.clone();
-        let exec_command = Arc::from(self.open_command.as_str());
-
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                let mut project_entries = Vec::new();
-
-                for search_path in &search_paths {
-                    if let Ok(entries) = fs::read_dir(search_path) {
-                        for entry in entries.flatten() {
-                            if let Ok(file_type) = entry.file_type()
-                                && file_type.is_dir()
-                            {
-                                let path = entry.path();
-
-                                // Skip hidden directories (starting with .)
-                                if let Some(file_name) = path.file_name()
-                                    && let Some(name_str) = file_name.to_str()
-                                {
-                                    // Skip hidden directories
-                                    if name_str.starts_with('.') {
-                                        continue;
-                                    }
-
-                                    // Skip directories in skip list
-                                    if skip_dirs.contains(name_str) {
-                                        continue;
-                                    }
-
-                                    let project_type = detect_project_type(
-                                        path.to_string_lossy().to_string().as_str(),
-                                    );
-                                    project_entries.push(ProjectEntry {
-                                        path,
-                                        exec_command: Arc::clone(&exec_command),
-                                        project_type,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Update the shared files collection
-                let mut files_guard = files_clone.lock().await;
-                *files_guard = project_entries;
-
-                println!("Projects plugin: Found {} projects", files_guard.len());
-            });
-        });
-    }
-
-    fn filter(&self, query: &str) -> Vec<LauncherItem> {
-        if query.is_empty() {
-            return self.default_list();
-        }
-
-        // Try to get files without blocking - if indexing is still in progress, return empty
-        let Ok(files) = self.files.try_lock() else {
-            return Vec::new();
-        };
-
-        let mut fuzzy_matcher = FuzzyMatcher::new();
-
-        // Get fuzzy matches directly on FileEntry slice
-        let matches = fuzzy_matcher.match_items(query, &files, 10);
-
-        // Convert to LauncherListItem
-        matches
-            .into_iter()
-            .map(|project_entry| project_entry.to_owned().into())
-            .collect()
-    }
-}
-
-pub fn new() -> ProjectsPlugin {
-    let search_paths = waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths")
-        .unwrap_or_default();
-
-    let skip_dirs =
-        waycast_config::get::<HashSet<String>>("plugins.projects.skip_dirs").unwrap_or_default();
-
-    let open_command = match waycast_config::get::<String>("plugins.projects.open_command") {
-        Ok(cmd) => cmd,
-        Err(_) => String::from("code -n {path}"),
-    };
-
-    ProjectsPlugin {
-        search_paths,
-        skip_dirs,
-        open_command,
-        files: Arc::new(Mutex::new(Vec::new())),
-    }
 }
 
 fn detect_project_type(path: &str) -> Option<String> {
@@ -296,6 +184,7 @@ fn detect_project_type(path: &str) -> Option<String> {
         None
     };
 
+    // TODO: Move the caching out of here. Should not be the scanner's concern
     let result: Result<Option<String>, waycast_core::cache::errors::CacheError> =
         cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || detect_fn(path));
 

@@ -1,4 +1,4 @@
-use waycast_core::{LauncherItem, LauncherPlugin};
+use waycast_core::LauncherItem;
 use waycast_macros::plugin;
 
 #[derive(Debug, Clone)]
@@ -20,36 +20,36 @@ impl CalculatorPlugin {
     }
 }
 
-impl LauncherPlugin for CalculatorPlugin {
-    plugin! {
-        name: "calculator",
-        priority: 1100,
-        description: "Run different calculations and get the result in the launcher list",
-        prefix: "calc"
-    }
+// impl LauncherPlugin for CalculatorPlugin {
+//     plugin! {
+//         name: "calculator",
+//         priority: 1100,
+//         description: "Run different calculations and get the result in the launcher list",
+//         prefix: "calc"
+//     }
 
-    fn filter(&self, query: &str) -> Vec<LauncherItem> {
-        if query.is_empty() {
-            return self.default_list();
-        }
+//     fn filter(&self, query: &str) -> Vec<LauncherItem> {
+//         if query.is_empty() {
+//             return self.default_list();
+//         }
 
-        // TODO: Just check if the query even resembles a math expression
-        // before wasting valuable CPU cycles trying to evaluate
+//         // TODO: Just check if the query even resembles a math expression
+//         // before wasting valuable CPU cycles trying to evaluate
 
-        if let Ok(result) = mathengine::evaluate_expression(query) {
-            return vec![LauncherItem {
-                id: "calculator_result".into(),
-                kind: waycast_core::ItemKind::Unknown,
-                title: format!("{}", result),
-                description: None,
-                icon: { "accessories-calculator".into() },
-            }];
-        }
+//         if let Ok(result) = mathengine::evaluate_expression(query) {
+//             return vec![LauncherItem {
+//                 id: "calculator_result".into(),
+//                 kind: waycast_core::ItemKind::Unknown,
+//                 title: format!("{}", result),
+//                 description: None,
+//                 icon: { "accessories-calculator".into() },
+//             }];
+//         }
 
-        Vec::new()
-    }
-}
+//         Vec::new()
+//     }
+// }
 
-pub fn new() -> CalculatorPlugin {
-    CalculatorPlugin::new()
-}
+// pub fn new() -> CalculatorPlugin {
+//     CalculatorPlugin::new()
+// }
