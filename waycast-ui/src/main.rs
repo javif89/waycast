@@ -4,8 +4,6 @@ mod icons;
 mod theme;
 mod ui;
 
-use std::io::Read;
-use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -23,7 +21,7 @@ use waycast_scanner::scan_and_update;
 fn runtime_dir() -> PathBuf {
     std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir())
+        .unwrap_or_else(std::env::temp_dir)
 }
 
 pub fn main() {

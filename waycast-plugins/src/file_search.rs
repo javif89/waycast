@@ -4,14 +4,8 @@ use gio::prelude::FileExt;
 use glib::object::Cast;
 use ignore::{WalkBuilder, WalkState};
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::Mutex;
-use walkdir::{DirEntry, WalkDir};
-use waycast_macros::plugin;
+use std::path::PathBuf;
 
-use crate::util::{FuzzyMatcher, FuzzySearchable};
 use waycast_core::{LauncherItem, WaycastScanner};
 
 pub struct FileScanner {
@@ -60,7 +54,7 @@ impl Drop for Collector {
 
 impl WaycastScanner for FileScanner {
     fn scan(&self) -> Vec<LauncherItem> {
-        let mut walker = WalkBuilder::new(&self.paths.iter().next().unwrap());
+        let mut walker = WalkBuilder::new(self.paths.iter().next().unwrap());
 
         for path in &self.paths {
             walker.add(path);

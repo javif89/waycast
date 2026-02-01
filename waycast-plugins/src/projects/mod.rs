@@ -4,16 +4,14 @@ pub mod type_scanner;
 use std::{
     collections::HashSet,
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
 };
 
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
 use waycast_core::{LauncherItem, WaycastScanner, cache::CacheTTL};
-use waycast_macros::plugin;
 
-use crate::util::FuzzyMatcher;
 use crate::{
     projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner},
     util::FuzzySearchable,
@@ -100,6 +98,12 @@ impl FuzzySearchable for ProjectEntry {
 
 pub struct ProjectScanner {
     search_paths: HashSet<PathBuf>,
+}
+
+impl Default for ProjectScanner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProjectScanner {

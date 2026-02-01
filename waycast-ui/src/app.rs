@@ -9,13 +9,11 @@ use iced::widget::{
 };
 use iced::{
     Alignment, Color, Element, Length, Subscription, Task as Command, Theme, event, keyboard,
-    window,
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
-use tokio::sync::futures;
 use waycast_core::LauncherItem;
-use waycast_data::{DB, ItemKind, ItemRow, ro_connection};
+use waycast_data::{DB, ItemKind, ro_connection};
 
 use crate::config;
 use crate::icons::{self, IconHandle};

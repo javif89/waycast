@@ -1,10 +1,7 @@
-use std::path::PathBuf;
 
 use freedesktop::ApplicationEntry;
 use waycast_core::{ItemKind, LauncherItem, WaycastScanner};
-use waycast_macros::plugin;
 
-use crate::util::{FuzzyMatcher, FuzzySearchable};
 
 pub struct ApplicationScanner;
 

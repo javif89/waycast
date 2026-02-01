@@ -1,5 +1,3 @@
-use waycast_core::LauncherItem;
-use waycast_macros::plugin;
 
 #[derive(Debug, Clone)]
 pub struct CalculatorResult {

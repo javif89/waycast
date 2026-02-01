@@ -1,13 +1,12 @@
 use std::{
     collections::HashSet,
-    path::{Path, PathBuf},
-    time::{Duration, Instant},
+    path::PathBuf,
+    time::Instant,
 };
 
-use tracing::{Instrument, error, info, info_span};
-use tracing_subscriber::fmt;
+use tracing::{Instrument, info, info_span};
 use waycast_core::{LauncherItem, WaycastScanner};
-use waycast_data::{DB, DataError, ItemKind, ItemRow, wal_connection};
+use waycast_data::{DB, DataError};
 use waycast_plugins::{
     drun::ApplicationScanner,
     file_search::{self, FileScanner},
@@ -19,7 +18,7 @@ pub async fn scan_and_update(db: &DB) -> Result<(), DataError> {
     let start = Instant::now();
 
     let (de, f, p) = tokio::join!(
-        tokio::task::spawn_blocking(|| ApplicationScanner::default().scan()),
+        tokio::task::spawn_blocking(|| ApplicationScanner.scan()),
         tokio::task::spawn_blocking(|| init_file_scanner().scan()),
         tokio::task::spawn_blocking(|| init_project_scanner().scan()),
     );
