@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use iced::keyboard::key;
 use iced::widget::scrollable::{self, Id as ScrollableId};
 use iced::widget::text_input::{self, Id as TextInputId};
@@ -11,8 +13,9 @@ use iced::{
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
+use tokio::sync::futures;
 use waycast_core::LauncherItem;
-use waycast_data::{ItemKind, ItemRow, ro_connection};
+use waycast_data::{DB, ItemKind, ItemRow, ro_connection};
 
 use crate::config;
 use crate::icons::{self, IconHandle};
@@ -30,6 +33,7 @@ pub enum Message {
 }
 
 pub struct Waycast {
+    db: Arc<DB>,
     items: Vec<LauncherItem>,
     query: String,
     selected_index: usize,
@@ -47,7 +51,17 @@ impl Application for Waycast {
         let search_input_id = TextInputId::unique();
         let scrollable_id = ScrollableId::unique();
 
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime");
+
+        let db = rt.block_on(async {
+            Arc::new(waycast_data::DB::open(ro_connection("waycast.db")).await)
+        });
+
         let app = Self {
+            db,
             items: Vec::new(),
             query: String::new(),
             selected_index: 0,
@@ -56,7 +70,8 @@ impl Application for Waycast {
         };
 
         let focus_task = text_input::focus(search_input_id);
-        let load_task = Command::perform(Waycast::load_initial_data(), Message::Loaded);
+        let load_task =
+            Command::perform(Waycast::load_initial_data(app.db.clone()), Message::Loaded);
         (app, Command::batch([focus_task, load_task]))
     }
 
@@ -84,10 +99,13 @@ impl Application for Waycast {
                 self.selected_index = 0;
 
                 if query.is_empty() {
-                    return Command::perform(Waycast::load_initial_data(), Message::Loaded);
+                    return Command::perform(
+                        Waycast::load_initial_data(self.db.clone()),
+                        Message::Loaded,
+                    );
                 }
 
-                Command::perform(Waycast::search(query), Message::Loaded)
+                Command::perform(Waycast::search(self.db.clone(), query), Message::Loaded)
             }
             Message::Loaded(results) => {
                 self.items = results;
@@ -146,10 +164,7 @@ impl Application for Waycast {
 }
 
 impl Waycast {
-    async fn load_initial_data() -> Vec<LauncherItem> {
-        println!("Loading data baybeee");
-        let db = waycast_data::DB::open(ro_connection("waycast.db")).await;
-
+    async fn load_initial_data(db: Arc<DB>) -> Vec<LauncherItem> {
         let items = db
             .get_items(Some(ItemKind::DesktopEntry))
             .await
@@ -158,9 +173,7 @@ impl Waycast {
         items.into_iter().map(|i| i.into()).collect()
     }
 
-    async fn search(query: String) -> Vec<LauncherItem> {
-        let db = waycast_data::DB::open(ro_connection("waycast.db")).await;
-
+    async fn search(db: Arc<DB>, query: String) -> Vec<LauncherItem> {
         let items = db.search(query).await.unwrap_or(Vec::new());
 
         items.into_iter().map(|i| i.into()).collect()
