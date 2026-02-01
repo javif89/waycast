@@ -241,6 +241,21 @@ impl LauncherItemRepository {
 
         Ok(results)
     }
+
+    /// Get all distinct icon names/paths from the items in the database
+    pub async fn get_icons(&self) -> Result<Vec<String>, DataError> {
+        let items: Vec<String> = sqlx::query_scalar!(
+            r#"
+            select
+                distinct icon
+            from items
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(items)
+    }
 }
 
 fn build_fts_query(input: &str) -> String {

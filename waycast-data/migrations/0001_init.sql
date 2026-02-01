@@ -57,3 +57,12 @@ CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
   INSERT INTO items_fts(rowid, title, description)
   VALUES (new.id, new.title, new.description);
 END;
+
+-- Icons table
+create table if not exists icons (
+    id integer primary key,
+    name text not null,
+    path text not null,
+
+    unique(name)
+);

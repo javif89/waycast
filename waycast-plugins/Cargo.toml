@@ -11,7 +11,6 @@ homepage.workspace = true
 
 [dependencies]
 waycast-core = { path = "../waycast-core" }
-waycast-macros = { path = "../waycast-macros" }
 waycast-config = { path = "../waycast-config" }
 directories = "6.0.0"
 gio = "0.21.1"

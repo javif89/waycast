@@ -1,12 +1,12 @@
 [workspace]
 members = [
     "waycast-core",
-    "waycast-macros",
     "waycast-plugins",
     "waycast-config",
     "waycast-ui",
     "waycast-scanner",
-    "waycast-data", "waycast-facade",
+    "waycast-data",
+    "waycast-facade",
 ]
 resolver = "2"
 

@@ -14,9 +14,34 @@ pub enum WaycastError {
     LaunchError(String),
 }
 
+pub enum Icon {
+    ThemeIcon { name: String, path: String },
+    Path(String),
+}
+
 pub struct WaycastLauncher;
 
 impl WaycastLauncher {
+    /// If it's a named theme icon, it will resolve its path.
+    /// If it's already an absolute path, it will just return
+    /// back the Path variant.
+    pub fn resolve_icon(name: &str) -> Option<Icon> {
+        // If icon_name is already a path and exists, return it directly
+        let path = std::path::Path::new(name);
+        if path.exists() {
+            return Some(Icon::Path(path.to_string_lossy().to_string()));
+        }
+
+        if let Some(path) = freedesktop::get_icon(name) {
+            return Some(Icon::ThemeIcon {
+                name: name.into(),
+                path: path.to_string_lossy().to_string(),
+            });
+        }
+
+        None
+    }
+
     pub fn execute_item(item: LauncherItem) -> Result<(), WaycastError> {
         match item.kind {
             waycast_core::ItemKind::DesktopEntry => {
@@ -88,7 +113,10 @@ impl WaycastLauncher {
 }
 
 /// Spawn a detached process that preserves the display environment
-use std::process::{Command, Stdio};
+use std::{
+    path::Path,
+    process::{Command, Stdio},
+};
 pub fn spawn_detached(program: &str, args: &[&str]) -> Result<(), std::io::Error> {
     use std::os::unix::process::CommandExt;
 

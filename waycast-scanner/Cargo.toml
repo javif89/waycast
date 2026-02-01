@@ -22,4 +22,5 @@ tracing-subscriber = "0.3.22"
 waycast-config = { version = "0.5.1", path = "../waycast-config" }
 waycast-core = { version = "0.5.1", path = "../waycast-core" }
 waycast-data = { version = "0.5.1", path = "../waycast-data" }
+waycast-facade = { version = "0.5.1", path = "../waycast-facade" }
 waycast-plugins = { version = "0.5.1", path = "../waycast-plugins" }

@@ -11,9 +11,12 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 
+pub mod icons;
 pub mod items;
 
 pub use items::LauncherItemRepository;
+
+use crate::icons::IconRepository;
 
 #[derive(Debug, Error)]
 pub enum DataError {
@@ -62,6 +65,12 @@ impl WaycastData {
 
     pub fn items(&self) -> LauncherItemRepository {
         LauncherItemRepository {
+            pool: self.pool.clone(),
+        }
+    }
+
+    pub fn icons(&self) -> IconRepository {
+        IconRepository {
             pool: self.pool.clone(),
         }
     }

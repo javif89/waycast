@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use iced::keyboard::key;
@@ -15,12 +17,11 @@ use iced_layershell::to_layer_message;
 use tracing::{error, info};
 use waycast_core::{FuzzyMatcher, LauncherItem};
 use waycast_data::WaycastData;
+use waycast_data::icons::IconRow;
 use waycast_data::items::ItemKind;
 use waycast_facade::WaycastLauncher;
-use waycast_plugins::projects;
 
 use crate::config;
-use crate::icons::{self, IconHandle};
 use crate::ui::styles;
 
 #[to_layer_message]
@@ -31,6 +32,7 @@ pub enum Message {
     EventOccurred(iced::Event),
     // Data loading
     Loaded(Vec<LauncherItem>),
+    IconHandles(HashMap<String, IconHandle>),
     // UI Intents
     CloseWindow,
     SearchSubmit,
@@ -40,6 +42,8 @@ pub struct Waycast {
     db: Arc<WaycastData>,
     /// Current items shown in the list
     items: Vec<LauncherItem>,
+    /// Icon handles to share between elements
+    icon_handles: HashMap<String, IconHandle>,
     query: String,
     selected_index: usize,
     search_input_id: TextInputId,
@@ -66,6 +70,7 @@ impl Application for Waycast {
 
         let app = Self {
             db,
+            icon_handles: HashMap::new(),
             items: Vec::new(),
             query: String::new(),
             selected_index: 0,
@@ -74,8 +79,13 @@ impl Application for Waycast {
         };
 
         let focus_task = text_input::focus(search_input_id);
-        let load_task =
-            Command::perform(Waycast::load_initial_data(app.db.clone()), Message::Loaded);
+        let load_task = Command::batch([
+            Command::perform(Waycast::load_initial_data(app.db.clone()), Message::Loaded),
+            Command::perform(
+                Waycast::build_icon_handle_map(app.db.clone()),
+                Message::IconHandles,
+            ),
+        ]);
         (app, Command::batch([focus_task, load_task]))
     }
 
@@ -113,6 +123,10 @@ impl Application for Waycast {
             }
             Message::Loaded(results) => {
                 self.items = results;
+                Command::none()
+            }
+            Message::IconHandles(handles) => {
+                self.icon_handles = handles;
                 Command::none()
             }
             Message::Execute(_id) => self.execute_item(),
@@ -167,7 +181,46 @@ impl Application for Waycast {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum IconHandle {
+    Svg(svg::Handle),
+    Image(image::Handle),
+}
+
+fn build_icon_handle(path: PathBuf) -> IconHandle {
+    // Create iced handle based on file extension
+    let handle = match Path::new(&path).extension().and_then(|e| e.to_str()) {
+        Some("svg") => IconHandle::Svg(svg::Handle::from_path(&path)),
+        _ => IconHandle::Image(image::Handle::from_path(&path)),
+    };
+
+    handle
+}
+
 impl Waycast {
+    async fn build_icon_handle_map(db: Arc<WaycastData>) -> HashMap<String, IconHandle> {
+        let path_or_names: Vec<String> = db.items().get_icons().await.unwrap_or_default();
+        let mut handles: HashMap<String, IconHandle> = HashMap::new();
+
+        for p in path_or_names {
+            if let Some(i) = WaycastLauncher::resolve_icon(&p) {
+                match i {
+                    waycast_facade::Icon::ThemeIcon { name, path } => {
+                        handles.insert(name, build_icon_handle(path.clone().into()));
+                    }
+                    waycast_facade::Icon::Path(path) => {
+                        handles.insert(path.clone(), build_icon_handle(path.clone().into()));
+                    }
+                }
+            }
+        }
+        // let icon_path = find_icon_file(icon_name, config::ICON_SIZE_STR).unwrap_or_else(|| {
+        //     find_icon_file("application-x-executable", config::ICON_SIZE_STR)
+        //         .unwrap_or_else(|| "notfound.png".into())
+        // });
+
+        handles
+    }
     async fn load_initial_data(db: Arc<WaycastData>) -> Vec<LauncherItem> {
         let items = db
             .items()
@@ -297,8 +350,11 @@ impl Waycast {
         item: waycast_core::LauncherItem,
         is_selected: bool,
     ) -> Element<'_, Message> {
-        let icon_handle = icons::get_or_load_icon(&item.icon);
-        let icon_view = build_icon_view(icon_handle);
+        let icon_handle = self
+            .icon_handles
+            .get(&item.icon)
+            .expect("I really shouldn't crash on no icon found");
+        let icon_view = build_icon_view(icon_handle.to_owned());
 
         let content = row![
             column![icon_view].padding(config::PADDING_SMALL),

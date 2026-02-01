@@ -5734,15 +5734,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waycast-macros"
-version = "0.5.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
-]
-
-[[package]]
 name = "waycast-plugins"
 version = "0.5.1"
 dependencies = [
@@ -5762,7 +5753,6 @@ dependencies = [
  "walkdir",
  "waycast-config",
  "waycast-core",
- "waycast-macros",
 ]
 
 [[package]]
@@ -5779,6 +5769,7 @@ dependencies = [
  "waycast-config",
  "waycast-core",
  "waycast-data",
+ "waycast-facade",
  "waycast-plugins",
 ]
 

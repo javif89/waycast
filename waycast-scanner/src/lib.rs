@@ -2,7 +2,8 @@ use std::{collections::HashSet, path::PathBuf, time::Instant};
 
 use tracing::{Instrument, info, info_span};
 use waycast_core::{LauncherItem, WaycastScanner};
-use waycast_data::{DataError, WaycastData};
+use waycast_data::{DataError, WaycastData, icons::IconRow};
+use waycast_facade::{Icon, WaycastLauncher};
 use waycast_plugins::{
     drun::ApplicationScanner,
     file_search::{self, FileScanner},
@@ -46,6 +47,33 @@ pub async fn scan_and_update(db: &WaycastData) -> Result<(), DataError> {
         .await?;
 
     Ok(())
+}
+
+pub async fn update_icon_cache(db: &WaycastData) -> Result<(), DataError> {
+    info!("Updating icon cache");
+    let icons: Vec<String> = db.items().get_icons().await.unwrap_or(Vec::new());
+
+    let themed: Vec<Icon> = icons
+        .iter()
+        .map(|path| WaycastLauncher::resolve_icon(path))
+        .flatten()
+        .collect();
+
+    let rows: Vec<IconRow> = themed
+        .iter()
+        .filter_map(|i| match i {
+            Icon::ThemeIcon { name, path } => Some(IconRow {
+                id: None,
+                name: name.to_owned(),
+                path: path.to_owned(),
+            }),
+            Icon::Path(_) => None,
+        })
+        .collect();
+
+    info!("Inserting {} rows into icon cache", rows.len());
+
+    db.icons().insert(rows).await
 }
 
 fn init_project_scanner() -> ProjectScanner {

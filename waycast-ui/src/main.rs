@@ -1,6 +1,5 @@
 mod app;
 mod config;
-mod icons;
 mod theme;
 mod ui;
 
@@ -16,7 +15,7 @@ use tokio::time;
 use tracing::{Instrument, error, info, info_span};
 use tracing_subscriber::fmt;
 use waycast_data::WaycastData;
-use waycast_scanner::scan_and_update;
+use waycast_scanner::{scan_and_update, update_icon_cache};
 
 fn runtime_dir() -> PathBuf {
     std::env::var_os("XDG_RUNTIME_DIR")
@@ -50,11 +49,18 @@ pub fn main() {
                 cadence.tick().await;
 
                 let scan_span = info_span!("scan_and_update");
+                let icon_cache_span = info_span!("update_icon_cache");
 
                 let result = scan_and_update(&db).instrument(scan_span).await;
 
                 match result {
-                    Ok(_) => info!("Items inserted successfully"),
+                    Ok(_) => {
+                        info!("Items inserted successfully");
+                        info!("Updating icon cache");
+                        if let Err(e) = update_icon_cache(&db).instrument(icon_cache_span).await {
+                            error!("Error updating icon cache {e}");
+                        }
+                    }
                     Err(e) => error!("Error: {e}"),
                 }
             }
