@@ -141,6 +141,10 @@
             # CLI Utils
             sqlx-cli
 
+            # Utilities
+            just
+            socat
+
             # Icons (so themed icons resolve)
             hicolor-icon-theme
 

@@ -7,6 +7,7 @@ use iced::widget::{
 };
 use iced::{
     Alignment, Color, Element, Length, Subscription, Task as Command, Theme, event, keyboard,
+    window,
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
@@ -34,7 +35,6 @@ pub struct Waycast {
     selected_index: usize,
     search_input_id: TextInputId,
     scrollable_id: ScrollableId,
-    should_hide: bool,
 }
 
 impl Application for Waycast {
@@ -56,7 +56,6 @@ impl Application for Waycast {
             selected_index: 0,
             search_input_id: search_input_id.clone(),
             scrollable_id,
-            should_hide: false,
         };
 
         let focus_task = text_input::focus(search_input_id);
@@ -118,11 +117,6 @@ impl Application for Waycast {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        if self.should_hide {
-            // Return empty view to hide window content immediately
-            return column![].into();
-        }
-
         let results_list = self.build_results_list();
         let scrollable_list = self.build_scrollable(results_list);
         let search_input = self.build_search_input();

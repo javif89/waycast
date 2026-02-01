@@ -141,3 +141,7 @@ reset-db:
 	rm waycast.db-wal -f
 	touch waycast.db
 	sqlx migrate run --source ./waycast-data/migrations --database-url sqlite://waycast.db
+
+[group('IPC')]
+ipc-show:
+	printf "show\n" | socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/waycast.sock

@@ -5707,22 +5707,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "waycast-daemon"
-version = "0.5.1"
-dependencies = [
- "directories",
- "freedesktop",
- "gio",
- "ignore",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "waycast-core",
- "waycast-data",
- "waycast-plugins",
-]
-
-[[package]]
 name = "waycast-data"
 version = "0.5.1"
 dependencies = [
@@ -5765,6 +5749,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "waycast-scanner"
+version = "0.5.1"
+dependencies = [
+ "directories",
+ "freedesktop",
+ "gio",
+ "ignore",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "waycast-core",
+ "waycast-data",
+ "waycast-plugins",
+]
+
+[[package]]
 name = "waycast-ui"
 version = "0.5.1"
 dependencies = [
@@ -5773,9 +5773,12 @@ dependencies = [
  "iced_layershell",
  "mathengine",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "waycast-core",
  "waycast-data",
  "waycast-plugins",
+ "waycast-scanner",
 ]
 
 [[package]]

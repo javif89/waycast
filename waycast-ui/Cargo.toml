@@ -21,6 +21,9 @@ iced = { version = "0.13.1", features = ["image", "svg", "tokio"] }
 iced_layershell = "0.13.7"
 mathengine = "0.1.0"
 tokio = { version = "1.49.0", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
 waycast-core = { path = "../waycast-core" }
 waycast-data = { version = "0.5.1", path = "../waycast-data" }
 waycast-plugins = { path = "../waycast-plugins" }
+waycast-scanner = { version = "0.5.1", path = "../waycast-scanner" }
