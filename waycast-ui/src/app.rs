@@ -12,9 +12,10 @@ use iced::{
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
-use waycast_core::LauncherItem;
+use waycast_core::{FuzzyMatcher, LauncherItem};
 use waycast_data::WaycastData;
 use waycast_data::items::ItemKind;
+use waycast_plugins::projects;
 
 use crate::config;
 use crate::icons::{self, IconHandle};
@@ -26,13 +27,16 @@ pub enum Message {
     Search(String),
     Execute(String),
     EventOccurred(iced::Event),
+    // Data loading
     Loaded(Vec<LauncherItem>),
+    // UI Intents
     CloseWindow,
     SearchSubmit,
 }
 
 pub struct Waycast {
     db: Arc<WaycastData>,
+    /// Current items shown in the list
     items: Vec<LauncherItem>,
     query: String,
     selected_index: usize,
@@ -173,9 +177,44 @@ impl Waycast {
     }
 
     async fn search(db: Arc<WaycastData>, query: String) -> Vec<LauncherItem> {
-        let items = db.items().search(query).await.unwrap_or(Vec::new());
+        // Use sqlite fts to filter files first since there could be thousands
+        let file_results: Vec<LauncherItem> = db
+            .items()
+            .search(query.clone(), Some(ItemKind::File), 20)
+            .await
+            .unwrap_or(Vec::new())
+            .into_iter()
+            .map(|i| i.into())
+            .collect();
 
-        items.into_iter().map(|i| i.into()).collect()
+        let mut fm = FuzzyMatcher::new();
+        let mut rows = Vec::new();
+
+        let apps = db
+            .items()
+            .get_items(Some(ItemKind::DesktopEntry))
+            .await
+            .unwrap_or(Vec::new());
+
+        let projects = db
+            .items()
+            .get_items(Some(ItemKind::Project))
+            .await
+            .unwrap_or(Vec::new());
+
+        rows.extend(apps);
+        rows.extend(projects);
+
+        let mut candidates: Vec<LauncherItem> = rows.into_iter().map(|i| i.into()).collect();
+        candidates.extend(file_results);
+
+        let results: Vec<LauncherItem> = fm
+            .match_items(&query, &candidates, 5)
+            .into_iter()
+            .cloned()
+            .collect();
+
+        results
     }
 
     fn handle_key_press(&mut self, key: keyboard::Key) -> Command<Message> {

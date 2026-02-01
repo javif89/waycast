@@ -1,21 +1,13 @@
 pub mod framework_detector;
 pub mod framework_macro;
 pub mod type_scanner;
-use std::{
-    collections::HashSet,
-    fs,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{collections::HashSet, fs, path::PathBuf, sync::Arc};
 
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
 use waycast_core::{LauncherItem, WaycastScanner, cache::CacheTTL};
 
-use crate::{
-    projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner},
-    util::FuzzySearchable,
-};
+use crate::projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner};
 
 static TOKEI_SCANNER: LazyLock<TypeScanner> = LazyLock::new(TypeScanner::new);
 static FRAMEWORK_DETECTOR: LazyLock<FrameworkDetector> = LazyLock::new(FrameworkDetector::new);
@@ -81,20 +73,6 @@ impl From<ProjectEntry> for LauncherItem {
 //         ))
 //     }
 // }
-
-impl FuzzySearchable for ProjectEntry {
-    fn primary_key(&self) -> String {
-        self.path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string()
-    }
-
-    fn secondary_keys(&self) -> Vec<String> {
-        vec![self.path.to_string_lossy().to_string()]
-    }
-}
 
 pub struct ProjectScanner {
     search_paths: HashSet<PathBuf>,

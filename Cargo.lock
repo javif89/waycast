@@ -5049,19 +5049,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "testbench"
-version = "0.5.1"
-dependencies = [
- "tokio",
- "tracing",
- "tracing-subscriber",
- "waycast-core",
- "waycast-data",
- "waycast-plugins",
- "waycast-scanner",
-]
-
-[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5712,6 +5699,7 @@ name = "waycast-core"
 version = "0.5.1"
 dependencies = [
  "bincode",
+ "nucleo-matcher",
  "redb",
  "serde",
  "serde_json",
