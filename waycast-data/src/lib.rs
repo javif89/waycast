@@ -1,11 +1,8 @@
 pub use sqlx;
 use thiserror::Error;
-use tracing::info;
-use waycast_core::LauncherItem;
 
 use std::{path::Path, str::FromStr, time::Duration};
 
-use serde::{Deserialize, Serialize};
 use sqlx::{
     SqlitePool,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
@@ -77,11 +74,9 @@ impl WaycastData {
 }
 
 async fn open(connection_options: SqliteConnectOptions) -> SqlitePool {
-    let pool = SqlitePoolOptions::new()
+    SqlitePoolOptions::new()
         .max_connections(8)
         .connect_with(connection_options)
         .await
-        .expect("Failed to make pool");
-
-    pool
+        .expect("Failed to make pool")
 }

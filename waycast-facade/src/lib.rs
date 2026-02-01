@@ -113,10 +113,7 @@ impl WaycastLauncher {
 }
 
 /// Spawn a detached process that preserves the display environment
-use std::{
-    path::Path,
-    process::{Command, Stdio},
-};
+use std::process::{Command, Stdio};
 pub fn spawn_detached(program: &str, args: &[&str]) -> Result<(), std::io::Error> {
     use std::os::unix::process::CommandExt;
 

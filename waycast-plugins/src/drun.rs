@@ -1,7 +1,5 @@
-
 use freedesktop::ApplicationEntry;
 use waycast_core::{ItemKind, LauncherItem, WaycastScanner};
-
 
 pub struct ApplicationScanner;
 

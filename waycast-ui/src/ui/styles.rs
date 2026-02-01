@@ -33,9 +33,7 @@ pub fn search_input_style(_theme: &Theme, _status: text_input::Status) -> text_i
     }
 }
 
-pub fn result_button_style(
-    is_selected: bool,
-) -> impl Fn(&Theme, button::Status) -> button::Style {
+pub fn result_button_style(is_selected: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |theme: &Theme, status: button::Status| {
         let base = button::text(theme, status);
 

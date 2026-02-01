@@ -1,7 +1,3 @@
-use nucleo_matcher::{
-    Matcher, Utf32Str,
-    pattern::{Atom, AtomKind, CaseMatching, Normalization},
-};
 use std::process::{Command, Stdio};
 
 /// Spawn a detached process that preserves the display environment

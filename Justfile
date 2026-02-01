@@ -49,12 +49,7 @@ fmt: ## Format all code
 
 [group('Testing and checking')]
 lint: ## Run clippy lints
-	cargo clippy --workspace --all-targets --all-features
-
-[group('Testing and checking')]
-lint-fix: ## Auto-fix linting issues
-	cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
-	cargo fmt --all
+	cargo clippy --workspace --all-targets --all-features --fix
 
 # Dependencies
 deps: ## Update dependencies

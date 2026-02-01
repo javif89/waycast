@@ -55,8 +55,7 @@ pub async fn update_icon_cache(db: &WaycastData) -> Result<(), DataError> {
 
     let themed: Vec<Icon> = icons
         .iter()
-        .map(|path| WaycastLauncher::resolve_icon(path))
-        .flatten()
+        .filter_map(|path| WaycastLauncher::resolve_icon(path))
         .collect();
 
     let rows: Vec<IconRow> = themed

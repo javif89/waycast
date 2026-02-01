@@ -1,9 +1,4 @@
-use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use tracing::info;
-use waycast_core::LauncherItem;
 
 use crate::DataError;
 

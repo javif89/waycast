@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -17,7 +17,6 @@ use iced_layershell::to_layer_message;
 use tracing::{error, info};
 use waycast_core::{FuzzyMatcher, LauncherItem};
 use waycast_data::WaycastData;
-use waycast_data::icons::IconRow;
 use waycast_data::items::ItemKind;
 use waycast_facade::WaycastLauncher;
 
@@ -189,12 +188,11 @@ pub enum IconHandle {
 
 fn build_icon_handle(path: PathBuf) -> IconHandle {
     // Create iced handle based on file extension
-    let handle = match Path::new(&path).extension().and_then(|e| e.to_str()) {
+
+    match Path::new(&path).extension().and_then(|e| e.to_str()) {
         Some("svg") => IconHandle::Svg(svg::Handle::from_path(&path)),
         _ => IconHandle::Image(image::Handle::from_path(&path)),
-    };
-
-    handle
+    }
 }
 
 impl Waycast {
@@ -295,10 +293,10 @@ impl Waycast {
 
     fn execute_item(&self) -> Command<Message> {
         info!("Executing");
-        if let Some(item) = self.items.get(self.selected_index) {
-            if let Err(e) = WaycastLauncher::execute_item(item.to_owned()) {
-                error!("Failed to launch: {e}");
-            }
+        if let Some(item) = self.items.get(self.selected_index)
+            && let Err(e) = WaycastLauncher::execute_item(item.to_owned())
+        {
+            error!("Failed to launch: {e}");
         }
 
         iced::exit()

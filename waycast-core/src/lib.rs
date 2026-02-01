@@ -34,7 +34,7 @@ impl FuzzySearchable for LauncherItem {
     }
 
     fn secondary_keys(&self) -> Vec<String> {
-        vec![self.description.clone().unwrap_or(String::new())]
+        vec![self.description.clone().unwrap_or_default()]
     }
 }
 
@@ -57,6 +57,12 @@ pub trait FuzzySearchable {
 /// A simple wrapper around nucleo-matcher for fuzzy string matching
 pub struct FuzzyMatcher {
     matcher: Matcher,
+}
+
+impl Default for FuzzyMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FuzzyMatcher {
