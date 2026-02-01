@@ -145,35 +145,6 @@ impl From<FileEntry> for LauncherItem {
 }
 
 // pub fn launch() {
-//     println!("Executing: {}", self.path.display());
-
-//     // Use xdg-open directly since it works properly with music files
-//     // Detach the process so it doesn't die when daemon is killed
-//     match spawn_detached("xdg-open", &[self.path.to_str().unwrap()]) {
-//         Ok(_) => {
-//             println!("Successfully launched with xdg-open");
-//             Ok(())
-//         }
-//         Err(e) => {
-//             println!("xdg-open failed: {}", e);
-//             // Fallback to GIO method
-//             let file_gio = gio::File::for_path(&self.path);
-//             let ctx = gio::AppLaunchContext::new();
-//             match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
-//                 Ok(()) => {
-//                     println!("Successfully launched with GIO fallback");
-//                     Ok(())
-//                 }
-//                 Err(e2) => {
-//                     println!("GIO fallback also failed: {}", e2);
-//                     Err(LaunchError::CouldNotLaunch(format!(
-//                         "Both xdg-open and GIO failed: {} / {}",
-//                         e, e2
-//                     )))
-//                 }
-//             }
-//         }
-//     }
 // }
 
 pub fn default_search_list() -> HashSet<PathBuf> {

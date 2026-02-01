@@ -1,0 +1,22 @@
+[package]
+name = "waycast-facade"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+freedesktop = "0.0.3"
+gio = "0.21.5"
+libc = "0.2.180"
+thiserror = "2.0.18"
+tracing = "0.1.44"
+waycast-config = { version = "0.5.1", path = "../waycast-config" }
+waycast-core = { version = "0.5.1", path = "../waycast-core" }
+waycast-data = { version = "0.5.1", path = "../waycast-data" }

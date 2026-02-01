@@ -5720,6 +5720,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "waycast-facade"
+version = "0.5.1"
+dependencies = [
+ "freedesktop",
+ "gio",
+ "libc",
+ "thiserror 2.0.18",
+ "tracing",
+ "waycast-config",
+ "waycast-core",
+ "waycast-data",
+]
+
+[[package]]
 name = "waycast-macros"
 version = "0.5.1"
 dependencies = [
@@ -5781,6 +5795,7 @@ dependencies = [
  "tracing-subscriber",
  "waycast-core",
  "waycast-data",
+ "waycast-facade",
  "waycast-plugins",
  "waycast-scanner",
 ]

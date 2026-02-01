@@ -12,9 +12,11 @@ use iced::{
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
+use tracing::{error, info};
 use waycast_core::{FuzzyMatcher, LauncherItem};
 use waycast_data::WaycastData;
 use waycast_data::items::ItemKind;
+use waycast_facade::WaycastLauncher;
 use waycast_plugins::projects;
 
 use crate::config;
@@ -218,11 +220,7 @@ impl Waycast {
     }
 
     fn handle_key_press(&mut self, key: keyboard::Key) -> Command<Message> {
-        // let results_len = self.launcher.current_results().len();
         let results_len = self.items.len();
-        // if results_len == 0 {
-        //     return Command::none();
-        // }
 
         match key {
             keyboard::Key::Named(key::Named::ArrowDown) => {
@@ -243,13 +241,11 @@ impl Waycast {
     }
 
     fn execute_item(&self) -> Command<Message> {
-        println!("Executing");
+        info!("Executing");
         if let Some(item) = self.items.get(self.selected_index) {
-            println!("We will execute eventually man");
-            // // TODO: Show some error in the UI if launching fails
-            // if let Err(e) = item.execute() {
-            //     eprintln!("Error executing app {} | {:#?}", item.id(), e);
-            // }
+            if let Err(e) = WaycastLauncher::execute_item(item.to_owned()) {
+                error!("Failed to launch: {e}");
+            }
         }
 
         iced::exit()

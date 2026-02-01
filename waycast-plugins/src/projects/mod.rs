@@ -53,27 +53,6 @@ impl From<ProjectEntry> for LauncherItem {
     }
 }
 
-// pub fn launch() {
-//     let project_path = self.path.to_string_lossy().to_string();
-//     let exec_cmd = self.exec_command.replace("{path}", &project_path);
-//     let parts: Vec<&str> = exec_cmd.split_whitespace().collect();
-//     if let Some((program, args)) = parts.split_first() {
-//         match spawn_detached(program, args) {
-//             Ok(_) => {
-//                 println!("Successfully opened with code");
-//                 Ok(())
-//             }
-//             Err(_) => Err(LaunchError::CouldNotLaunch(
-//                 "Failed to open project folder".into(),
-//             )),
-//         }
-//     } else {
-//         Err(LaunchError::CouldNotLaunch(
-//             "No program found in exec_command".into(),
-//         ))
-//     }
-// }
-
 pub struct ProjectScanner {
     search_paths: HashSet<PathBuf>,
 }
