@@ -13,7 +13,8 @@ use iced::{
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
 use waycast_core::LauncherItem;
-use waycast_data::{DB, ItemKind, ro_connection};
+use waycast_data::WaycastData;
+use waycast_data::items::ItemKind;
 
 use crate::config;
 use crate::icons::{self, IconHandle};
@@ -31,7 +32,7 @@ pub enum Message {
 }
 
 pub struct Waycast {
-    db: Arc<DB>,
+    db: Arc<WaycastData>,
     items: Vec<LauncherItem>,
     query: String,
     selected_index: usize,
@@ -54,9 +55,8 @@ impl Application for Waycast {
             .build()
             .expect("tokio runtime");
 
-        let db = rt.block_on(async {
-            Arc::new(waycast_data::DB::open(ro_connection("waycast.db")).await)
-        });
+        let db =
+            rt.block_on(async { Arc::new(WaycastData::read_only_connection("waycast.db").await) });
 
         let app = Self {
             db,
@@ -162,8 +162,9 @@ impl Application for Waycast {
 }
 
 impl Waycast {
-    async fn load_initial_data(db: Arc<DB>) -> Vec<LauncherItem> {
+    async fn load_initial_data(db: Arc<WaycastData>) -> Vec<LauncherItem> {
         let items = db
+            .items()
             .get_items(Some(ItemKind::DesktopEntry))
             .await
             .unwrap_or(Vec::new());
@@ -171,8 +172,8 @@ impl Waycast {
         items.into_iter().map(|i| i.into()).collect()
     }
 
-    async fn search(db: Arc<DB>, query: String) -> Vec<LauncherItem> {
-        let items = db.search(query).await.unwrap_or(Vec::new());
+    async fn search(db: Arc<WaycastData>, query: String) -> Vec<LauncherItem> {
+        let items = db.items().search(query).await.unwrap_or(Vec::new());
 
         items.into_iter().map(|i| i.into()).collect()
     }

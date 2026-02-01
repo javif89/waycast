@@ -15,7 +15,7 @@ use app::Waycast;
 use tokio::time;
 use tracing::{Instrument, error, info, info_span};
 use tracing_subscriber::fmt;
-use waycast_data::{DB, wal_connection};
+use waycast_data::WaycastData;
 use waycast_scanner::scan_and_update;
 
 fn runtime_dir() -> PathBuf {
@@ -43,7 +43,7 @@ pub fn main() {
 
         runtime.block_on(async move {
             println!("here?");
-            let db = DB::open(wal_connection("waycast.db")).await;
+            let db = WaycastData::writeable_connection("waycast.db").await;
             let mut cadence = time::interval(Duration::from_secs(20));
 
             loop {

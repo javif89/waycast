@@ -1,19 +1,15 @@
-use std::{
-    collections::HashSet,
-    path::PathBuf,
-    time::Instant,
-};
+use std::{collections::HashSet, path::PathBuf, time::Instant};
 
 use tracing::{Instrument, info, info_span};
 use waycast_core::{LauncherItem, WaycastScanner};
-use waycast_data::{DB, DataError};
+use waycast_data::{DataError, WaycastData};
 use waycast_plugins::{
     drun::ApplicationScanner,
     file_search::{self, FileScanner},
     projects::ProjectScanner,
 };
 
-pub async fn scan_and_update(db: &DB) -> Result<(), DataError> {
+pub async fn scan_and_update(db: &WaycastData) -> Result<(), DataError> {
     info!("Gathering data");
     let start = Instant::now();
 
@@ -44,7 +40,8 @@ pub async fn scan_and_update(db: &DB) -> Result<(), DataError> {
 
     info!("Inserting {} items", items.len());
     let insert_span = info_span!("inserting");
-    db.insert_items(items.iter().map(|i| i.to_owned().into()).collect())
+    db.items()
+        .insert(items.iter().map(|i| i.to_owned().into()).collect())
         .instrument(insert_span)
         .await?;
 
