@@ -6,11 +6,10 @@ use tracing::{Instrument, error, info, info_span};
 use waycast_core::{LauncherItem, WaycastScanner};
 use waycast_data::{DataError, WaycastData, icons::IconRow};
 use waycast_facade::{Icon, WaycastLauncher};
-use waycast_plugins::{
-    drun::ApplicationScanner,
-    file_search::{self, FileScanner},
-    projects::ProjectScanner,
-};
+mod scanners;
+use scanners::{ApplicationScanner, FileScanner, projects::ProjectScanner};
+
+use crate::scanners::default_search_list;
 
 pub struct WaycastDaemon {}
 
@@ -146,7 +145,7 @@ fn init_file_scanner() -> FileScanner {
     {
         search_paths.extend(paths);
     } else {
-        search_paths.extend(file_search::default_search_list());
+        search_paths.extend(default_search_list());
     }
 
     if let Ok(paths) =

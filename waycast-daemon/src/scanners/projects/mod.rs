@@ -7,7 +7,8 @@ use std::sync::LazyLock;
 use tokio::sync::Mutex;
 use waycast_core::{LauncherItem, WaycastScanner, cache::CacheTTL};
 
-use crate::projects::{framework_detector::FrameworkDetector, type_scanner::TypeScanner};
+use framework_detector::FrameworkDetector;
+use type_scanner::TypeScanner;
 
 static TOKEI_SCANNER: LazyLock<TypeScanner> = LazyLock::new(TypeScanner::new);
 static FRAMEWORK_DETECTOR: LazyLock<FrameworkDetector> = LazyLock::new(FrameworkDetector::new);

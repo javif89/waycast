@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "waycast-core",
-    "waycast-plugins",
     "waycast-config",
     "waycast-ui",
     "waycast-daemon",

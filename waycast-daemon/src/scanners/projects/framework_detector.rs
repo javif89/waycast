@@ -1,4 +1,4 @@
-use crate::projects::framework_macro::FrameworkHeuristics;
+use crate::scanners::projects::framework_macro::FrameworkHeuristics;
 
 pub enum Framework {
     Laravel,
@@ -21,7 +21,7 @@ crate::frameworks! {
         files: ["Gemfile"],
         json_checks: [("package.json", "dependencies.rails"), ("package.json", "devDependencies.rails")],
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::has_file;
+            use crate::scanners::projects::framework_macro::has_file;
 
             // Check for Gemfile with rails gem
             if let Ok(content) = std::fs::read_to_string(format!("{}/Gemfile", project_path))
@@ -39,7 +39,7 @@ crate::frameworks! {
         files: ["package.json"],
         json_checks: [("package.json", "dependencies.next"), ("package.json", "devDependencies.next")],
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::has_file;
+            use crate::scanners::projects::framework_macro::has_file;
             has_file(project_path, "next.config.js") || has_file(project_path, "next.config.mjs")
         },
     },
@@ -47,7 +47,7 @@ crate::frameworks! {
         files: ["package.json"],
         json_checks: [("package.json", "dependencies.vue"), ("package.json", "devDependencies.vue")],
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::has_file;
+            use crate::scanners::projects::framework_macro::has_file;
             has_file(project_path, "vue.config.js") ||
             has_file(project_path, "src/App.vue")
         },
@@ -56,7 +56,7 @@ crate::frameworks! {
         files: ["package.json"],
         json_checks: [("package.json", "dependencies.svelte"), ("package.json", "devDependencies.svelte")],
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::has_file;
+            use crate::scanners::projects::framework_macro::has_file;
             has_file(project_path, "svelte.config.js") ||
             has_file(project_path, "src/App.svelte")
         },
@@ -64,7 +64,7 @@ crate::frameworks! {
     Django {
         files: ["manage.py"],
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::has_file;
+            use crate::scanners::projects::framework_macro::has_file;
 
             // Check for requirements.txt with Django
             if let Ok(content) = std::fs::read_to_string(format!("{}/requirements.txt", project_path))
@@ -80,7 +80,7 @@ crate::frameworks! {
     },
     Flask {
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::has_file;
+            use crate::scanners::projects::framework_macro::has_file;
 
             // Check for requirements.txt with Flask
             if let Ok(content) = std::fs::read_to_string(format!("{}/requirements.txt", project_path))
@@ -108,7 +108,7 @@ crate::frameworks! {
     Ansible {
         directories: ["playbooks"],
         custom: |project_path: &str| {
-            use crate::projects::framework_macro::has_file;
+            use crate::scanners::projects::framework_macro::has_file;
             has_file(project_path, "ansible.cfg") ||
             has_file(project_path, "playbook.yml") ||
             has_file(project_path, "site.yml") ||

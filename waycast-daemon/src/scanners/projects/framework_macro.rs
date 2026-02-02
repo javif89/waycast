@@ -53,7 +53,7 @@ macro_rules! frameworks {
     ) => {
         $(
             struct $name;
-            impl $crate::projects::framework_macro::FrameworkHeuristics for $name {
+            impl $crate::scanners::projects::framework_macro::FrameworkHeuristics for $name {
                 fn name(&self) -> &'static str {
                     stringify!($name)
                 }
@@ -62,7 +62,7 @@ macro_rules! frameworks {
                     // Check required files first
                     $(
                         $(
-                            if !$crate::projects::framework_macro::has_file(project_path, $file) {
+                            if !$crate::scanners::projects::framework_macro::has_file(project_path, $file) {
                                 return false;
                             }
                         )*
@@ -71,7 +71,7 @@ macro_rules! frameworks {
                     // Check directories - any match returns true
                     $(
                         $(
-                            if $crate::projects::framework_macro::has_directory(project_path, $dir) {
+                            if $crate::scanners::projects::framework_macro::has_directory(project_path, $dir) {
                                 return true;
                             }
                         )*
@@ -80,8 +80,8 @@ macro_rules! frameworks {
                     // Check JSON paths - any match returns true
                     $(
                         $(
-                            if let Some(json) = $crate::projects::framework_macro::read_json_config(project_path, $json_file) {
-                                if $crate::projects::framework_macro::check_json_path(&json, $json_path) {
+                            if let Some(json) = $crate::scanners::projects::framework_macro::read_json_config(project_path, $json_file) {
+                                if $crate::scanners::projects::framework_macro::check_json_path(&json, $json_path) {
                                     return true;
                                 }
                             }
@@ -115,7 +115,7 @@ macro_rules! frameworks {
 
         )*
 
-        static HEURISTICS: &[&dyn $crate::projects::framework_macro::FrameworkHeuristics] = &[
+        static HEURISTICS: &[&dyn $crate::scanners::projects::framework_macro::FrameworkHeuristics] = &[
             $(&$name {},)*
         ];
     };
