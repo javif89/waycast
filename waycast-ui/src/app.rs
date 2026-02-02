@@ -354,7 +354,6 @@ impl Waycast {
         item: waycast_core::LauncherItem,
         is_selected: bool,
     ) -> Element<'_, Message> {
-        info!("Attempting handle for {}", item.icon);
         let icon_handle: IconHandle = self
             .icon_handles
             .get(&item.icon)
@@ -372,7 +371,6 @@ impl Waycast {
                     let handle = build_icon_handle(path.into());
                     Some(handle)
                 } else {
-                    error!("We're fucked");
                     warn!("Going with default vscode icon");
 
                     Some(

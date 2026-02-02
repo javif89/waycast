@@ -28,4 +28,4 @@ waycast-core = { path = "../waycast-core" }
 waycast-data = { version = "0.5.1", path = "../waycast-data" }
 waycast-facade = { version = "0.5.1", path = "../waycast-facade" }
 waycast-plugins = { path = "../waycast-plugins" }
-waycast-scanner = { version = "0.5.1", path = "../waycast-scanner" }
+waycast-daemon = { version = "0.5.1", path = "../waycast-daemon" }

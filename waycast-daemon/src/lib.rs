@@ -1,6 +1,8 @@
 use std::{collections::HashSet, path::PathBuf, time::Instant};
 
-use tracing::{Instrument, info, info_span};
+use std::time::Duration;
+use tokio::time;
+use tracing::{Instrument, error, info, info_span};
 use waycast_core::{LauncherItem, WaycastScanner};
 use waycast_data::{DataError, WaycastData, icons::IconRow};
 use waycast_facade::{Icon, WaycastLauncher};
@@ -10,7 +12,50 @@ use waycast_plugins::{
     projects::ProjectScanner,
 };
 
-pub async fn scan_and_update(db: &WaycastData) -> Result<(), DataError> {
+pub struct WaycastDaemon {}
+
+impl WaycastDaemon {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl WaycastDaemon {
+    pub fn run(&self) {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(4)
+            .build()
+            .unwrap();
+
+        runtime.block_on(async move {
+            let db = WaycastData::writeable_connection("waycast.db").await;
+            let mut cadence = time::interval(Duration::from_secs(20));
+
+            loop {
+                cadence.tick().await;
+
+                let scan_span = info_span!("scan_and_update");
+                let icon_cache_span = info_span!("update_icon_cache");
+
+                let result = scan_and_update(&db).instrument(scan_span).await;
+
+                match result {
+                    Ok(_) => {
+                        info!("Items inserted successfully");
+                        info!("Updating icon cache");
+                        if let Err(e) = update_icon_cache(&db).instrument(icon_cache_span).await {
+                            error!("Error updating icon cache {e}");
+                        }
+                    }
+                    Err(e) => error!("Error: {e}"),
+                }
+            }
+        });
+    }
+}
+
+async fn scan_and_update(db: &WaycastData) -> Result<(), DataError> {
     info!("Gathering data");
     let start = Instant::now();
 
@@ -49,7 +94,7 @@ pub async fn scan_and_update(db: &WaycastData) -> Result<(), DataError> {
     Ok(())
 }
 
-pub async fn update_icon_cache(db: &WaycastData) -> Result<(), DataError> {
+async fn update_icon_cache(db: &WaycastData) -> Result<(), DataError> {
     info!("Updating icon cache");
     let icons: Vec<String> = db.items().get_icons().await.unwrap_or(Vec::new());
 

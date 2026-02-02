@@ -1,5 +1,5 @@
 [package]
-name = "waycast-scanner"
+name = "waycast-daemon"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

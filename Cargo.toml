@@ -4,7 +4,7 @@ members = [
     "waycast-plugins",
     "waycast-config",
     "waycast-ui",
-    "waycast-scanner",
+    "waycast-daemon",
     "waycast-data",
     "waycast-facade",
 ]
