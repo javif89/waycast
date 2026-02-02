@@ -14,7 +14,7 @@ use iced::{
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use waycast_core::{FuzzyMatcher, LauncherItem};
 use waycast_data::WaycastData;
 use waycast_data::items::ItemKind;
@@ -198,18 +198,24 @@ fn build_icon_handle(path: PathBuf) -> IconHandle {
 impl Waycast {
     async fn build_icon_handle_map(db: Arc<WaycastData>) -> HashMap<String, IconHandle> {
         let path_or_names: Vec<String> = db.items().get_icons().await.unwrap_or_default();
+        let cached_theme_icons = db.icons().all().await.unwrap_or_default();
         let mut handles: HashMap<String, IconHandle> = HashMap::new();
 
+        // Insert cached icons first to save on resolution time
+        for ci in cached_theme_icons {
+            handles.insert(ci.name, build_icon_handle(ci.path.clone().into()));
+        }
+
         for p in path_or_names {
-            if let Some(i) = WaycastLauncher::resolve_icon(&p) {
-                match i {
-                    waycast_facade::Icon::ThemeIcon { name, path } => {
-                        handles.insert(name, build_icon_handle(path.clone().into()));
-                    }
-                    waycast_facade::Icon::Path(path) => {
-                        handles.insert(path.clone(), build_icon_handle(path.clone().into()));
-                    }
-                }
+            // If it's a path icon, add it to the handles.
+            // If it's a themed icon, skip since it
+            // should have been in the cache.
+            let path = std::path::Path::new(&p);
+            if path.exists() {
+                handles.insert(
+                    path.to_owned().to_string_lossy().to_string(),
+                    build_icon_handle(path.into()),
+                );
             }
         }
         // let icon_path = find_icon_file(icon_name, config::ICON_SIZE_STR).unwrap_or_else(|| {
@@ -348,11 +354,38 @@ impl Waycast {
         item: waycast_core::LauncherItem,
         is_selected: bool,
     ) -> Element<'_, Message> {
-        let icon_handle = self
+        info!("Attempting handle for {}", item.icon);
+        let icon_handle: IconHandle = self
             .icon_handles
             .get(&item.icon)
-            .expect("I really shouldn't crash on no icon found");
-        let icon_view = build_icon_view(icon_handle.to_owned());
+            .cloned()
+            .or_else(|| {
+                warn!("Could not find handle for {}", item.icon);
+                warn!("Attempting to check manually");
+
+                if let Some(icon) = WaycastLauncher::resolve_icon(&item.icon) {
+                    let path = match icon {
+                        waycast_facade::Icon::ThemeIcon { name, path } => path,
+                        waycast_facade::Icon::Path(path) => path,
+                    };
+
+                    let handle = build_icon_handle(path.into());
+                    Some(handle)
+                } else {
+                    error!("We're fucked");
+                    warn!("Going with default vscode icon");
+
+                    Some(
+                        self.icon_handles
+                            .get("vscode")
+                            .cloned()
+                            .expect("What the fuck"),
+                    )
+                }
+            })
+            .unwrap();
+
+        let icon_view = build_icon_view(icon_handle);
 
         let content = row![
             column![icon_view].padding(config::PADDING_SMALL),

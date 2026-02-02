@@ -17,6 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 freedesktop = { version = "0.0.3", features = ["icon"] }
+fs2 = "0.4.3"
 iced = { version = "0.13.1", features = ["image", "svg", "tokio"] }
 iced_layershell = "0.13.7"
 mathengine = "0.1.0"
