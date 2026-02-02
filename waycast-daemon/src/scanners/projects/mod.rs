@@ -5,7 +5,7 @@ use std::{collections::HashSet, fs, path::PathBuf, sync::Arc};
 
 use std::sync::LazyLock;
 use tokio::sync::Mutex;
-use waycast_core::{LauncherItem, WaycastScanner, cache::CacheTTL};
+use waycast_core::{LauncherItem, WaycastScanner};
 
 use framework_detector::FrameworkDetector;
 use type_scanner::TypeScanner;
@@ -127,9 +127,6 @@ pub struct ProjectsPlugin {
 }
 
 fn detect_project_type(path: &str) -> Option<String> {
-    let cache_key = format!("project_type:{}", path);
-    let cache = waycast_core::cache::get();
-
     let detect_fn = |path| {
         let fw = FRAMEWORK_DETECTOR.detect(path);
         if let Some(name) = fw {
@@ -145,14 +142,6 @@ fn detect_project_type(path: &str) -> Option<String> {
 
         None
     };
-
-    // TODO: Move the caching out of here. Should not be the scanner's concern
-    let result: Result<Option<String>, waycast_core::cache::errors::CacheError> =
-        cache.remember_with_ttl(&cache_key, CacheTTL::hours(24), || detect_fn(path));
-
-    if let Ok(project_type) = result {
-        return project_type;
-    }
 
     detect_fn(path)
 }

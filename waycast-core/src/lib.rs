@@ -4,8 +4,6 @@ use nucleo_matcher::{
 };
 use serde::{Deserialize, Serialize};
 
-pub mod cache;
-
 #[derive(Debug)]
 pub enum LaunchError {
     CouldNotLaunch(String),

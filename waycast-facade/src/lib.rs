@@ -2,7 +2,7 @@ use freedesktop::{ApplicationEntry, ExecuteError, FindError};
 use gio::prelude::FileExt;
 use thiserror::Error;
 use tracing::{error, info};
-use waycast_core::LauncherItem;
+use waycast_core::{LaunchError, LauncherItem};
 
 #[derive(Error, Debug)]
 pub enum WaycastError {
@@ -49,9 +49,14 @@ impl WaycastLauncher {
                 info!("Found app successfully");
                 info!("Path: {}", app.path().display());
                 info!("ID: {}", app.id().unwrap_or("Not found".into()));
-                app.execute()?;
 
-                Ok(())
+                let (cmd, args) = app.prepare_command(&[], &[])?;
+                info!("Executing with command: {} | args: {}", cmd, args.join(","));
+                let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+                match spawn_detached(&cmd, &arg_refs) {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(WaycastError::LaunchError(e.to_string())),
+                }
             }
             waycast_core::ItemKind::File => {
                 info!("Executing: {}", item.id);
