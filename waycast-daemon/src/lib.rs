@@ -14,6 +14,12 @@ use waycast_plugins::{
 
 pub struct WaycastDaemon {}
 
+impl Default for WaycastDaemon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WaycastDaemon {
     pub fn new() -> Self {
         Self {}

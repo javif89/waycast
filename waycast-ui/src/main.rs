@@ -15,11 +15,9 @@ use iced_layershell::reexport::Anchor;
 use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 
 use app::Waycast;
-use tokio::time;
-use tracing::{Instrument, error, info, info_span};
+use tracing::info;
 use tracing_subscriber::fmt;
 use waycast_daemon::WaycastDaemon;
-use waycast_data::WaycastData;
 
 fn runtime_dir() -> PathBuf {
     std::env::var_os("XDG_RUNTIME_DIR")
