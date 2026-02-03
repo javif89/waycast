@@ -14,3 +14,4 @@ perf.data
 perf.data.old
 waycast.db*
 TODO.md
+heaptrack*.zst

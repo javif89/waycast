@@ -154,6 +154,8 @@
             # Benchmarking / Profiling
             linuxKernel.packages.linux_6_6.perf
             valgrind
+            heaptrack
+            gdb
           ];
 
           LD_LIBRARY_PATH =

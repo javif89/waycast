@@ -66,7 +66,7 @@ impl Application for Waycast {
             .expect("tokio runtime");
 
         let db =
-            rt.block_on(async { Arc::new(WaycastData::read_only_connection("waycast.db").await) });
+            rt.block_on(async { Arc::new(WaycastData::writeable_connection("waycast.db").await) });
 
         let app = Self {
             db,
@@ -232,10 +232,10 @@ impl Waycast {
                             build_icon_handle(p),
                         );
                     }
-                    Err(_) => {
+                    Err(e) => {
                         // TODO: Rethink this. If the database is fucked,
                         // then everything is fucked.
-                        error!("Cache error. Is the DB alright?");
+                        error!("Cache error: {e}");
                         handles.insert(
                             path.to_owned().to_string_lossy().to_string(),
                             build_icon_handle(value_fn()),
