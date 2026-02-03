@@ -5889,6 +5889,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "waycast"
+version = "0.5.1"
+dependencies = [
+ "fs2",
+ "tracing",
+ "tracing-subscriber",
+ "waycast-daemon",
+ "waycast-ui",
+]
+
+[[package]]
 name = "waycast-config"
 version = "0.5.1"
 dependencies = [

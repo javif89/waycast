@@ -5,7 +5,7 @@ members = [
     "waycast-ui",
     "waycast-daemon",
     "waycast-data",
-    "waycast-facade",
+    "waycast-facade", "waycast",
 ]
 resolver = "2"
 

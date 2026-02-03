@@ -1,28 +1,13 @@
-mod app;
-mod config;
-mod theme;
-mod ui;
-
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 
-use iced_layershell::Application;
-use iced_layershell::reexport::Anchor;
-use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
-
-use app::Waycast;
 use tracing::info;
 use tracing_subscriber::fmt;
 use waycast_daemon::WaycastDaemon;
-
-fn runtime_dir() -> PathBuf {
-    std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-}
+use waycast_ui::WaycastUi;
 
 pub fn main() {
     println!("Waycast v{}", env!("CARGO_PKG_VERSION"));
@@ -54,49 +39,39 @@ pub fn main() {
     });
 
     let ui_thread_handle = std::thread::spawn(move || {
-        // let _ = Waycast::run(Settings {
-        //     id: Some(config::APP_NAME.into()),
-        //     layer_settings: LayerShellSettings {
-        //         size: Some((config::WINDOW_WIDTH, config::WINDOW_HEIGHT)),
-        //         exclusive_zone: 0,
-        //         anchor: Anchor::Bottom | Anchor::Left | Anchor::Right | Anchor::Top,
-        //         start_mode: StartMode::Active,
-        //         ..Default::default()
-        //     },
-        //     ..Default::default()
-        // });
-        // println!("App exited");
-        loop {
-            let sock = runtime_dir().join("waycast.sock");
-            let _ = std::fs::remove_file(&sock);
+        let _ = WaycastUi::run();
+        println!("App exited");
+        // loop {
+        //     let sock = runtime_dir().join("waycast.sock");
+        //     let _ = std::fs::remove_file(&sock);
 
-            let listener = UnixListener::bind(&sock).unwrap();
+        //     let listener = UnixListener::bind(&sock).unwrap();
 
-            println!("Waiting for signal...");
-            let (mut conn, _addr) = listener.accept().unwrap();
-            let mut buf = [0u8; 4096];
-            let n = conn.read(&mut buf).unwrap_or(0);
+        //     println!("Waiting for signal...");
+        //     let (mut conn, _addr) = listener.accept().unwrap();
+        //     let mut buf = [0u8; 4096];
+        //     let n = conn.read(&mut buf).unwrap_or(0);
 
-            let msg = std::str::from_utf8(&buf[..n])
-                .unwrap_or("<non-utf8>")
-                .trim();
+        //     let msg = std::str::from_utf8(&buf[..n])
+        //         .unwrap_or("<non-utf8>")
+        //         .trim();
 
-            if msg == "show" {
-                println!("Launching UI");
-                let _ = Waycast::run(Settings {
-                    id: Some(config::APP_NAME.into()),
-                    layer_settings: LayerShellSettings {
-                        size: Some((config::WINDOW_WIDTH, config::WINDOW_HEIGHT)),
-                        exclusive_zone: 0,
-                        anchor: Anchor::Bottom | Anchor::Left | Anchor::Right | Anchor::Top,
-                        start_mode: StartMode::Active,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                });
-                println!("App exited");
-            }
-        }
+        //     if msg == "show" {
+        //         println!("Launching UI");
+        //         let _ = Waycast::run(Settings {
+        //             id: Some(config::APP_NAME.into()),
+        //             layer_settings: LayerShellSettings {
+        //                 size: Some((config::WINDOW_WIDTH, config::WINDOW_HEIGHT)),
+        //                 exclusive_zone: 0,
+        //                 anchor: Anchor::Bottom | Anchor::Left | Anchor::Right | Anchor::Top,
+        //                 start_mode: StartMode::Active,
+        //                 ..Default::default()
+        //             },
+        //             ..Default::default()
+        //         });
+        //         println!("App exited");
+        //     }
+        // }
     });
 
     ui_thread_handle.join().unwrap();
@@ -126,4 +101,10 @@ pub fn acquire_single_instance_lock(app_id: &str) -> io::Result<File> {
     fs2::FileExt::try_lock_exclusive(&file)?;
 
     Ok(file)
+}
+
+fn runtime_dir() -> PathBuf {
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
 }

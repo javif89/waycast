@@ -4,7 +4,7 @@ default: ## Show help
 # Development
 [group('Development')]
 run: 
-	cargo build -p waycast-ui --release
+	cargo build -p waycast --release
 	./target/release/waycast
 
 run-nocomp:
@@ -12,7 +12,7 @@ run-nocomp:
 
 [group('Profiling')]
 run-heaptrack: 
-	cargo build -p waycast-ui
+	cargo build -p waycast
 	heaptrack -- ./target/debug/waycast
 
 daemon:
@@ -33,11 +33,11 @@ run-flake:
 
 [group('build')]
 build: ## Build waycast GUI (debug)
-	cargo build -p waycast-ui
+	cargo build -p waycast
 
 [group('build')]
 build-release: ## Build waycast GUI (optimized)
-	cargo build -p waycast-ui --release
+	cargo build -p waycast --release
 
 # Testing & Quality
 [group('Testing and checking')]
@@ -86,7 +86,7 @@ bench: ## Run benchmarks
 
 [group('Profiling')]
 profile: ## Profile the application (requires cargo-flamegraph)
-	cargo flamegraph -p waycast-ui
+	cargo flamegraph -p waycast
 	brave flamegraph.svg
 
 [group('Profiling')]

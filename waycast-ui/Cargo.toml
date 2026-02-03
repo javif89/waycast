@@ -11,9 +11,9 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
-[[bin]]
-name = "waycast"
-path = "src/main.rs"
+# [[bin]]
+# name = "waycast"
+# path = "src/main.rs"
 
 [dependencies]
 freedesktop = { version = "0.0.3", features = ["icon"] }
