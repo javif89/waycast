@@ -5,7 +5,6 @@ use tokio::time;
 use tracing::{Instrument, error, info, info_span};
 use waycast_core::{LauncherItem, WaycastScanner};
 use waycast_data::{DataError, WaycastData};
-use waycast_facade::{Icon, WaycastLauncher};
 mod scanners;
 use scanners::{ApplicationScanner, FileScanner, projects::ProjectScanner};
 

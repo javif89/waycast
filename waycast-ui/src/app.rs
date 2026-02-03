@@ -229,7 +229,7 @@ impl Waycast {
                     Ok(p) => {
                         handles.insert(
                             path.to_owned().to_string_lossy().to_string(),
-                            build_icon_handle(p.into()),
+                            build_icon_handle(p),
                         );
                     }
                     Err(_) => {
@@ -238,7 +238,7 @@ impl Waycast {
                         error!("Cache error. Is the DB alright?");
                         handles.insert(
                             path.to_owned().to_string_lossy().to_string(),
-                            build_icon_handle(value_fn().into()),
+                            build_icon_handle(value_fn()),
                         );
                     }
                 }

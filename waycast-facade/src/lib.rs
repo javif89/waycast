@@ -2,7 +2,7 @@ use freedesktop::{ApplicationEntry, ExecuteError, FindError};
 use gio::prelude::FileExt;
 use thiserror::Error;
 use tracing::{error, info};
-use waycast_core::{LaunchError, LauncherItem};
+use waycast_core::LauncherItem;
 
 #[derive(Error, Debug)]
 pub enum WaycastError {
