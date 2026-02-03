@@ -99,30 +99,28 @@ async fn scan_and_update(db: &WaycastData) -> Result<(), DataError> {
     Ok(())
 }
 
+/// Warm the icon cache so that we ideally only get cache hits in the UI
 async fn update_icon_cache(db: &WaycastData) -> Result<(), DataError> {
-    info!("Updating icon cache");
+    info!("Warming icon cache");
     let icons: Vec<String> = db.items().get_icons().await.unwrap_or(Vec::new());
 
-    let themed: Vec<Icon> = icons
-        .iter()
-        .filter_map(|path| WaycastLauncher::resolve_icon(path))
-        .collect();
+    for i in icons {
+        // Check if it's a path. If not, then it's
+        // a themed icon. We will resolve its
+        // path and cache it.
 
-    let rows: Vec<IconRow> = themed
-        .iter()
-        .filter_map(|i| match i {
-            Icon::ThemeIcon { name, path } => Some(IconRow {
-                id: None,
-                name: name.to_owned(),
-                path: path.to_owned(),
-            }),
-            Icon::Path(_) => None,
-        })
-        .collect();
+        let path = std::path::Path::new(&i);
+        if !path.exists() {
+            let key = format!("icon:{}", i);
+            if let Some(icon_path) = freedesktop::get_icon(&i) {
+                db.cache()
+                    .put(&key, &icon_path, Some(Duration::from_hours(8)))
+                    .await?;
+            }
+        }
+    }
 
-    info!("Inserting {} rows into icon cache", rows.len());
-
-    db.icons().insert(rows).await
+    Ok(())
 }
 
 fn init_project_scanner() -> ProjectScanner {

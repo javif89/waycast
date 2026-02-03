@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use iced::keyboard::key;
 use iced::widget::scrollable::{self, Id as ScrollableId};
@@ -198,30 +199,51 @@ fn build_icon_handle(path: PathBuf) -> IconHandle {
 impl Waycast {
     async fn build_icon_handle_map(db: Arc<WaycastData>) -> HashMap<String, IconHandle> {
         let path_or_names: Vec<String> = db.items().get_icons().await.unwrap_or_default();
-        let cached_theme_icons = db.icons().all().await.unwrap_or_default();
         let mut handles: HashMap<String, IconHandle> = HashMap::new();
-
-        // Insert cached icons first to save on resolution time
-        for ci in cached_theme_icons {
-            handles.insert(ci.name, build_icon_handle(ci.path.clone().into()));
-        }
 
         for p in path_or_names {
             // If it's a path icon, add it to the handles.
-            // If it's a themed icon, skip since it
-            // should have been in the cache.
+            // If it's a themed icon, resolve and cache
+            // then add to the handles.
             let path = std::path::Path::new(&p);
             if path.exists() {
                 handles.insert(
                     path.to_owned().to_string_lossy().to_string(),
                     build_icon_handle(path.into()),
                 );
+            } else {
+                let key = format!("icon:{}", p);
+                let value_fn = || {
+                    match freedesktop::get_icon(&p) {
+                        Some(path) => path,
+                        None => freedesktop::get_icon("vscode")
+                            .unwrap_or(PathBuf::from("/tmp/notfound")), // TODO: I can definitely come up with something better. Just not now
+                    }
+                };
+                let themed_icon_path = db
+                    .cache()
+                    .remember(&key, Some(Duration::from_hours(8)), value_fn)
+                    .await;
+
+                match themed_icon_path {
+                    Ok(p) => {
+                        handles.insert(
+                            path.to_owned().to_string_lossy().to_string(),
+                            build_icon_handle(p.into()),
+                        );
+                    }
+                    Err(_) => {
+                        // TODO: Rethink this. If the database is fucked,
+                        // then everything is fucked.
+                        error!("Cache error. Is the DB alright?");
+                        handles.insert(
+                            path.to_owned().to_string_lossy().to_string(),
+                            build_icon_handle(value_fn().into()),
+                        );
+                    }
+                }
             }
         }
-        // let icon_path = find_icon_file(icon_name, config::ICON_SIZE_STR).unwrap_or_else(|| {
-        //     find_icon_file("application-x-executable", config::ICON_SIZE_STR)
-        //         .unwrap_or_else(|| "notfound.png".into())
-        // });
 
         handles
     }
