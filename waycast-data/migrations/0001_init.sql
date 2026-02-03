@@ -58,15 +58,6 @@ CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
   VALUES (new.id, new.title, new.description);
 END;
 
--- Icons table
-create table if not exists icons (
-    id integer primary key,
-    name text not null,
-    path text not null,
-
-    unique(name)
-);
-
 -- Cache table
 create table if not exists cache (
     key text primary key not null,
