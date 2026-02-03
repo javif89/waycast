@@ -145,6 +145,9 @@
             just
             socat
 
+            # Cargo tools
+            cargo-machete
+
             # Icons (so themed icons resolve)
             hicolor-icon-theme
 
