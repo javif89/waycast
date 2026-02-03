@@ -66,3 +66,12 @@ create table if not exists icons (
 
     unique(name)
 );
+
+-- Cache table
+create table if not exists cache (
+    key text primary key not null,
+    value text not null,
+    expires_at integer null,
+
+    unique(key)
+);

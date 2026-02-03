@@ -8,12 +8,13 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 
+pub mod cache;
 pub mod icons;
 pub mod items;
 
 pub use items::LauncherItemRepository;
 
-use crate::icons::IconRepository;
+use crate::{cache::CacheRepository, icons::IconRepository};
 
 #[derive(Debug, Error)]
 pub enum DataError {
@@ -22,6 +23,9 @@ pub enum DataError {
 
     #[error("Query error: {0}")]
     QueryError(String),
+
+    #[error("Failed to serialize/deserialize value")]
+    SerializationError(#[from] serde_json::Error),
 }
 
 pub struct WaycastData {
@@ -68,6 +72,12 @@ impl WaycastData {
 
     pub fn icons(&self) -> IconRepository {
         IconRepository {
+            pool: self.pool.clone(),
+        }
+    }
+
+    pub fn cache(&self) -> CacheRepository {
+        CacheRepository {
             pool: self.pool.clone(),
         }
     }
