@@ -81,7 +81,7 @@ impl CacheRepository {
                 // Check if it's expired. If so,
                 // delete and return None
                 if is_expired(r.expires_at) {
-                    self.delete(key).await;
+                    self.delete(key).await?;
                     return Ok(None);
                 }
 

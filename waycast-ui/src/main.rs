@@ -8,7 +8,6 @@ use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
-use std::time::Duration;
 
 use iced_layershell::Application;
 use iced_layershell::reexport::Anchor;
@@ -35,8 +34,10 @@ pub fn main() {
             println!("Sending show command");
             let sock = runtime_dir().join("waycast.sock");
             let mut stream = UnixStream::connect(sock).expect("Could not connect to socket");
-            stream.write_all(b"show\n");
-            stream.shutdown(Shutdown::Write);
+            // TODO: We should log if there's errors with the
+            // socket so the user can debug
+            let _ = stream.write_all(b"show\n");
+            let _ = stream.shutdown(Shutdown::Write);
             std::process::exit(0);
         }
         Err(e) => panic!("Some other non lock related error {e}"),
@@ -48,7 +49,7 @@ pub fn main() {
 
     info!("Daemon starting up...");
 
-    let scanner_thread_handle = std::thread::spawn(move || {
+    let _scanner_thread_handle = std::thread::spawn(move || {
         WaycastDaemon::new().run();
     });
 
@@ -99,14 +100,6 @@ pub fn main() {
     });
 
     ui_thread_handle.join().unwrap();
-
-    // Some apps (like steam) need a bit of a grace period
-    // to properly detach from the parent process. By
-    // taking this approach, the UI can hide
-    // immediately for good UX, but the
-    // process will wait a little bit
-    // before closing.
-    std::thread::sleep(Duration::from_millis(1000));
 }
 
 fn lock_path(app_id: &str) -> PathBuf {
@@ -124,6 +117,7 @@ pub fn acquire_single_instance_lock(app_id: &str) -> io::Result<File> {
     let file = OpenOptions::new()
         .read(true)
         .write(true)
+        .truncate(true)
         .create(true) // file existence doesn't matter
         .open(&path)?;
 

@@ -1,10 +1,9 @@
 pub mod framework_detector;
 pub mod framework_macro;
 pub mod type_scanner;
-use std::{collections::HashSet, fs, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, fs, path::PathBuf};
 
 use std::sync::LazyLock;
-use tokio::sync::Mutex;
 use waycast_core::{LauncherItem, WaycastScanner};
 
 use framework_detector::FrameworkDetector;
@@ -16,7 +15,6 @@ static FRAMEWORK_DETECTOR: LazyLock<FrameworkDetector> = LazyLock::new(Framework
 #[derive(Clone)]
 pub struct ProjectEntry {
     path: PathBuf,
-    exec_command: Arc<str>,
     project_type: Option<String>,
 }
 
@@ -100,11 +98,7 @@ impl WaycastScanner for ProjectScanner {
 
                             let project_type =
                                 detect_project_type(path.to_string_lossy().to_string().as_str());
-                            project_entries.push(ProjectEntry {
-                                path,
-                                exec_command: "code -n".into(),
-                                project_type,
-                            });
+                            project_entries.push(ProjectEntry { path, project_type });
                         }
                     }
                 }
@@ -116,14 +110,6 @@ impl WaycastScanner for ProjectScanner {
             .map(|p| p.to_owned().into())
             .collect()
     }
-}
-
-pub struct ProjectsPlugin {
-    search_paths: HashSet<PathBuf>,
-    skip_dirs: HashSet<String>,
-    open_command: String,
-    // Running list of files in memory
-    files: Arc<Mutex<Vec<ProjectEntry>>>,
 }
 
 fn detect_project_type(path: &str) -> Option<String> {

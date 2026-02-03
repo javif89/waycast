@@ -126,9 +126,6 @@ fn init_project_scanner() -> ProjectScanner {
     let search_paths = waycast_config::get::<HashSet<PathBuf>>("plugins.projects.search_paths")
         .unwrap_or_default();
 
-    let skip_dirs =
-        waycast_config::get::<HashSet<String>>("plugins.projects.skip_dirs").unwrap_or_default();
-
     ProjectScanner::new().with_search_paths(search_paths)
 }
 

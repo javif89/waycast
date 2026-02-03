@@ -386,7 +386,7 @@ impl Waycast {
 
                 if let Some(icon) = WaycastLauncher::resolve_icon(&item.icon) {
                     let path = match icon {
-                        waycast_facade::Icon::ThemeIcon { name, path } => path,
+                        waycast_facade::Icon::ThemeIcon { name: _, path } => path,
                         waycast_facade::Icon::Path(path) => path,
                     };
 

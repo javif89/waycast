@@ -37,7 +37,6 @@ impl WaycastScanner for ApplicationScanner {
 
 use crossbeam_channel::unbounded;
 use directories::UserDirs;
-use gio::prelude::FileExt;
 use glib::object::Cast;
 use ignore::{WalkBuilder, WalkState};
 use std::collections::HashSet;
