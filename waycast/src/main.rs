@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use notify_rust::Notification;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
@@ -87,6 +88,12 @@ fn start_waycast() {
             }
         }
     });
+
+    let _ = Notification::new()
+        .summary("Waycast")
+        .body("Daemon started successfully")
+        .icon("dialog-information")
+        .show();
 
     ui_thread_handle.join().unwrap();
 }
