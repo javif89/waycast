@@ -1,3 +1,4 @@
+use clap::{Parser, Subcommand};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
@@ -5,18 +6,49 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 
 use tracing::info;
-use tracing_subscriber::fmt;
+use tracing_subscriber::{EnvFilter, fmt};
 use waycast_daemon::WaycastDaemon;
 use waycast_ui::WaycastUi;
 
-pub fn main() {
-    println!("Waycast v{}", env!("CARGO_PKG_VERSION"));
+#[derive(Subcommand)]
+enum Command {
+    Version,
+}
 
+#[derive(Parser)]
+struct App {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+pub fn main() {
+    tracing_subscriber::fmt()
+        .with_span_events(fmt::format::FmtSpan::CLOSE | fmt::format::FmtSpan::NEW)
+        .with_env_filter(
+            EnvFilter::new("error")
+                .add_directive("waycast=trace".parse().unwrap())
+                .add_directive("waycast_data=trace".parse().unwrap())
+                .add_directive("waycast_ui=trace".parse().unwrap())
+                .add_directive("waycast_daemon=trace".parse().unwrap()),
+        )
+        .init();
+
+    let app = App::parse();
+
+    match app.command {
+        Some(Command::Version) => {
+            println!("Waycast v{}", env!("CARGO_PKG_VERSION"));
+        }
+        None => start_waycast(),
+    }
+}
+
+fn start_waycast() {
     let _lock = match acquire_single_instance_lock("waycast") {
         Ok(lock) => lock,
         Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-            println!("Another instance is already running.");
-            println!("Sending show command");
+            info!("Another instance is already running.");
+            info!("Sending show command");
             let sock = runtime_dir().join("waycast.sock");
             let mut stream = UnixStream::connect(sock).expect("Could not connect to socket");
             // TODO: We should log if there's errors with the
@@ -28,50 +60,32 @@ pub fn main() {
         Err(e) => panic!("Some other non lock related error {e}"),
     };
 
-    tracing_subscriber::fmt()
-        .with_span_events(fmt::format::FmtSpan::CLOSE | fmt::format::FmtSpan::NEW)
-        .init();
-
-    info!("Daemon starting up...");
-
     let _scanner_thread_handle = std::thread::spawn(move || {
         WaycastDaemon::new().run();
     });
 
     let ui_thread_handle = std::thread::spawn(move || {
-        let _ = WaycastUi::run();
-        println!("App exited");
-        // loop {
-        //     let sock = runtime_dir().join("waycast.sock");
-        //     let _ = std::fs::remove_file(&sock);
+        loop {
+            let sock = runtime_dir().join("waycast.sock");
+            let _ = std::fs::remove_file(&sock);
 
-        //     let listener = UnixListener::bind(&sock).unwrap();
+            let listener = UnixListener::bind(&sock).unwrap();
 
-        //     println!("Waiting for signal...");
-        //     let (mut conn, _addr) = listener.accept().unwrap();
-        //     let mut buf = [0u8; 4096];
-        //     let n = conn.read(&mut buf).unwrap_or(0);
+            info!("Waiting for signal...");
+            let (mut conn, _addr) = listener.accept().unwrap();
+            let mut buf = [0u8; 4096];
+            let n = conn.read(&mut buf).unwrap_or(0);
 
-        //     let msg = std::str::from_utf8(&buf[..n])
-        //         .unwrap_or("<non-utf8>")
-        //         .trim();
+            let msg = std::str::from_utf8(&buf[..n])
+                .unwrap_or("<non-utf8>")
+                .trim();
 
-        //     if msg == "show" {
-        //         println!("Launching UI");
-        //         let _ = Waycast::run(Settings {
-        //             id: Some(config::APP_NAME.into()),
-        //             layer_settings: LayerShellSettings {
-        //                 size: Some((config::WINDOW_WIDTH, config::WINDOW_HEIGHT)),
-        //                 exclusive_zone: 0,
-        //                 anchor: Anchor::Bottom | Anchor::Left | Anchor::Right | Anchor::Top,
-        //                 start_mode: StartMode::Active,
-        //                 ..Default::default()
-        //             },
-        //             ..Default::default()
-        //         });
-        //         println!("App exited");
-        //     }
-        // }
+            if msg == "show" {
+                info!("Launching UI");
+                let _ = WaycastUi::run();
+                info!("App exited");
+            }
+        }
     });
 
     ui_thread_handle.join().unwrap();

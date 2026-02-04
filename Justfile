@@ -3,9 +3,9 @@ default: ## Show help
 
 # Development
 [group('Development')]
-run: 
+run cmd='': 
 	cargo build -p waycast --release
-	./target/release/waycast
+	./target/release/waycast {{cmd}}
 
 run-nocomp:
 	./target/release/waycast

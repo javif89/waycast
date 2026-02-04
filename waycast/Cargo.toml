@@ -12,8 +12,9 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
+clap = { version = "4.5.56", features = ["derive"] }
 fs2 = "0.4.3"
 tracing = "0.1.44"
-tracing-subscriber = "0.3.22"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 waycast-daemon = { version = "0.5.1", path = "../waycast-daemon" }
 waycast-ui = { version = "0.5.1", path = "../waycast-ui" }
