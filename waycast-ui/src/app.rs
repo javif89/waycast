@@ -36,6 +36,8 @@ pub enum Message {
     // UI Intents
     CloseWindow,
     SearchSubmit,
+    // Window actions
+    HideWindow(iced::window::Id),
 }
 
 pub struct Waycast {

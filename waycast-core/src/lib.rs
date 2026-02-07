@@ -17,6 +17,11 @@ pub enum ItemKind {
     Unknown,
 }
 
+pub enum Icon {
+    Themed(String),
+    Path(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct LauncherItem {
     pub id: String,

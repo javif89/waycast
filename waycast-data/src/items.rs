@@ -96,6 +96,105 @@ impl LauncherItemRepository {
         }
     }
 
+    /// Insert items into the database of a certain kind.
+    /// This is used for partial updates like when
+    /// reacting to a change in the file system.
+    ///
+    /// Steps are as follows:
+    ///
+    /// 1. Truncate the items_staging table
+    /// 2. Add items to items_staging
+    /// 3. Delete any items in items not found in items_staging (by item_id + kind)
+    /// 4. Add any items to the items table present in items_staging and not in items
+    ///
+    /// This approach prevents having a situation where the user
+    /// opens waycast to find no items while we're in the middle
+    /// of this operation.
+    pub async fn insert_of_kind(
+        &self,
+        items: Vec<ItemRow>,
+        kind: ItemKind,
+    ) -> Result<(), DataError> {
+        sqlx::query!("delete from items_staging where kind = ?", kind)
+            .execute(&self.pool)
+            .await?;
+
+        let mut tx = self.pool.begin().await?;
+        for item in items {
+            sqlx::query!(
+                r#"
+                    insert into items_staging (
+                        item_id,
+                        kind,
+                        title,
+                        description,
+                        icon
+                    )
+                    values (?, ?, ?, ?, ?)
+                    on conflict(item_id, kind) do update set
+                    title = excluded.title,
+                    description = excluded.description,
+                    icon = excluded.icon
+                "#,
+                item.id,
+                item.kind,
+                item.title,
+                item.description,
+                item.icon
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        // Delete anything not in staging
+        sqlx::query!(
+            r#"
+            delete from items
+            where not exists (
+                select 1 from items_staging iss
+                where iss.item_id = items.item_id
+                and iss.kind = ?1
+            )
+            and kind = ?1;
+            "#,
+            kind
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Insert anything we don't have from staging
+        sqlx::query!(
+            r#"
+                insert into items (
+                    item_id,
+                    kind,
+                    title,
+                    description,
+                    icon
+                )
+                select
+                    iss.item_id,
+                    iss.kind,
+                    iss.title,
+                    iss.description,
+                    iss.icon
+                from items_staging iss
+                where not exists (
+                    select 1 from items
+                    where items.item_id = iss.item_id
+                    and items.kind = iss.kind
+                )
+                and iss.kind = ?;
+            "#,
+            kind
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     /// Insert items into the database. Steps are as follows:
     ///
     /// 1. Truncate the items_staging table

@@ -2,15 +2,18 @@ use std::{collections::HashSet, path::PathBuf, time::Instant};
 
 use std::time::Duration;
 use tokio::time;
-use tracing::{Instrument, error, info, info_span};
+use tracing::{Instrument, error, info, info_span, instrument};
 use waycast_core::{LauncherItem, WaycastScanner};
 use waycast_data::{DataError, WaycastData};
-mod scanners;
+pub mod scanners;
 use scanners::{ApplicationScanner, FileScanner, projects::ProjectScanner};
 
 use crate::scanners::default_search_list;
 
-pub struct WaycastDaemon {}
+pub struct WaycastDaemon {
+    db: WaycastData,
+    rt: tokio::runtime::Runtime,
+}
 
 impl Default for WaycastDaemon {
     fn default() -> Self {
@@ -20,35 +23,38 @@ impl Default for WaycastDaemon {
 
 impl WaycastDaemon {
     pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl WaycastDaemon {
-    pub fn run(&self) {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
+        let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .worker_threads(4)
             .build()
             .unwrap();
 
-        runtime.block_on(async move {
-            let db = WaycastData::writeable_connection("waycast.db").await;
-            let mut cadence = time::interval(Duration::from_secs(20));
+        let db = rt.block_on(WaycastData::writeable_connection("waycast.db"));
 
+        Self { db, rt }
+    }
+}
+
+impl WaycastDaemon {
+    pub fn run(&self) {
+        self.rt.block_on(async move {
+            let mut cadence = time::interval(Duration::from_secs(20));
             loop {
                 cadence.tick().await;
 
                 let scan_span = info_span!("scan_and_update");
                 let icon_cache_span = info_span!("update_icon_cache");
 
-                let result = scan_and_update(&db).instrument(scan_span).await;
+                let result = scan_and_update(&self.db).instrument(scan_span).await;
 
                 match result {
                     Ok(_) => {
                         info!("Items inserted successfully");
                         info!("Updating icon cache");
-                        if let Err(e) = update_icon_cache(&db).instrument(icon_cache_span).await {
+                        if let Err(e) = update_icon_cache(&self.db)
+                            .instrument(icon_cache_span)
+                            .await
+                        {
                             error!("Error updating icon cache {e}");
                         }
                     }

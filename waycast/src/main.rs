@@ -1,15 +1,25 @@
 use clap::{Parser, Subcommand};
+use crossbeam_channel::Sender;
+use notify::{Config, Error, Event, EventKind, RecommendedWatcher};
+use notify_debouncer_full::{DebouncedEvent, RecommendedCache, new_debouncer_opt, notify};
 use notify_rust::Notification;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use waycast::{FileEvent, watch_directories};
+use waycast_core::WaycastScanner;
+use waycast_daemon::scanners::ApplicationScanner;
+use waycast_data::WaycastData;
 
-use tracing::info;
+use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt};
 use waycast_daemon::WaycastDaemon;
 use waycast_ui::WaycastUi;
+
+mod watcher;
 
 #[derive(Subcommand)]
 enum Command {
@@ -33,6 +43,43 @@ pub fn main() {
                 .add_directive("waycast_daemon=trace".parse().unwrap()),
         )
         .init();
+
+    let (tx, rx) = crossbeam_channel::unbounded::<FileEvent>();
+    let app_dirs = freedesktop::application_entry_paths();
+
+    let app_entry_thread = std::thread::spawn(move || {
+        watch_directories(app_dirs, tx, notify::RecursiveMode::NonRecursive);
+    });
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    std::thread::spawn(move || {
+        info!("Watching for changes to application entries");
+        for _ in rx {
+            info!("App change happened!");
+            info!("Rescanning app entries");
+            rt.block_on(async move {
+                let db = WaycastData::writeable_connection("waycast.db").await;
+                let app_entries = ApplicationScanner::default()
+                    .scan()
+                    .iter()
+                    .map(|i| i.to_owned().into())
+                    .collect();
+                let result = db
+                    .items()
+                    .insert_of_kind(app_entries, waycast_data::items::ItemKind::DesktopEntry)
+                    .await;
+
+                match result {
+                    Ok(_) => info!("Application entry rescan successful"),
+                    Err(e) => error!("Error on application entry scan: {e}"),
+                }
+            });
+        }
+    });
 
     let app = App::parse();
 
