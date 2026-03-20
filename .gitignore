@@ -13,6 +13,4 @@ flamegraph.svg
 perf.data
 perf.data.old
 waycast.db*
-TODO.md
-DEVLOG.md
 heaptrack*.zst
