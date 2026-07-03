@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-07-02
+
+### Major refactor of the entire application.
+
+#### Daemon Architecture
+
+App now runs a daemon which scans in the background and watches for new apps and projects,
+as opposed to the previous way of just scanning everything every time waycast was invoked.
+
+#### Async
+
+The initial version of waycast used no async to keep it simple. Now we use the tokio
+runtime so we can run scans and other tasks concurrently. This was also necessary to
+use SQLX for the database.
+
+#### Database (SQLite)
+
+We now use SQLite as a data store. On every scan, the database gets updated with all the
+apps, projects, and files we scan. This gives us more flexibility since we now have a data
+store that we can query, as opposed to just holding everything in memory.
+
+Additionally, if the daemon has a failure when scanning, we can still show data in the UI,
+even if stale.
+
+The original version of waycast used redb as a key value store for caching. Since we now
+have SQLite, we just have a `cache` table instead. No need for a whole separate dependency
+for just story key:value pairs.
+
+#### Logging
+
+We're now using the tracing library for logging. This is a standard in rust. Since we now
+have a background process we need better visibility into the daemon's operations.
+
+You can now see waycast daemon logs with standard tools like `journalctl`.
+
 ## [0.5.1] - 2025-11-23
 
 ## Technical
