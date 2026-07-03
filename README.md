@@ -35,32 +35,34 @@ Waycast is an application launcher built for Wayland desktops. It's fast, extens
 
 ## Development
 
-This is a Cargo workspace with three main crates:
+This is a single Cargo package with three main modules:
 
-- **waycast-core** - The launcher engine (traits, logic, no UI)
-- **waycast-plugins** - Plugin implementations (desktop apps, file search)
-- **waycast-ui** - Iced UI and main binary
+- **core** - Domain models, search, configuration, persistence, and item launching
+- **daemon** - Application, file, and project scanners plus filesystem watching
+- **ui** - The Iced layer-shell interface
 
-### Common Commands
+### Testing the nix flake packaging
 
-```bash
-make help           # See all available commands
-make quick          # Format code + compile check
-make test           # Run tests (that I don't have yet)
-make build-all      # Build everything
-make install        # Install to system
-```
+`nix build`
+`nix run`
+
+## Packaging/release process
+
+1. `dev:prepare-sqlx` to generate the necessary sqlx data
 
 ### Project Structure
 
 ```
 waycast/
-├── waycast-core/           # Core launcher logic
-├── waycast-plugins/        # Plugin implementations
-└── waycast-ui/            # Iced UI (main app)
+├── migrations/             # SQLite migrations
+└── src/
+    ├── core/               # Models, search, config, data, and launching
+    ├── daemon/             # Scanning, indexing, and filesystem watching
+    ├── ui/                 # Iced UI
+    └── main.rs             # CLI and process orchestration
 ```
 
-The core is deliberately minimal and UI-agnostic. Plugins depend on core. UI depends on both core and plugins. Nothing depends on the UI.
+The core module is UI-agnostic. The daemon depends on core, the UI consumes core services, and `main.rs` composes the daemon and UI into the `waycast` executable.
 
 ## Why Another Launcher?
 
@@ -115,50 +117,105 @@ layerrule = [
 layerrule = "noanim, Waycast";
 ```
 
-### Nix Flakes
+### Nix installation
 
-Add to your `flake.nix` inputs:
+Waycast is not currently packaged in nixpkgs. Add this repository as a flake
+input:
+
 ```nix
-waycast.url = "git+https://gitgud.foo/thegrind/waycast";
+inputs.waycast.url = "git+https://gitgud.boo/javif89/waycast";
 ```
 
-Add the overlay and Home Manager module:
-```nix
-nixpkgs.overlays = [ inputs.waycast.overlays.default ];
+#### Home Manager (recommended)
 
-home-manager.users.youruser = {
-  imports = [ inputs.waycast.homeManagerModules.default ];
-  
+Import the Waycast module in your Home Manager configuration. No nixpkgs
+overlay is required.
+
+```nix
+{
+  imports = [ inputs.waycast.homeModules.default ];
+
   programs.waycast = {
     enable = true;
+
     settings = {
       plugins.projects = {
-        search_paths = ["/absolute/path/to/search"];
+        search_paths = [ "/absolute/path/to/projects" ];
         skip_dirs = [ "node_modules" "target" ".git" ];
         open_command = "code -n {path}";
       };
+
       plugins.file_search = {
-        search_paths = ["/absolute/path/to/search"];
-        ignore_dirs = ["scripts", "temp"];
+        search_paths = [ "/absolute/path/to/search" ];
+        ignore_dirs = [ "scripts" "temp" ];
       };
     };
-    css = ''
-      window {
-        background: rgba(0, 0, 0, 0.8);
-        border-radius: 12px;
-      }
-    '';
   };
+}
+```
+
+For Home Manager configured as a NixOS module, place the import and
+`programs.waycast` configuration under your user:
+
+```nix
+home-manager.users.youruser = {
+  imports = [ inputs.waycast.homeModules.default ];
+  programs.waycast.enable = true;
 };
 ```
 
-**Just the package:**
+For standalone Home Manager, add the module to `homeConfigurations`:
+
 ```nix
-nixpkgs.overlays = [ inputs.waycast.overlays.default ];
-environment.systemPackages = [ pkgs.waycast ];
-# or for home-manager:
-home.packages = [ pkgs.waycast ];
+homeConfigurations.youruser = home-manager.lib.homeManagerConfiguration {
+  pkgs = nixpkgs.legacyPackages.x86_64-linux;
+  modules = [
+    waycast.homeModules.default
+    {
+      programs.waycast.enable = true;
+    }
+  ];
+};
 ```
+
+Enabling the module installs Waycast and creates `waycast-daemon.service`, a
+systemd user service that starts with `graphical-session.target` and restarts
+the background process if it exits. Running `waycast` from a terminal or window
+manager keybind then signals the background process to open the UI.
+
+Your desktop environment or window manager must activate the systemd user
+graphical session. For example, Home Manager's Hyprland module should have its
+systemd integration enabled. After applying your configuration, check the
+service with:
+
+```bash
+systemctl --user status waycast-daemon.service
+```
+
+#### Package only
+
+The package is also available without the Home Manager module:
+
+```nix
+# NixOS
+environment.systemPackages = [
+  inputs.waycast.packages.${pkgs.stdenv.hostPlatform.system}.default
+];
+
+# Home Manager
+home.packages = [
+  inputs.waycast.packages.${pkgs.stdenv.hostPlatform.system}.default
+];
+```
+
+Or install it into a Nix profile:
+
+```bash
+nix profile install 'git+https://gitgud.boo/javif89/waycast'
+```
+
+Package-only installation does not create the required background service. You
+must arrange for `waycast` to start with your graphical session yourself.
 
 ## Contributing
 
@@ -166,4 +223,4 @@ TBA
 
 ## License
 
-TBA
+MIT

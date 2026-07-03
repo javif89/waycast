@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            select\n                key,\n                value,\n                expires_at\n            from cache\n            where key = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "key",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "cache",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "name": "value",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "cache",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "name": "expires_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "cache",
+            "name": "expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "19dcd5d813a5ddec997133330f8d5ad1f05e2c96967dfba98bdcbdccc608770c"
+}

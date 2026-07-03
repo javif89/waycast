@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                insert into items (\n                    item_id,\n                    kind,\n                    title,\n                    description,\n                    icon\n                )\n                select\n                    iss.item_id,\n                    iss.kind,\n                    iss.title,\n                    iss.description,\n                    iss.icon\n                from items_staging iss\n                where not exists (\n                    select 1 from items\n                    where items.item_id = iss.item_id\n                    and items.kind = iss.kind\n                );\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "b601398663917df369861db40ded4df2a3eb0b418ae284f47a07782e67d8a15f"
+}

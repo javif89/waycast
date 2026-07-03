@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            select\n                distinct icon\n            from items\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "icon",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "items",
+            "name": "icon"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d102f22061152c25de12f57cec03a262ff13b91248e4e0d7be4ddc37fa8115ad"
+}

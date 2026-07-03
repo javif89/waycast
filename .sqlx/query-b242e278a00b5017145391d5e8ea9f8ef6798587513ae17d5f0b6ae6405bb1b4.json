@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    insert into items_staging (\n                        item_id,\n                        kind,\n                        title,\n                        description,\n                        icon\n                    )\n                    values (?, ?, ?, ?, ?)\n                    on conflict(item_id, kind) do update set\n                    title = excluded.title,\n                    description = excluded.description,\n                    icon = excluded.icon\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "b242e278a00b5017145391d5e8ea9f8ef6798587513ae17d5f0b6ae6405bb1b4"
+}

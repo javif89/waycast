@@ -3,6 +3,7 @@
 
 # direnv cache (should not be committed)
 .direnv/
+.devenv/
 waycast_cache
 waycast.toml
 # Using locally to test .config, .cache, and data dir
@@ -12,3 +13,5 @@ result
 flamegraph.svg
 perf.data
 perf.data.old
+waycast.db*
+heaptrack*.zst

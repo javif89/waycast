@@ -1,0 +1,452 @@
+use sqlx::SqlitePool;
+use tracing::info;
+
+use crate::core::{ItemKind, LauncherItem};
+
+use super::DataError;
+
+#[derive(sqlx::FromRow, Debug)]
+struct ItemRow {
+    pub id: String,
+    pub kind: ItemKind,
+    pub title: String,
+    pub description: Option<String>,
+    pub icon: String,
+}
+
+impl From<LauncherItem> for ItemRow {
+    fn from(value: LauncherItem) -> Self {
+        Self {
+            id: value.id,
+            kind: value.kind,
+            title: value.title,
+            description: value.description,
+            icon: value.icon,
+        }
+    }
+}
+
+impl From<ItemRow> for LauncherItem {
+    fn from(value: ItemRow) -> Self {
+        Self {
+            id: value.id,
+            kind: value.kind,
+            title: value.title,
+            description: value.description,
+            icon: value.icon,
+        }
+    }
+}
+
+pub struct LauncherItemRepository {
+    pub pool: SqlitePool,
+}
+
+impl LauncherItemRepository {
+    async fn reset_items_staging(&self) -> Result<(), DataError> {
+        let result = sqlx::query!("delete from items_staging")
+            .execute(&self.pool)
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(err) => Err(DataError::QueryError(err.to_string())),
+        }
+    }
+
+    /// Insert items into the database of a certain kind.
+    /// This is used for partial updates like when
+    /// reacting to a change in the file system.
+    ///
+    /// Steps are as follows:
+    ///
+    /// 1. Truncate the items_staging table
+    /// 2. Add items to items_staging
+    /// 3. Delete any items in items not found in items_staging (by item_id + kind)
+    /// 4. Add any items to the items table present in items_staging and not in items
+    ///
+    /// This approach prevents having a situation where the user
+    /// opens waycast to find no items while we're in the middle
+    /// of this operation.
+    pub async fn insert_of_kind(
+        &self,
+        items: Vec<LauncherItem>,
+        kind: ItemKind,
+    ) -> Result<(), DataError> {
+        sqlx::query!("delete from items_staging where kind = ?", kind)
+            .execute(&self.pool)
+            .await?;
+
+        let mut tx = self.pool.begin().await?;
+        for item in items {
+            sqlx::query!(
+                r#"
+                    insert into items_staging (
+                        item_id,
+                        kind,
+                        title,
+                        description,
+                        icon
+                    )
+                    values (?, ?, ?, ?, ?)
+                    on conflict(item_id, kind) do update set
+                    title = excluded.title,
+                    description = excluded.description,
+                    icon = excluded.icon
+                "#,
+                item.id,
+                item.kind,
+                item.title,
+                item.description,
+                item.icon
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        // Delete anything not in staging
+        sqlx::query!(
+            r#"
+            delete from items
+            where not exists (
+                select 1 from items_staging iss
+                where iss.item_id = items.item_id
+                and iss.kind = ?1
+            )
+            and kind = ?1;
+            "#,
+            kind
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Insert anything we don't have from staging
+        sqlx::query!(
+            r#"
+                insert into items (
+                    item_id,
+                    kind,
+                    title,
+                    description,
+                    icon
+                )
+                select
+                    iss.item_id,
+                    iss.kind,
+                    iss.title,
+                    iss.description,
+                    iss.icon
+                from items_staging iss
+                where not exists (
+                    select 1 from items
+                    where items.item_id = iss.item_id
+                    and items.kind = iss.kind
+                )
+                and iss.kind = ?;
+            "#,
+            kind
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Insert items into the database. Steps are as follows:
+    ///
+    /// 1. Truncate the items_staging table
+    /// 2. Add items to items_staging
+    /// 3. Delete any items in items not found in items_staging (by item_id + kind)
+    /// 4. Add any items to the items table present in items_staging and not in items
+    ///
+    /// This approach prevents having a situation where the user
+    /// opens waycast to find no items while we're in the middle
+    /// of this operation.
+    pub async fn insert(&self, items: Vec<LauncherItem>) -> Result<(), DataError> {
+        self.reset_items_staging().await?;
+
+        let mut tx = self.pool.begin().await?;
+        for item in items {
+            sqlx::query!(
+                r#"
+                    insert into items_staging (
+                        item_id,
+                        kind,
+                        title,
+                        description,
+                        icon
+                    )
+                    values (?, ?, ?, ?, ?)
+                    on conflict(item_id, kind) do update set
+                    title = excluded.title,
+                    description = excluded.description,
+                    icon = excluded.icon
+                "#,
+                item.id,
+                item.kind,
+                item.title,
+                item.description,
+                item.icon
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        // Delete anything not in staging
+        sqlx::query!(
+            r#"
+            delete from items
+            where not exists (
+                select 1 from items_staging iss
+                where iss.item_id = items.item_id
+                and iss.kind = items.kind
+            );
+            "#
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Insert anything we don't have from staging
+        sqlx::query!(
+            r#"
+                insert into items (
+                    item_id,
+                    kind,
+                    title,
+                    description,
+                    icon
+                )
+                select
+                    iss.item_id,
+                    iss.kind,
+                    iss.title,
+                    iss.description,
+                    iss.icon
+                from items_staging iss
+                where not exists (
+                    select 1 from items
+                    where items.item_id = iss.item_id
+                    and items.kind = iss.kind
+                );
+            "#
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_items(&self, kind: Option<ItemKind>) -> Result<Vec<LauncherItem>, DataError> {
+        let items = sqlx::query_as!(
+            ItemRow,
+            r#"
+            select
+                item_id as id,
+                kind,
+                title,
+                description,
+                icon
+            from items
+            where (?1 is null or kind = ?1)
+        "#,
+            kind
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(items.into_iter().map(LauncherItem::from).collect())
+    }
+
+    pub async fn search(
+        &self,
+        query: String,
+        kind: Option<ItemKind>,
+        limit: u32,
+    ) -> Result<Vec<LauncherItem>, DataError> {
+        let fts_query = build_fts_query(&query);
+
+        info!("Searching fts index for {}", fts_query);
+
+        let results = sqlx::query_as!(
+            ItemRow,
+            r#"
+                select
+                    i.item_id as id,
+                    i.kind,
+                    i.title,
+                    i.description,
+                    i.icon
+                from items_fts
+                join items i on i.id = items_fts.rowid
+                where items_fts match ?1
+                and (?2 is null or i.kind = ?2)
+                order by bm25(items_fts, 10.0, 3.0) desc
+                limit ?3
+            "#,
+            fts_query,
+            kind,
+            limit
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        info!("Found {} items", results.len());
+
+        Ok(results.into_iter().map(LauncherItem::from).collect())
+    }
+
+    /// Get all distinct icon names/paths from the items in the database
+    pub async fn get_icons(&self) -> Result<Vec<String>, DataError> {
+        let items: Vec<String> = sqlx::query_scalar!(
+            r#"
+            select
+                distinct icon
+            from items
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(items)
+    }
+}
+
+fn build_fts_query(input: &str) -> String {
+    let cleaned = input
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect::<String>();
+
+    cleaned
+        .split_whitespace()
+        .map(|t| format!("{t}*"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::core::data::WaycastData;
+
+    fn item(id: &str, kind: ItemKind, title: &str) -> LauncherItem {
+        LauncherItem {
+            id: id.into(),
+            kind,
+            title: title.into(),
+            description: Some(format!("Description for {title}")),
+            icon: "application-x-executable".into(),
+        }
+    }
+
+    async fn database() -> (TempDir, WaycastData) {
+        let directory = tempfile::tempdir().expect("temporary database directory");
+        let database = WaycastData::writeable_connection(directory.path().join("waycast.db"))
+            .await
+            .expect("initialize temporary database");
+        (directory, database)
+    }
+
+    #[tokio::test]
+    async fn item_kinds_keep_the_existing_database_encoding() {
+        let (_directory, database) = database().await;
+        let repository = database.items();
+        repository
+            .insert(vec![
+                item("app", ItemKind::DesktopEntry, "Application"),
+                item("file", ItemKind::File, "File"),
+                item("project", ItemKind::Project, "Project"),
+                item("unknown", ItemKind::Unknown, "Unknown"),
+            ])
+            .await
+            .expect("insert items");
+
+        let mut stored_kinds =
+            sqlx::query_scalar::<_, String>("select kind from items order by kind")
+                .fetch_all(&repository.pool)
+                .await
+                .expect("read stored item kinds");
+        stored_kinds.sort();
+
+        assert_eq!(stored_kinds, ["desktopentry", "file", "project", "unknown"]);
+
+        let loaded = repository.get_items(None).await.expect("load items");
+        assert!(
+            loaded
+                .iter()
+                .any(|item| item.kind == ItemKind::DesktopEntry)
+        );
+        assert!(loaded.iter().any(|item| item.kind == ItemKind::File));
+        assert!(loaded.iter().any(|item| item.kind == ItemKind::Project));
+        assert!(loaded.iter().any(|item| item.kind == ItemKind::Unknown));
+    }
+
+    #[tokio::test]
+    async fn repositories_use_domain_items_for_filtering_replacement_and_search() {
+        let (_directory, database) = database().await;
+        let repository = database.items();
+        repository
+            .insert(vec![
+                item("old-app", ItemKind::DesktopEntry, "Old Application"),
+                item("notes", ItemKind::File, "Meeting Notes"),
+                item("waycast", ItemKind::Project, "Waycast Project"),
+            ])
+            .await
+            .expect("insert initial items");
+
+        repository
+            .insert_of_kind(
+                vec![item("new-app", ItemKind::DesktopEntry, "New Application")],
+                ItemKind::DesktopEntry,
+            )
+            .await
+            .expect("replace applications");
+
+        let applications = repository
+            .get_items(Some(ItemKind::DesktopEntry))
+            .await
+            .expect("load applications");
+        assert_eq!(applications.len(), 1);
+        assert_eq!(applications[0].id, "new-app");
+
+        let files = repository
+            .get_items(Some(ItemKind::File))
+            .await
+            .expect("load files");
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].id, "notes");
+
+        let results = repository
+            .search("meet".into(), Some(ItemKind::File), 20)
+            .await
+            .expect("search files");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "notes");
+    }
+
+    #[tokio::test]
+    async fn legacy_text_values_decode_through_the_canonical_item_kind() {
+        let (_directory, database) = database().await;
+        let repository = database.items();
+        sqlx::query(
+            r#"
+            insert into items (item_id, kind, title, description, icon)
+            values ('legacy-app', 'desktopentry', 'Legacy App', null, 'legacy')
+            "#,
+        )
+        .execute(&repository.pool)
+        .await
+        .expect("insert legacy row");
+
+        let items = repository
+            .get_items(Some(ItemKind::DesktopEntry))
+            .await
+            .expect("load legacy row");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].kind, ItemKind::DesktopEntry);
+    }
+}

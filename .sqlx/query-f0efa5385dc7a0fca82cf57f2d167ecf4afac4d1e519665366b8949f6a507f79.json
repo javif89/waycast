@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "delete from items_staging",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "f0efa5385dc7a0fca82cf57f2d167ecf4afac4d1e519665366b8949f6a507f79"
+}

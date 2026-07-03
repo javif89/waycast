@@ -1,0 +1,459 @@
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
+
+use crate::core::config::data_dir;
+use crate::core::data::WaycastData;
+use crate::core::launcher::WaycastLauncher;
+use crate::core::{FuzzyMatcher, ItemKind, LauncherItem};
+use iced::keyboard::key;
+use iced::widget::scrollable::{self, Id as ScrollableId};
+use iced::widget::text_input::{self, Id as TextInputId};
+use iced::widget::{
+    button, column, container, image, row, scrollable as scrollable_widget, svg, text,
+    text_input as text_input_widget,
+};
+use iced::{
+    Alignment, Color, Element, Length, Subscription, Task as Command, Theme, event, keyboard,
+};
+use iced_layershell::Application;
+use iced_layershell::to_layer_message;
+use tracing::{error, info, warn};
+
+use crate::ui::config;
+use crate::ui::styles;
+
+static DATABASE_FILENAME: &str = "waycast.db";
+
+#[to_layer_message]
+#[derive(Debug, Clone)]
+pub enum Message {
+    Search(String),
+    Execute(String),
+    EventOccurred(iced::Event),
+    // Data loading
+    Loaded(Vec<LauncherItem>),
+    IconHandles(HashMap<String, IconHandle>),
+    // UI Intents
+    CloseWindow,
+    SearchSubmit,
+    // Window actions
+    HideWindow(iced::window::Id),
+}
+
+pub struct Waycast {
+    db: Arc<WaycastData>,
+    /// Current items shown in the list
+    items: Vec<LauncherItem>,
+    /// Icon handles to share between elements
+    icon_handles: HashMap<String, IconHandle>,
+    query: String,
+    selected_index: usize,
+    search_input_id: TextInputId,
+    scrollable_id: ScrollableId,
+}
+
+impl Application for Waycast {
+    type Message = Message;
+    type Flags = ();
+    type Theme = Theme;
+    type Executor = iced::executor::Default;
+
+    fn new(_flags: ()) -> (Self, Command<Message>) {
+        let search_input_id = TextInputId::unique();
+        let scrollable_id = ScrollableId::unique();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime");
+
+        let database_dir = data_dir()
+            .expect("No database found. Exiting...")
+            .join(DATABASE_FILENAME);
+
+        let db = rt.block_on(async {
+            Arc::new(
+                WaycastData::writeable_connection(database_dir)
+                    .await
+                    .expect("failed to initialize the Waycast database for the UI"),
+            )
+        });
+
+        let app = Self {
+            db,
+            icon_handles: HashMap::new(),
+            items: Vec::new(),
+            query: String::new(),
+            selected_index: 0,
+            search_input_id: search_input_id.clone(),
+            scrollable_id,
+        };
+
+        let focus_task = text_input::focus(search_input_id);
+        let load_task = Command::batch([
+            Command::perform(Waycast::load_initial_data(app.db.clone()), Message::Loaded),
+            Command::perform(
+                Waycast::build_icon_handle_map(app.db.clone()),
+                Message::IconHandles,
+            ),
+        ]);
+        (app, Command::batch([focus_task, load_task]))
+    }
+
+    fn namespace(&self) -> String {
+        config::APP_NAME.to_string()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        Subscription::batch([
+            event::listen().map(Message::EventOccurred),
+            keyboard::on_key_release(|key, _modifiers| {
+                if matches!(key, keyboard::Key::Named(key::Named::Escape)) {
+                    Some(Message::CloseWindow)
+                } else {
+                    None
+                }
+            }),
+        ])
+    }
+
+    fn update(&mut self, message: Message) -> Command<Message> {
+        match message {
+            Message::Search(query) => {
+                self.query = query.clone();
+                self.selected_index = 0;
+
+                if query.is_empty() {
+                    return Command::perform(
+                        Waycast::load_initial_data(self.db.clone()),
+                        Message::Loaded,
+                    );
+                }
+
+                Command::perform(Waycast::search(self.db.clone(), query), Message::Loaded)
+            }
+            Message::Loaded(results) => {
+                self.items = results;
+                Command::none()
+            }
+            Message::IconHandles(handles) => {
+                self.icon_handles = handles;
+                Command::none()
+            }
+            Message::Execute(_id) => self.execute_item(),
+            Message::EventOccurred(event) => {
+                if let iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                    key,
+                    modifiers: _,
+                    ..
+                }) = event
+                {
+                    self.handle_key_press(key)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::CloseWindow => iced::exit(),
+            Message::SearchSubmit => self.execute_item(),
+            _ => Command::none(),
+        }
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        let results_list = self.build_results_list();
+        let scrollable_list = self.build_scrollable(results_list);
+        let search_input = self.build_search_input();
+
+        let mut col = column![container(search_input).padding(config::PADDING_LARGE),];
+
+        if let Ok(calc_result) = mathengine::evaluate_expression(&self.query) {
+            let disp = match calc_result {
+                mathengine::Value::Number(n) => format!("{:.2}", n.0),
+                mathengine::Value::UnitValue(uv) => format!("{:.2} {}", uv.value(), uv.unit()),
+            };
+            col = col.push(
+                container(
+                    text(format!("= {}", disp))
+                        .size(20)
+                        .font(styles::bold_font())
+                        .color(Color::from_rgba(1.0, 1.0, 1.0, 0.7)),
+                )
+                .padding(config::PADDING_LARGE),
+            );
+        } else {
+            col = col.push(container(scrollable_list).padding(config::PADDING_LARGE));
+        }
+
+        col.into()
+    }
+
+    fn theme(&self) -> Self::Theme {
+        Theme::Dark
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum IconHandle {
+    Svg(svg::Handle),
+    Image(image::Handle),
+}
+
+fn build_icon_handle(path: PathBuf) -> IconHandle {
+    // Create iced handle based on file extension
+
+    match Path::new(&path).extension().and_then(|e| e.to_str()) {
+        Some("svg") => IconHandle::Svg(svg::Handle::from_path(&path)),
+        _ => IconHandle::Image(image::Handle::from_path(&path)),
+    }
+}
+
+impl Waycast {
+    async fn build_icon_handle_map(db: Arc<WaycastData>) -> HashMap<String, IconHandle> {
+        let path_or_names: Vec<String> = db.items().get_icons().await.unwrap_or_default();
+        let mut handles: HashMap<String, IconHandle> = HashMap::new();
+
+        for p in path_or_names {
+            // If it's a path icon, add it to the handles.
+            // If it's a themed icon, resolve and cache
+            // then add to the handles.
+            let path = std::path::Path::new(&p);
+            if path.exists() {
+                handles.insert(
+                    path.to_owned().to_string_lossy().to_string(),
+                    build_icon_handle(path.into()),
+                );
+            } else {
+                let key = format!("icon:{}", p);
+                let value_fn = || {
+                    match freedesktop::get_icon(&p) {
+                        Some(path) => path,
+                        None => freedesktop::get_icon("vscode")
+                            .unwrap_or(PathBuf::from("/tmp/notfound")), // TODO: I can definitely come up with something better. Just not now
+                    }
+                };
+                let themed_icon_path = db
+                    .cache()
+                    .remember(&key, Some(Duration::from_hours(8)), value_fn)
+                    .await;
+
+                match themed_icon_path {
+                    Ok(p) => {
+                        handles.insert(
+                            path.to_owned().to_string_lossy().to_string(),
+                            build_icon_handle(p),
+                        );
+                    }
+                    Err(e) => {
+                        // TODO: Rethink this. If the database is fucked,
+                        // then everything is fucked.
+                        error!("Cache error: {e}");
+                        handles.insert(
+                            path.to_owned().to_string_lossy().to_string(),
+                            build_icon_handle(value_fn()),
+                        );
+                    }
+                }
+            }
+        }
+
+        handles
+    }
+    async fn load_initial_data(db: Arc<WaycastData>) -> Vec<LauncherItem> {
+        db.items()
+            .get_items(Some(ItemKind::DesktopEntry))
+            .await
+            .unwrap_or(Vec::new())
+    }
+
+    async fn search(db: Arc<WaycastData>, query: String) -> Vec<LauncherItem> {
+        // Use sqlite fts to filter files first since there could be thousands
+        let file_results: Vec<LauncherItem> = db
+            .items()
+            .search(query.clone(), Some(ItemKind::File), 20)
+            .await
+            .unwrap_or(Vec::new());
+
+        let mut fm = FuzzyMatcher::new();
+        let mut rows = Vec::new();
+
+        let apps = db
+            .items()
+            .get_items(Some(ItemKind::DesktopEntry))
+            .await
+            .unwrap_or(Vec::new());
+
+        let projects = db
+            .items()
+            .get_items(Some(ItemKind::Project))
+            .await
+            .unwrap_or(Vec::new());
+
+        rows.extend(apps);
+        rows.extend(projects);
+
+        let mut candidates = rows;
+        candidates.extend(file_results);
+
+        let results: Vec<LauncherItem> = fm
+            .match_items(&query, &candidates, 5)
+            .into_iter()
+            .cloned()
+            .collect();
+
+        results
+    }
+
+    fn handle_key_press(&mut self, key: keyboard::Key) -> Command<Message> {
+        let results_len = self.items.len();
+
+        match key {
+            keyboard::Key::Named(key::Named::ArrowDown) => {
+                self.selected_index = (self.selected_index + 1) % results_len;
+                self.scroll_to_selected()
+            }
+            keyboard::Key::Named(key::Named::ArrowUp) => {
+                if self.selected_index == 0 {
+                    self.selected_index = results_len - 1;
+                } else {
+                    self.selected_index -= 1;
+                }
+                self.scroll_to_selected()
+            }
+            keyboard::Key::Named(key::Named::Enter) => self.execute_item(),
+            _ => Command::none(),
+        }
+    }
+
+    fn execute_item(&self) -> Command<Message> {
+        info!("Executing");
+        if let Some(item) = self.items.get(self.selected_index)
+            && let Err(e) = WaycastLauncher::execute_item(item.to_owned())
+        {
+            error!("Failed to launch: {e}");
+        }
+
+        iced::exit()
+    }
+
+    fn scroll_to_selected(&self) -> Command<Message> {
+        let scroll_offset = self.selected_index as f32 * config::ITEM_HEIGHT;
+        scrollable::scroll_to(
+            self.scrollable_id.clone(),
+            scrollable::AbsoluteOffset {
+                x: 0.0,
+                y: scroll_offset,
+            },
+        )
+    }
+
+    fn build_search_input(&self) -> Element<'_, Message> {
+        row![
+            text_input_widget(config::SEARCH_PLACEHOLDER, &self.query)
+                .id(self.search_input_id.clone())
+                .size(config::SEARCH_INPUT_SIZE)
+                .padding(config::PADDING_SMALL)
+                .style(styles::search_input_style)
+                .on_input(Message::Search)
+                .width(Length::Fill)
+                .on_submit(Message::SearchSubmit),
+        ]
+        .into()
+    }
+
+    fn build_results_list(&self) -> Element<'_, Message> {
+        let results = self.items.clone();
+
+        if results.is_empty() {
+            return column![text("No results")].into();
+        }
+
+        let mut col = column![];
+        for (index, item) in results.iter().enumerate() {
+            let result_item = self.build_result_item(item.clone(), index == self.selected_index);
+            col = col.push(result_item);
+        }
+
+        col.into()
+    }
+
+    fn build_result_item(
+        &self,
+        item: crate::core::LauncherItem,
+        is_selected: bool,
+    ) -> Element<'_, Message> {
+        let icon_handle: IconHandle = self
+            .icon_handles
+            .get(&item.icon)
+            .cloned()
+            .or_else(|| {
+                warn!("Could not find handle for {}", item.icon);
+                warn!("Attempting to check manually");
+
+                if let Some(icon) = WaycastLauncher::resolve_icon(&item.icon) {
+                    let path = match icon {
+                        crate::core::launcher::Icon::ThemeIcon { name: _, path } => path,
+                        crate::core::launcher::Icon::Path(path) => path,
+                    };
+
+                    let handle = build_icon_handle(path.into());
+                    Some(handle)
+                } else {
+                    warn!("Going with default vscode icon");
+
+                    Some(
+                        self.icon_handles
+                            .get("vscode")
+                            .cloned()
+                            .expect("What the fuck"),
+                    )
+                }
+            })
+            .unwrap();
+
+        let icon_view = build_icon_view(icon_handle);
+
+        let content = row![
+            column![icon_view].padding(config::PADDING_SMALL),
+            column![
+                text(item.title)
+                    .size(config::TITLE_FONT_SIZE)
+                    .font(styles::bold_font()),
+                text(item.description.unwrap_or_default())
+                    .size(config::DESCRIPTION_FONT_SIZE)
+                    .font(styles::italic_font())
+            ]
+            .padding(config::PADDING_SMALL),
+        ]
+        .align_y(Alignment::Center);
+
+        button(content)
+            .on_press(Message::Execute(item.id))
+            .width(Length::Fill)
+            .style(styles::result_button_style(is_selected))
+            .into()
+    }
+
+    fn build_scrollable<'a>(&self, content: Element<'a, Message>) -> Element<'a, Message> {
+        scrollable_widget(content)
+            .id(self.scrollable_id.clone())
+            .height(Length::Fill)
+            .width(Length::Fill)
+            .style(styles::scrollable_style)
+            .into()
+    }
+}
+
+fn build_icon_view(icon_handle: IconHandle) -> Element<'static, Message> {
+    match icon_handle {
+        IconHandle::Svg(handle) => svg::Svg::new(handle)
+            .width(config::ICON_SIZE)
+            .height(config::ICON_SIZE)
+            .into(),
+        IconHandle::Image(handle) => image::Image::new(handle)
+            .width(config::ICON_SIZE)
+            .height(config::ICON_SIZE)
+            .into(),
+    }
+}

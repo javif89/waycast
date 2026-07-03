@@ -1,5 +1,14 @@
 {
     "search.exclude": {
+        "**/.direnv": true,
+        "**/.devenv": true,
+        "**/node_modules": true,
+        "**/target": true
+    },
+    "files.watcherExclude": {
+        "**/.direnv/**": true,
+        "**/.devenv/**": true,
+        "**/node_modules/**": true,
         "**/target": true
     }
 }

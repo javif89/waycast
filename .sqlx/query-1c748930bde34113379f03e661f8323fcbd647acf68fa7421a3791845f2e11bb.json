@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                select\n                    i.item_id as id,\n                    i.kind,\n                    i.title,\n                    i.description,\n                    i.icon\n                from items_fts\n                join items i on i.id = items_fts.rowid\n                where items_fts match ?1\n                and (?2 is null or i.kind = ?2)\n                order by bm25(items_fts, 10.0, 3.0) desc\n                limit ?3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "items",
+            "name": "item_id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "items",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "items",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "description",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "items",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "name": "icon",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "items",
+            "name": "icon"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "1c748930bde34113379f03e661f8323fcbd647acf68fa7421a3791845f2e11bb"
+}

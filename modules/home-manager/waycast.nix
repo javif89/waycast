@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 with lib;
 
@@ -16,14 +21,7 @@ in
 
     package = mkOption {
       type = types.package;
-      default = pkgs.waycast;
-      description = "The waycast package to use";
-    };
-
-    enableDaemon = mkOption {
-      type = types.bool;
-      default = true;
-      description = "Whether to enable the waycast daemon as a systemd user service";
+      description = "The Waycast package to use";
     };
 
     settings = mkOption {
@@ -49,40 +47,14 @@ in
         and placed in ~/.config/waycast/waycast.toml
       '';
     };
-
-    css = mkOption {
-      type = types.nullOr types.lines;
-      default = null;
-      example = ''
-        window {
-          background: rgba(0, 0, 0, 0.8);
-          border-radius: 12px;
-        }
-
-        .search-entry {
-          font-size: 16px;
-          padding: 12px;
-        }
-      '';
-      description = ''
-        Custom GTK CSS styling for waycast.
-        This will be placed in ~/.config/waycast/waycast.css
-      '';
-    };
   };
 
   config = mkIf cfg.enable {
     home.packages = [ cfg.package ];
 
-    xdg.configFile = mkMerge [
-      (mkIf (cfg.settings != { }) {
-        "waycast/waycast.toml".source = toToml cfg.settings;
-      })
-
-      (mkIf (cfg.css != null) {
-        "waycast/waycast.css".text = cfg.css;
-      })
-    ];
+    xdg.configFile = mkIf (cfg.settings != { }) {
+      "waycast/waycast.toml".source = toToml cfg.settings;
+    };
 
     # Ensure cache and data dirs exist to avoid runtime errors in the future
     home.file."${config.xdg.cacheHome}/waycast/.keep".text = "";
@@ -95,7 +67,7 @@ in
     };
 
     # Enable waycast daemon as systemd user service
-    systemd.user.services.waycast-daemon = mkIf cfg.enableDaemon {
+    systemd.user.services.waycast-daemon = {
       Unit = {
         Description = "Waycast application launcher daemon";
         Documentation = "https://waycast.dev";
@@ -105,17 +77,14 @@ in
 
       Service = {
         Type = "simple";
-        ExecStart = "${cfg.package}/bin/waycast-daemon";
-        Restart = "on-failure";
-        RestartSec = "5";
-        Environment = [
-          "XDG_RUNTIME_DIR=%t"
-          "WAYLAND_DISPLAY=wayland-0"
-        ];
+        ExecStart = lib.getExe cfg.package;
+        Restart = "always";
+        RestartSec = "1s";
+        Environment = [ "XDG_RUNTIME_DIR=%t" ];
       };
 
       Install = {
-        WantedBy = [ "default.target" ];
+        WantedBy = [ "graphical-session.target" ];
       };
     };
   };

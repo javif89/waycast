@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            delete from items\n            where not exists (\n                select 1 from items_staging iss\n                where iss.item_id = items.item_id\n                and iss.kind = items.kind\n            );\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "a8455002d89cc89b5d67239eb30942c4a987d22882b74036297da97dc99c28b8"
+}

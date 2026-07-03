@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "delete from cache where key = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "c28060f752a7ae91bde7b5e68c26df05fb25ef379ca851a34ae8ef294e1064c2"
+}
