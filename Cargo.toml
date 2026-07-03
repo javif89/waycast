@@ -1,6 +1,6 @@
 [package]
 name = "waycast"
-version = "0.5.1"
+version = "1.0.0"
 authors = ["Javier Feliz <me@javierfeliz.com>"]
 edition = "2024"
 rust-version = "1.94.0"
