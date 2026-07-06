@@ -6,6 +6,8 @@ use std::{os::unix::net::UnixListener, path::PathBuf};
 
 use tracing::{error, info};
 
+use crate::app::AppMessage;
+
 #[derive(Debug)]
 pub enum SocketCommand {
     /// Show the waycast UI
@@ -34,11 +36,8 @@ impl WaycastSocketListener {
     }
 
     /// BLOCKS and waits for events to come through
-    pub fn listen(&self, command_tx: Sender<SocketCommand>) {
-        info!(
-            "Socket listener started on {}",
-            self.socket_path.to_string_lossy()
-        );
+    pub fn listen(&self, command_tx: Sender<AppMessage>) {
+        info!("Socket listener started on {}", self.socket_path.display());
 
         for conn in self.listener.incoming() {
             let stream = match conn {
@@ -58,7 +57,7 @@ impl WaycastSocketListener {
             }
 
             let cmd = match msg.trim() {
-                "show" => SocketCommand::Show,
+                "show" => AppMessage::Show,
                 _ => {
                     error!("Invalid command {}", msg.trim());
                     continue;
@@ -77,19 +76,23 @@ pub struct WaycastSocketCient {
     client: UnixStream,
 }
 
+// TODO: At this point I can probably just serialize app
+// messages with serde instead of doing this whole
+// string parsing rigamaroll.
 impl WaycastSocketCient {
     pub fn new(socket_path: PathBuf) -> Self {
         let client = UnixStream::connect(&socket_path).expect("Could not connect to socket");
         Self { client }
     }
 
-    fn send_command(&mut self, cmd: SocketCommand) {
+    fn send_command(&mut self, cmd: AppMessage) {
         match cmd {
-            SocketCommand::Show => {
+            AppMessage::Show => {
                 // TODO: We should log if there's errors with the
                 // socket so the user can debug
                 let _ = self.client.write_all(b"show\n");
             }
+            _ => todo!("Command not implemented yet"),
         };
     }
 
@@ -98,6 +101,6 @@ impl WaycastSocketCient {
     }
 
     pub fn send_show(&mut self) {
-        self.send_command(SocketCommand::Show);
+        self.send_command(AppMessage::Show);
     }
 }

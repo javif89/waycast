@@ -2,16 +2,18 @@ use config::{Config, Environment};
 use directories::ProjectDirs;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::OnceLock;
 use std::{env, path::PathBuf};
 use std::{fs, io};
 
+use crate::daemon::scanners;
+
 /// Utility struct for waycast configuration. The idea
 /// is that this resolves all needed paths and settings
 /// that will then trickle down to the parts of the
-/// app necessary. Will be loosely integrated for now.
-/// TODO: Add in project and file scan directories from waycast.toml
+/// app necessary.
 #[derive(Debug)]
 pub struct AppConfig {
     /// The path to the file we're using as a "single instance lock"
@@ -26,11 +28,18 @@ pub struct AppConfig {
     pub database_file: PathBuf,
     /// Directories for app data. XDG dirs from the freedesktop spec
     pub app_dir: AppDirectories,
+    /// Directories to scan for the different item types
+    pub scan_paths: ScanDirectories,
 }
 
 impl AppConfig {
     pub fn development() -> Self {
         let appdirs = AppDirectories::development();
+        let config_file = appdirs.config.join("waycast.toml");
+
+        initialize(&config_file);
+        // TODO: Have development specific paths when we start writing more tests
+        let scan_paths = ScanDirectories::default();
 
         Self {
             lock_file: appdirs.runtime.join("waycast.lock"),
@@ -38,6 +47,7 @@ impl AppConfig {
             config_file: appdirs.config.join("waycast.toml"),
             database_file: appdirs.data.join("waycast.db"),
             app_dir: appdirs,
+            scan_paths,
         }
     }
 }
@@ -45,13 +55,18 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         let appdirs = AppDirectories::default();
+        let config_file = appdirs.config.join("waycast.toml");
+
+        initialize(&config_file);
+        let scan_paths = ScanDirectories::default();
 
         Self {
             lock_file: appdirs.runtime.join("waycast.lock"),
             socket_file: appdirs.runtime.join("waycast.sock"),
-            config_file: appdirs.config.join("waycast.toml"),
+            config_file,
             database_file: appdirs.data.join("waycast.db"),
             app_dir: appdirs,
+            scan_paths,
         }
     }
 }
@@ -102,6 +117,46 @@ impl Default for AppDirectories {
                 .unwrap_or_else(std::env::temp_dir),
         }
     }
+}
+
+/// Directories to scan for the different item types
+#[derive(Debug)]
+pub struct ScanDirectories {
+    pub apps: HashSet<PathBuf>,
+    pub projects: HashSet<PathBuf>,
+    pub files: HashSet<PathBuf>,
+}
+
+impl Default for ScanDirectories {
+    fn default() -> Self {
+        let projects = get::<HashSet<PathBuf>>("plugins.projects.search_paths").unwrap_or_default();
+        let (files, _) = get_file_search_paths();
+        let apps: HashSet<PathBuf> = freedesktop::application_entry_paths().into_iter().collect();
+
+        Self {
+            apps,
+            projects,
+            files,
+        }
+    }
+}
+
+fn get_file_search_paths() -> (HashSet<PathBuf>, HashSet<String>) {
+    // Gather file scanning paths and dirs to ignore
+    let mut search_paths: HashSet<PathBuf> = HashSet::new();
+    let mut skip_dirs: HashSet<String> = HashSet::new();
+
+    if let Ok(paths) = config_file().get::<Vec<PathBuf>>("plugins.file_search.search_paths") {
+        search_paths.extend(paths);
+    } else {
+        search_paths.extend(scanners::default_search_list());
+    }
+
+    if let Ok(paths) = config_file().get::<Vec<String>>("plugins.file_search.ignore_dirs") {
+        skip_dirs.extend(paths);
+    }
+
+    (search_paths, skip_dirs)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
