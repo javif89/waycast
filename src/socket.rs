@@ -1,17 +1,22 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::net::Shutdown;
 use std::os::unix::net::UnixStream;
 use std::sync::mpsc::Sender;
 use std::{os::unix::net::UnixListener, path::PathBuf};
 
+use thiserror::Error;
 use tracing::{error, info};
 
 use crate::app::AppMessage;
 
-#[derive(Debug)]
-pub enum SocketCommand {
-    /// Show the waycast UI
-    Show,
+#[derive(Debug, Error)]
+pub enum SocketError {
+    #[error("The waycast daemon is not running")]
+    DaemonNotAvailable,
+    #[error("Invalid command: {0}")]
+    InvalidCommand(String),
+    #[error(transparent)]
+    IOError(#[from] io::Error),
 }
 
 pub struct WaycastSocketListener {
@@ -58,6 +63,7 @@ impl WaycastSocketListener {
 
             let cmd = match msg.trim() {
                 "show" => AppMessage::Show,
+                "ping" => AppMessage::Ping,
                 _ => {
                     error!("Invalid command {}", msg.trim());
                     continue;
@@ -72,35 +78,44 @@ impl WaycastSocketListener {
     }
 }
 
-pub struct WaycastSocketCient {
+pub struct WaycastSocketClient {
     client: UnixStream,
 }
 
 // TODO: At this point I can probably just serialize app
 // messages with serde instead of doing this whole
 // string parsing rigamaroll.
-impl WaycastSocketCient {
-    pub fn new(socket_path: PathBuf) -> Self {
-        let client = UnixStream::connect(&socket_path).expect("Could not connect to socket");
-        Self { client }
+impl WaycastSocketClient {
+    pub fn new(socket_path: PathBuf) -> Result<Self, SocketError> {
+        let client =
+            UnixStream::connect(&socket_path).map_err(|_| SocketError::DaemonNotAvailable)?;
+
+        Ok(Self { client })
     }
 
-    fn send_command(&mut self, cmd: AppMessage) {
+    fn send_command(&mut self, cmd: AppMessage) -> Result<(), SocketError> {
         match cmd {
             AppMessage::Show => {
-                // TODO: We should log if there's errors with the
-                // socket so the user can debug
-                let _ = self.client.write_all(b"show\n");
+                self.client.write_all(b"show\n")?;
             }
-            _ => todo!("Command not implemented yet"),
+            AppMessage::Ping => {
+                self.client.write_all(b"ping\n")?;
+            }
+            _ => panic!("Invalid command"),
         };
+
+        Ok(())
     }
 
     pub fn close(&mut self) {
         let _ = self.client.shutdown(Shutdown::Write);
     }
 
-    pub fn send_show(&mut self) {
-        self.send_command(AppMessage::Show);
+    pub fn send_show(&mut self) -> Result<(), SocketError> {
+        self.send_command(AppMessage::Show)
+    }
+
+    pub fn send_ping(&mut self) -> Result<(), SocketError> {
+        self.send_command(AppMessage::Ping)
     }
 }

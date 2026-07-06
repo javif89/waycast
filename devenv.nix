@@ -82,7 +82,7 @@ in
   scripts = {
     "run".exec = ''
       cargo build --release && \
-      ./target/release/waycast "$@"
+      ./target/release/waycast $@
     '';
 
     "profile:heaptrack".exec = ''

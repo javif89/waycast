@@ -118,4 +118,16 @@ impl CacheRepository {
 
         Ok(v)
     }
+
+    pub async fn clear(&self) -> Result<(), DataError> {
+        sqlx::query!(
+            r#"
+            delete from cache
+        "#
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
 }

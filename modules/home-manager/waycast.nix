@@ -77,7 +77,7 @@ in
 
       Service = {
         Type = "simple";
-        ExecStart = lib.getExe cfg.package;
+        ExecStart = "${lib.getExe cfg.package} daemon";
         Restart = "always";
         RestartSec = "1s";
         Environment = [ "XDG_RUNTIME_DIR=%t" ];

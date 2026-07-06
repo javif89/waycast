@@ -51,6 +51,8 @@ pub struct WaycastApplication {
 #[derive(Debug)]
 pub enum AppMessage {
     Show,
+    /// Ping the daemon and check if it's running
+    Ping,
     Rescan,
     Stop,
 }
@@ -101,6 +103,9 @@ impl WaycastApplication {
                 match cmd {
                     AppMessage::Show => {
                         Self::show_ui(self.cfg.database_file.clone());
+                    }
+                    AppMessage::Ping => {
+                        info!("Received ping");
                     }
                     AppMessage::Rescan => todo!(),
                     AppMessage::Stop => todo!(),
