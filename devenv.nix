@@ -81,8 +81,8 @@ in
 
   scripts = {
     "run".exec = ''
-      cargo build --release
-      ./target/release/waycast $1
+      cargo build --release && \
+      ./target/release/waycast "$@"
     '';
 
     "profile:heaptrack".exec = ''

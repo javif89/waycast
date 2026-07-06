@@ -2,12 +2,11 @@ use clap::{Parser, Subcommand};
 use notify_rust::Notification;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
-use std::net::Shutdown;
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::io;
 use std::path::PathBuf;
-use waycast::core::config::{self, data_dir};
+use waycast::core::config::{self, AppConfig};
 use waycast::daemon::{DaemonError, scanners};
+use waycast::socket::{SocketCommand, WaycastSocketCient, WaycastSocketListener};
 
 use thiserror::Error;
 use tracing::{error, info};
@@ -26,13 +25,8 @@ struct App {
     command: Option<Command>,
 }
 
-static DATABASE_FILENAME: &str = "waycast.db";
-
 #[derive(Debug, Error)]
 enum StartupError {
-    #[error("Could not determine the Waycast data directory")]
-    DataDirectoryUnavailable,
-
     #[error(transparent)]
     Daemon(#[from] DaemonError),
 }
@@ -59,45 +53,53 @@ pub fn main() {
 }
 
 fn start_waycast() -> Result<(), StartupError> {
-    let _lock = match acquire_single_instance_lock("waycast") {
+    let cfg = if config::is_development_mode() {
+        AppConfig::development()
+    } else {
+        AppConfig::default()
+    };
+
+    // Create all the necessary app directories in case they don't exist
+    // TODO: Move this after the lock acquisition. I don't want anything
+    // adding latency to the UI startup command being sent.
+    // This will also be solved when we put showing the UI on its own
+    // command rather than relying on the lock to either start the daemon
+    // or show the UI.
+    cfg.app_dir.create().expect("Failed to create the necessary XDG directories. This is fatal. Please check your desktop environment setup");
+
+    let _lock = match acquire_single_instance_lock(&cfg) {
         Ok(lock) => lock,
         Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
             info!("Another instance is already running.");
             info!("Sending show command");
-            let sock = runtime_dir().join("waycast.sock");
-            let mut stream = UnixStream::connect(sock).expect("Could not connect to socket");
-            // TODO: We should log if there's errors with the
-            // socket so the user can debug
-            let _ = stream.write_all(b"show\n");
-            let _ = stream.shutdown(Shutdown::Write);
+            let mut client = WaycastSocketCient::new(cfg.socket_file.clone());
+            client.send_show();
+            client.close();
             std::process::exit(0);
         }
         Err(e) => panic!("Some other non lock related error {e}"),
     };
 
-    let daemon = create_daemon()?;
+    config::initialize(&cfg.config_file);
+
+    let daemon = create_daemon(&cfg)?;
     let _scanner_thread_handle = std::thread::spawn(move || daemon.run());
 
     let ui_thread_handle = std::thread::spawn(move || {
-        loop {
-            let sock = runtime_dir().join("waycast.sock");
-            let _ = std::fs::remove_file(&sock);
+        let (tx, rx) = std::sync::mpsc::channel::<SocketCommand>();
+        let listener = WaycastSocketListener::new(cfg.socket_file.clone());
 
-            let listener = UnixListener::bind(&sock).unwrap();
+        std::thread::spawn(move || {
+            listener.listen(tx);
+        });
 
-            info!("Waiting for signal...");
-            let (mut conn, _addr) = listener.accept().unwrap();
-            let mut buf = [0u8; 4096];
-            let n = conn.read(&mut buf).unwrap_or(0);
-
-            let msg = std::str::from_utf8(&buf[..n])
-                .unwrap_or("<non-utf8>")
-                .trim();
-
-            if msg == "show" {
-                info!("Launching UI");
-                let _ = WaycastUi::run();
-                info!("App exited");
+        for cmd in rx {
+            match cmd {
+                SocketCommand::Show => {
+                    info!("Launching UI");
+                    let _ = WaycastUi::run(cfg.database_file.clone());
+                    info!("App exited");
+                }
             }
         }
     });
@@ -112,24 +114,13 @@ fn start_waycast() -> Result<(), StartupError> {
     Ok(())
 }
 
-fn lock_path(app_id: &str) -> PathBuf {
-    // Prefer XDG_RUNTIME_DIR on Linux if available; else /tmp.
-    // You can swap this for directories::ProjectDirs if you want.
-    let base = std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/tmp"));
-    base.join(format!("{app_id}.lock"))
-}
-
-pub fn acquire_single_instance_lock(app_id: &str) -> io::Result<File> {
-    let path = lock_path(app_id);
-
+pub fn acquire_single_instance_lock(cfg: &AppConfig) -> io::Result<File> {
     let file = OpenOptions::new()
         .read(true)
         .write(true)
         .truncate(true)
         .create(true) // file existence doesn't matter
-        .open(&path)?;
+        .open(cfg.lock_file.clone())?;
 
     // Try to acquire an exclusive lock without blocking.
     // If this errors with "would block", another instance holds the lock.
@@ -138,26 +129,16 @@ pub fn acquire_single_instance_lock(app_id: &str) -> io::Result<File> {
     Ok(file)
 }
 
-fn runtime_dir() -> PathBuf {
-    std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-}
-
-fn create_daemon() -> Result<WaycastDaemon, StartupError> {
+fn create_daemon(cfg: &AppConfig) -> Result<WaycastDaemon, StartupError> {
     let project_scan_paths =
         config::get::<HashSet<PathBuf>>("plugins.projects.search_paths").unwrap_or_default();
 
     let (file_scan_paths, file_ignore_dirs) = get_file_search_paths();
 
-    let database_path = data_dir()
-        .ok_or(StartupError::DataDirectoryUnavailable)?
-        .join(DATABASE_FILENAME);
-
-    info!(path = %database_path.display(), "Initializing database");
+    info!(path = %cfg.database_file.display(), "Initializing database");
 
     WaycastDaemon::new(
-        database_path,
+        &cfg.database_file,
         project_scan_paths,
         file_scan_paths,
         file_ignore_dirs,

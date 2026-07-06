@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::config::data_dir;
 use crate::core::data::WaycastData;
 use crate::core::launcher::WaycastLauncher;
 use crate::core::{FuzzyMatcher, ItemKind, LauncherItem};
@@ -23,8 +22,6 @@ use tracing::{error, info, warn};
 
 use crate::ui::config;
 use crate::ui::styles;
-
-static DATABASE_FILENAME: &str = "waycast.db";
 
 #[to_layer_message]
 #[derive(Debug, Clone)]
@@ -56,11 +53,11 @@ pub struct Waycast {
 
 impl Application for Waycast {
     type Message = Message;
-    type Flags = ();
+    type Flags = PathBuf;
     type Theme = Theme;
     type Executor = iced::executor::Default;
 
-    fn new(_flags: ()) -> (Self, Command<Message>) {
+    fn new(database_file: PathBuf) -> (Self, Command<Message>) {
         let search_input_id = TextInputId::unique();
         let scrollable_id = ScrollableId::unique();
 
@@ -69,13 +66,9 @@ impl Application for Waycast {
             .build()
             .expect("tokio runtime");
 
-        let database_dir = data_dir()
-            .expect("No database found. Exiting...")
-            .join(DATABASE_FILENAME);
-
         let db = rt.block_on(async {
             Arc::new(
-                WaycastData::writeable_connection(database_dir)
+                WaycastData::writeable_connection(database_file)
                     .await
                     .expect("failed to initialize the Waycast database for the UI"),
             )
