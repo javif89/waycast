@@ -1,0 +1,33 @@
+changesDir: .changes
+unreleasedDir: unreleased
+headerPath: header.tpl.md
+changelogPath: CHANGELOG.md
+versionExt: md
+versionFormat: '## {{.Version}} - {{.Time.Format "2006-01-02"}}'
+kindFormat: '### {{.Kind}}'
+changeFormat: '* {{.Body}}'
+kinds:
+    - label: Highlights
+      changeFormat: '{{.Body}}'
+      auto: patch
+    - label: Breaking Changes
+      auto: major
+    - label: Added
+      auto: minor
+    - label: Changed
+      auto: minor
+    - label: Fixed
+      auto: patch
+    - label: Removed
+      auto: major
+    - label: Deprecated
+      auto: minor
+    - label: Security
+      auto: patch
+    - label: Technical
+      auto: patch
+newlines:
+    afterChangelogHeader: 1
+    beforeChangelogVersion: 1
+    endOfVersion: 1
+envPrefix: CHANGIE_

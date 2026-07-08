@@ -62,6 +62,9 @@ in
       valgrind
       heaptrack
       gdb
+
+      # Local changelog management
+      changie
     ]
     ++ icedGUILibs;
 

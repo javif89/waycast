@@ -7,9 +7,9 @@ rust-version = "1.94.0"
 license = "MIT"
 description = "Feature-rich application launcher for Wayland compositors"
 homepage = "https://waycast.dev"
-repository = "https://github.com/javif89/waycast"
+repository = "https://gitgud.boo/waycasthq/waycast"
 categories = ["gui", "os::unix-apis"]
-keywords = ["launcher", "wayland", "gtk4", "application-launcher", "desktop"]
+keywords = ["launcher", "wayland", "application-launcher", "desktop"]
 
 [dependencies]
 clap = { version = "4.5.56", features = ["derive"] }
