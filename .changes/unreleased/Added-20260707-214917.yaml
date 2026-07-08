@@ -1,0 +1,3 @@
+kind: Technical
+body: Introduced AppConfig struct and sub configs for easier config management and resolution
+time: 2026-07-07T21:49:17.578568806-04:00

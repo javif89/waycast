@@ -1,0 +1,3 @@
+kind: Added
+body: Separated daemon start and show ui into their own commands instead of relying on the daemon already running to decide what to do
+time: 2026-07-07T21:48:24.085818586-04:00
