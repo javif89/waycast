@@ -1,0 +1,216 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.1.0). A leading 'v' is fine."
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Pin the changie version used to batch the changelog.
+  CHANGIE_VERSION: "1.21.1"
+  # The repo builds with sqlx in offline mode against the checked-in .sqlx dir.
+  SQLX_OFFLINE: "true"
+  # Prefer a PAT (needed if `master` is branch-protected); fall back to the
+  # automatic Actions token, which works when `master` is unprotected.
+  RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Check out master explicitly so we can commit the bump back to it.
+          ref: master
+          # Don't leave the automatic token in git config as a URL-scoped header;
+          # it would shadow the RELEASE_TOKEN header on our push to master.
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            pkg-config \
+            libexpat1-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libglib2.0-dev
+
+      - name: Install job dependencies
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            jq
+
+      - name: Install Rust toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@1.94.0
+
+      - name: Cache cargo build
+        uses: https://github.com/Swatinem/rust-cache@v2
+        with:
+          # Same shared-key across the test, clippy, and release jobs so they
+          # pool one dependency cache instead of one per job id.
+          shared-key: waycast
+          # Save the dep cache even when later steps (push/release) fail, so we
+          # stop recompiling the whole tree on every debugging run.
+          cache-on-failure: true
+
+      - name: Install cargo-edit (provides cargo set-version)
+        run: cargo install cargo-edit --locked
+
+      - name: Install changie
+        run: |
+          set -euo pipefail
+          url="https://github.com/miniscruff/changie/releases/download/v${CHANGIE_VERSION}/changie_${CHANGIE_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL "$url" | tar -xz changie
+          install -m 0755 changie /usr/local/bin/changie
+          rm -f changie
+          changie --version
+
+      - name: Record base commit and previous tag
+        id: base
+        run: |
+          set -euo pipefail
+          # Tip of master we are releasing, captured BEFORE the release commit
+          # so the PR list excludes the changelog/version-bump commit itself.
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          prev_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          echo "prev_tag=${prev_tag}" >> "$GITHUB_OUTPUT"
+          echo "Previous tag: ${prev_tag:-<none>}"
+
+      - name: Batch changelog and resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          # Normalize the typed input, then hand changie the v-prefixed version.
+          # changie handles the vX.Y.Z form and names the fragment .changes/vX.Y.Z.md
+          # to match the existing files. Cargo.toml needs the plain semver.
+          num="${{ inputs.version }}"
+          num="${num#v}"     # plain semver, e.g. 1.0.1
+          ver="v${num}"      # v1.0.1
+
+          changie batch "$ver"
+          changie merge
+
+          body_file=".changes/${ver}.md"
+          if [ ! -f "$body_file" ]; then
+            echo "::error::Expected changie version file '$body_file' was not created."
+            exit 1
+          fi
+
+          echo "tag=${ver}" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=${num}" >> "$GITHUB_OUTPUT"
+          echo "body_file=${body_file}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${ver} (Cargo version ${num})"
+
+      - name: Bump version in Cargo.toml
+        run: |
+          set -euo pipefail
+          # Updates Cargo.toml and Cargo.lock in one shot.
+          cargo set-version "${{ steps.version.outputs.cargo_version }}"
+          grep -n '^version' Cargo.toml
+
+      - name: Build release binary
+        run: |
+          set -euo pipefail
+          cargo build --release --locked
+          ls -lh target/release/waycast
+
+      - name: Commit changelog + version bump to master
+        id: commit
+        run: |
+          set -euo pipefail
+          git config user.name "Boo"
+          git config user.email "bot-boo@gitgud.boo"
+
+          git add -A
+          git commit -m "chore(release): ${{ steps.version.outputs.tag }}"
+
+          git -c http.extraheader="Authorization: token ${RELEASE_TOKEN}" \
+            push origin HEAD:master
+
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          cat "${{ steps.version.outputs.body_file }}" > "$body"
+
+          prev="${{ steps.base.outputs.prev_tag }}"
+          base="${{ steps.base.outputs.sha }}"
+          if [ -n "$prev" ]; then
+            range="${prev}..${base}"
+          else
+            range="$base"
+          fi
+
+          prs="$(git log --pretty=format:'- %s' "$range")"
+          if [ -n "$prs" ]; then
+            {
+              printf '\n\n---\n\n'
+              printf '\n\n**Pull requests in this release**\n\n'
+              printf '%s\n' "$prs"
+            } >> "$body"
+          fi
+
+          echo "file=${body}" >> "$GITHUB_OUTPUT"
+          echo "----- release notes -----"
+          cat "$body"
+
+      - name: Create release
+        id: create
+        run: |
+          set -euo pipefail
+          api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+
+          jq -n \
+            --arg tag "${{ steps.version.outputs.tag }}" \
+            --arg target "${{ steps.commit.outputs.sha }}" \
+            --arg name "${{ steps.version.outputs.tag }}" \
+            --rawfile body "${{ steps.notes.outputs.file }}" \
+            '{tag_name:$tag, target_commitish:$target, name:$name, body:$body, draft:false, prerelease:false}' \
+            > payload.json
+
+          release_id="$(curl -sSf -X POST "${api}/releases" \
+            -H "Authorization: token ${RELEASE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d @payload.json | jq -r '.id')"
+
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "::error::Failed to create release."
+            exit 1
+          fi
+          echo "id=${release_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Attach binary
+        run: |
+          set -euo pipefail
+          api="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          asset="waycast-${{ steps.version.outputs.tag }}-x86_64-linux"
+
+          curl -sSf -X POST \
+            "${api}/releases/${{ steps.create.outputs.id }}/assets?name=${asset}" \
+            -H "Authorization: token ${RELEASE_TOKEN}" \
+            -F "attachment=@target/release/waycast"
+
+          echo "Attached ${asset}"
