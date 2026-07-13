@@ -3,6 +3,14 @@ name: Changelog
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    # Only gate PRs that touch code, packaging, or CI. When none of these
+    # change, the workflow doesn't run and no fragment is required.
+    paths:
+      - "src/**"
+      - "modules/**"
+      - "migrations/**"
+      - ".forgejo/**"
+      - "flake.nix"
 
 jobs:
   require-fragment:
@@ -12,23 +20,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require a changelog fragment for code/packaging changes
+      - name: Require a changelog fragment
         run: |
           set -euo pipefail
           BASE="${GITHUB_BASE_REF}"
           git fetch --no-tags origin "$BASE"
 
-          CHANGED=$(git diff --name-only "origin/$BASE...HEAD")
-
-          # Only gate PRs that touch code, packaging, or CI.
-          GATED=$(echo "$CHANGED" | { grep -E '^(src|modules|migrations|\.forgejo)/|^flake\.nix$' || true; })
-          if [ -z "$GATED" ]; then
-            echo "No changes under src/, modules/, migrations/, .forgejo/, or flake.nix."
-            echo "Changelog fragment not required for this PR."
-            exit 0
-          fi
-
-          # A gated path changed -> require a fragment (added/modified, not deleted).
+          # A gated path changed (guaranteed by the trigger `paths` filter) ->
+          # require a fragment (added/modified, not deleted).
           FRAGMENTS=$(git diff --name-only --diff-filter=d "origin/$BASE...HEAD" \
             -- '.changes/unreleased/' \
             | { grep -E '\.ya?ml$' || true; } \
@@ -36,8 +35,6 @@ jobs:
 
           if [ -z "$FRAGMENTS" ]; then
             echo "::error::This PR changes code/packaging but adds no changelog fragment."
-            echo "Gated changes:"
-            echo "$GATED"
             echo "Add a fragment in the devenv shell with:  changie new"
             exit 1
           fi

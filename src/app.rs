@@ -142,6 +142,7 @@ impl WaycastApplication {
             .read(true)
             .write(true)
             .create(true) // file existence doesn't matter
+            .truncate(true)
             .open(cfg.lock_file.clone())
             .map_err(AppError::LockIO)?;
 

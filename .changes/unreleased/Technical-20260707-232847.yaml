@@ -1,0 +1,3 @@
+kind: Technical
+body: Added CI jobs to run tests + linter on pull requests
+time: 2026-07-07T23:28:47.97511911-04:00
