@@ -1,0 +1,3 @@
+kind: Fixed
+body: Properly detach launched apps from the waycast process using double fork
+time: 2026-08-03T11:19:38.484079631-04:00

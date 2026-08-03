@@ -80,6 +80,11 @@ in
         ExecStart = "${lib.getExe cfg.package} daemon";
         Restart = "always";
         RestartSec = "1s";
+        # Only kill the daemon itself. Launched apps normally live in their own
+        # transient scope, but on setups without systemd-run they stay in this
+        # cgroup, and the default control-group mode would take them down with
+        # every daemon restart.
+        KillMode = "process";
         Environment = [ "XDG_RUNTIME_DIR=%t" ];
       };
 
