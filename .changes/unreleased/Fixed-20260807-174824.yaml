@@ -1,0 +1,3 @@
+kind: Fixed
+body: Fixed UI crashing when the "vscode" icon wasn't found. Caused by project scanning not being configured
+time: 2026-08-07T17:48:24.250933286-04:00

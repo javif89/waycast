@@ -1,5 +1,6 @@
 pub mod config;
 pub mod data;
+pub mod icon;
 pub mod launcher;
 mod model;
 mod search;

@@ -58,10 +58,7 @@ impl Default for FileScanner {
 
 impl FileScanner {
     pub fn new(paths: HashSet<PathBuf>, ignore_dirs: HashSet<String>) -> Self {
-        Self {
-            paths,
-            ignore_dirs,
-        }
+        Self { paths, ignore_dirs }
     }
 }
 struct Collector {

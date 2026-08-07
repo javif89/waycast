@@ -1,0 +1,3 @@
+kind: Technical
+body: Introduced new IconResolver to centralize icon resolution and fallback handling
+time: 2026-08-07T17:47:56.28153918-04:00

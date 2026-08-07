@@ -61,7 +61,7 @@ jobs:
             jq
 
       - name: Install Rust toolchain
-        uses: https://github.com/dtolnay/rust-toolchain@1.94.0
+        uses: https://github.com/dtolnay/rust-toolchain@1.96.0
 
       - name: Cache cargo build
         uses: https://github.com/Swatinem/rust-cache@v2

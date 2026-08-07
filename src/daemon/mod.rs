@@ -4,6 +4,7 @@ use std::{collections::HashSet, path::PathBuf, time::Instant};
 use thiserror::Error;
 
 use crate::core::data::{DataError, WaycastData};
+use crate::core::icon::IconResolver;
 use crate::core::{LauncherItem, WaycastScanner};
 use crate::daemon::watcher::{FileEvent, watch_directories};
 use std::time::Duration;
@@ -236,21 +237,15 @@ impl WaycastDaemon {
     async fn update_icon_cache(&self) -> Result<(), DataError> {
         info!("Warming icon cache");
         let icons: Vec<String> = self.db.items().get_icons().await.unwrap_or(Vec::new());
+        let resolver = IconResolver::new();
 
         for i in icons {
-            // Check if it's a path. If not, then it's
-            // a themed icon. We will resolve its
-            // path and cache it.
-
-            let path = std::path::Path::new(&i);
-            if !path.exists() {
-                let key = format!("icon:{}", i);
-                if let Some(icon_path) = freedesktop::get_icon(&i) {
-                    self.db
-                        .cache()
-                        .put(&key, &icon_path, Some(Duration::from_hours(8)))
-                        .await?;
-                }
+            if let Some(path) = resolver.resolve(&i) {
+                let key = resolver.cache_key(&i);
+                self.db
+                    .cache()
+                    .put(&key, &path, Some(Duration::from_hours(8)))
+                    .await?;
             }
         }
 

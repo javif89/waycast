@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::core::data::WaycastData;
+use crate::core::icon::IconResolver;
 use crate::core::launcher::WaycastLauncher;
 use crate::core::{FuzzyMatcher, ItemKind, LauncherItem};
 use iced::keyboard::key;
@@ -18,7 +18,7 @@ use iced::{
 };
 use iced_layershell::Application;
 use iced_layershell::to_layer_message;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::ui::config;
 use crate::ui::styles;
@@ -49,6 +49,7 @@ pub struct Waycast {
     selected_index: usize,
     search_input_id: TextInputId,
     scrollable_id: ScrollableId,
+    icon_resolver: IconResolver,
 }
 
 impl Application for Waycast {
@@ -82,6 +83,7 @@ impl Application for Waycast {
             selected_index: 0,
             search_input_id: search_input_id.clone(),
             scrollable_id,
+            icon_resolver: IconResolver::new(),
         };
 
         let focus_task = text_input::focus(search_input_id);
@@ -137,12 +139,7 @@ impl Application for Waycast {
             }
             Message::Execute(_id) => self.execute_item(),
             Message::EventOccurred(event) => {
-                if let iced::Event::Keyboard(keyboard::Event::KeyPressed {
-                    key,
-                    modifiers: _,
-                    ..
-                }) = event
-                {
+                if let iced::Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) = event {
                     self.handle_key_press(key)
                 } else {
                     Command::none()
@@ -206,49 +203,14 @@ impl Waycast {
     async fn build_icon_handle_map(db: Arc<WaycastData>) -> HashMap<String, IconHandle> {
         let path_or_names: Vec<String> = db.items().get_icons().await.unwrap_or_default();
         let mut handles: HashMap<String, IconHandle> = HashMap::new();
+        // TODO: Pass the configured resolver from above
+        let resolver = IconResolver::new();
 
         for p in path_or_names {
-            // If it's a path icon, add it to the handles.
-            // If it's a themed icon, resolve and cache
-            // then add to the handles.
-            let path = std::path::Path::new(&p);
-            if path.exists() {
-                handles.insert(
-                    path.to_owned().to_string_lossy().to_string(),
-                    build_icon_handle(path.into()),
-                );
-            } else {
-                let key = format!("icon:{}", p);
-                let value_fn = || {
-                    match freedesktop::get_icon(&p) {
-                        Some(path) => path,
-                        None => freedesktop::get_icon("vscode")
-                            .unwrap_or(PathBuf::from("/tmp/notfound")), // TODO: I can definitely come up with something better. Just not now
-                    }
-                };
-                let themed_icon_path = db
-                    .cache()
-                    .remember(&key, Some(Duration::from_hours(8)), value_fn)
-                    .await;
-
-                match themed_icon_path {
-                    Ok(p) => {
-                        handles.insert(
-                            path.to_owned().to_string_lossy().to_string(),
-                            build_icon_handle(p),
-                        );
-                    }
-                    Err(e) => {
-                        // TODO: Rethink this. If the database is fucked,
-                        // then everything is fucked.
-                        error!("Cache error: {e}");
-                        handles.insert(
-                            path.to_owned().to_string_lossy().to_string(),
-                            build_icon_handle(value_fn()),
-                        );
-                    }
-                }
-            }
+            // Key by the original icon name/path from the DB, NOT the resolved
+            // path: lookups come from LauncherItem::icon, which holds that string.
+            let resolved_path = resolver.resolve_or_fallback_cached(db.clone(), &p).await;
+            handles.insert(p, build_icon_handle(resolved_path));
         }
 
         handles
@@ -380,30 +342,7 @@ impl Waycast {
             .icon_handles
             .get(&item.icon)
             .cloned()
-            .or_else(|| {
-                warn!("Could not find handle for {}", item.icon);
-                warn!("Attempting to check manually");
-
-                if let Some(icon) = WaycastLauncher::resolve_icon(&item.icon) {
-                    let path = match icon {
-                        crate::core::launcher::Icon::ThemeIcon { name: _, path } => path,
-                        crate::core::launcher::Icon::Path(path) => path,
-                    };
-
-                    let handle = build_icon_handle(path.into());
-                    Some(handle)
-                } else {
-                    warn!("Going with default vscode icon");
-
-                    Some(
-                        self.icon_handles
-                            .get("vscode")
-                            .cloned()
-                            .expect("What the fuck"),
-                    )
-                }
-            })
-            .unwrap();
+            .unwrap_or_else(|| build_icon_handle(self.icon_resolver.resolve_fallback()));
 
         let icon_view = build_icon_view(icon_handle);
 
