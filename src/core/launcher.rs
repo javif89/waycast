@@ -1,11 +1,10 @@
-use crate::core::LauncherItem;
 use freedesktop::{ApplicationEntry, ExecuteError, FindError};
 use gio::prelude::FileExt;
 use thiserror::Error;
 use tracing::{error, info};
 
 #[derive(Error, Debug)]
-pub enum WaycastError {
+pub enum LaunchError {
     #[error("Failed to launch {0}")]
     AppLaunchError(#[from] ExecuteError),
     #[error("Item with id {0} not found")]
@@ -14,86 +13,73 @@ pub enum WaycastError {
     LaunchError(String),
 }
 
-pub struct WaycastLauncher;
+pub fn launch_desktop_entry(id: &str) -> Result<(), LaunchError> {
+    let app = ApplicationEntry::from_id(id)?;
+    info!("Found app successfully");
+    info!("Path: {}", app.path().display());
+    info!("ID: {}", app.id().unwrap_or("Not found".into()));
 
-impl WaycastLauncher {
-    pub fn execute_item(item: LauncherItem) -> Result<(), WaycastError> {
-        match item.kind {
-            crate::core::ItemKind::DesktopEntry => {
-                let app = ApplicationEntry::from_id(&item.id)?;
-                info!("Found app successfully");
-                info!("Path: {}", app.path().display());
-                info!("ID: {}", app.id().unwrap_or("Not found".into()));
+    let (cmd, args) = app.prepare_command(&[], &[])?;
+    info!("Executing with command: {} | args: {}", cmd, args.join(","));
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let working_dir = app.path_dir();
+    let opts = SpawnOptions {
+        working_dir: working_dir.as_deref(),
+        scope_id: Some(id),
+    };
 
-                let (cmd, args) = app.prepare_command(&[], &[])?;
-                info!("Executing with command: {} | args: {}", cmd, args.join(","));
-                let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-                let working_dir = app.path_dir();
-                let opts = SpawnOptions {
-                    working_dir: working_dir.as_deref(),
-                    scope_id: Some(&item.id),
-                };
-                match spawn_detached(&cmd, &arg_refs, opts) {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(WaycastError::LaunchError(e.to_string())),
-                }
-            }
-            crate::core::ItemKind::File => {
-                info!("Executing: {}", item.id);
+    match spawn_detached(&cmd, &arg_refs, opts) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(LaunchError::LaunchError(e.to_string())),
+    }
+}
 
-                // Use xdg-open directly since it works properly with music files
-                // Detach the process so it doesn't die when daemon is killed
-                match spawn_detached("xdg-open", &[&item.id], SpawnOptions::default()) {
-                    Ok(_) => {
-                        info!("Successfully launched with xdg-open");
-                        Ok(())
-                    }
-                    Err(e) => {
-                        error!("xdg-open failed: {}", e);
-                        info!("Attempting GIO method");
-                        // Fallback to GIO method
-                        let file_gio = gio::File::for_path(&item.id);
-                        let ctx = gio::AppLaunchContext::new();
-                        match gio::AppInfo::launch_default_for_uri(
-                            file_gio.uri().as_str(),
-                            Some(&ctx),
-                        ) {
-                            Ok(()) => {
-                                info!("Successfully launched with GIO fallback");
-                                Ok(())
-                            }
-                            Err(e2) => {
-                                println!("GIO fallback also failed: {}", e2);
-                                Err(WaycastError::LaunchError(e2.to_string()))
-                            }
-                        }
-                    }
-                }
-            }
-            crate::core::ItemKind::Project => {
-                let project_path = item.id;
-                let exec_cmd = crate::core::config::get::<String>("plugins.projects.open_command")
-                    .unwrap_or(String::from("code -n {path}"))
-                    .replace("{path}", &project_path);
-                let parts: Vec<&str> = exec_cmd.split_whitespace().collect();
-                if let Some((program, args)) = parts.split_first() {
-                    match spawn_detached(program, args, SpawnOptions::default()) {
-                        Ok(_) => {
-                            info!("Successfully opened with configured editor");
-                            Ok(())
-                        }
-                        Err(_) => Err(WaycastError::LaunchError(
-                            "Failed to open project folder".into(),
-                        )),
-                    }
-                } else {
-                    Err(WaycastError::LaunchError(
-                        "No program found in exec_command".into(),
-                    ))
-                }
-            }
-            crate::core::ItemKind::Unknown => todo!(),
+pub fn open_path(path: &str) -> Result<(), LaunchError> {
+    info!("Executing: {}", path);
+
+    // Use xdg-open directly since it works properly with music files
+    // Detach the process so it doesn't die when daemon is killed
+    match spawn_detached("xdg-open", &[path], SpawnOptions::default()) {
+        Ok(_) => {
+            info!("Successfully launched with xdg-open");
+            Ok(())
         }
+        Err(e) => {
+            error!("xdg-open failed: {}", e);
+            info!("Attempting GIO method");
+            // Fallback to GIO method
+            let file_gio = gio::File::for_path(path);
+            let ctx = gio::AppLaunchContext::new();
+            match gio::AppInfo::launch_default_for_uri(file_gio.uri().as_str(), Some(&ctx)) {
+                Ok(()) => {
+                    info!("Successfully launched with GIO fallback");
+                    Ok(())
+                }
+                Err(e2) => {
+                    error!("GIO fallback also failed: {}", e2);
+                    Err(LaunchError::LaunchError(e2.to_string()))
+                }
+            }
+        }
+    }
+}
+
+pub fn run_command(command: &str) -> Result<(), LaunchError> {
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    let Some((program, args)) = parts.split_first() else {
+        return Err(LaunchError::LaunchError(
+            "No program found in command".into(),
+        ));
+    };
+
+    match spawn_detached(program, args, SpawnOptions::default()) {
+        Ok(_) => {
+            info!("Successfully ran configured command");
+            Ok(())
+        }
+        Err(e) => Err(LaunchError::LaunchError(format!(
+            "Failed to run command: {e}"
+        ))),
     }
 }
 

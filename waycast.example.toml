@@ -1,0 +1,7 @@
+[files]
+search_paths = ["~/Pictures", "~/Documents"]
+ignore_dirs = []
+
+[projects]
+open_command = "code -n {path}"
+search_paths = ["/home/user/projects", "/home/user/some-other-projects"]

@@ -1,0 +1,3 @@
+kind: Added
+body: Print resolved config serialized as toml with the `waycast config` command. If bat is available, it also prints it colored
+time: 2026-08-07T22:34:26.621440066-04:00

@@ -1,0 +1,3 @@
+kind: Technical
+body: Introduce a facade to more easily share domain logic between daemon and UI
+time: 2026-08-07T22:19:13.043688873-04:00

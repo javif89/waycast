@@ -70,9 +70,6 @@ pub fn main() -> Result<(), StartupError> {
         Command::Cache { command } => match command {
             Cache::Clear => cmd::cache_clear_command(cfg.database_file),
         },
-        Command::Config => {
-            println!("{:#?}", cfg);
-            Ok(())
-        }
+        Command::Config => cmd::config_command(&cfg),
     }
 }

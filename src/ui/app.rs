@@ -2,10 +2,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::core::data::WaycastData;
-use crate::core::icon::IconResolver;
-use crate::core::launcher::WaycastLauncher;
-use crate::core::{FuzzyMatcher, ItemKind, LauncherItem};
+use crate::core::LauncherItem;
+use crate::facade::{self, WaycastFacade};
 use iced::keyboard::key;
 use iced::widget::scrollable::{self, Id as ScrollableId};
 use iced::widget::text_input::{self, Id as TextInputId};
@@ -40,7 +38,7 @@ pub enum Message {
 }
 
 pub struct Waycast {
-    db: Arc<WaycastData>,
+    waycast: Arc<facade::WaycastFacade>,
     /// Current items shown in the list
     items: Vec<LauncherItem>,
     /// Icon handles to share between elements
@@ -49,48 +47,36 @@ pub struct Waycast {
     selected_index: usize,
     search_input_id: TextInputId,
     scrollable_id: ScrollableId,
-    icon_resolver: IconResolver,
 }
 
 impl Application for Waycast {
     type Message = Message;
-    type Flags = PathBuf;
+    type Flags = Arc<WaycastFacade>;
     type Theme = Theme;
     type Executor = iced::executor::Default;
 
-    fn new(database_file: PathBuf) -> (Self, Command<Message>) {
+    fn new(waycast: Arc<facade::WaycastFacade>) -> (Self, Command<Message>) {
         let search_input_id = TextInputId::unique();
         let scrollable_id = ScrollableId::unique();
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("tokio runtime");
-
-        let db = rt.block_on(async {
-            Arc::new(
-                WaycastData::writeable_connection(database_file)
-                    .await
-                    .expect("failed to initialize the Waycast database for the UI"),
-            )
-        });
-
         let app = Self {
-            db,
+            waycast,
             icon_handles: HashMap::new(),
             items: Vec::new(),
             query: String::new(),
             selected_index: 0,
             search_input_id: search_input_id.clone(),
             scrollable_id,
-            icon_resolver: IconResolver::new(),
         };
 
         let focus_task = text_input::focus(search_input_id);
         let load_task = Command::batch([
-            Command::perform(Waycast::load_initial_data(app.db.clone()), Message::Loaded),
             Command::perform(
-                Waycast::build_icon_handle_map(app.db.clone()),
+                Self::load_initial_data(app.waycast.clone()),
+                Message::Loaded,
+            ),
+            Command::perform(
+                Self::build_icon_handle_map(app.waycast.clone()),
                 Message::IconHandles,
             ),
         ]);
@@ -122,12 +108,12 @@ impl Application for Waycast {
 
                 if query.is_empty() {
                     return Command::perform(
-                        Waycast::load_initial_data(self.db.clone()),
+                        Self::load_initial_data(self.waycast.clone()),
                         Message::Loaded,
                     );
                 }
 
-                Command::perform(Waycast::search(self.db.clone(), query), Message::Loaded)
+                Command::perform(Self::search(self.waycast.clone(), query), Message::Loaded)
             }
             Message::Loaded(results) => {
                 self.items = results;
@@ -200,64 +186,26 @@ fn build_icon_handle(path: PathBuf) -> IconHandle {
 }
 
 impl Waycast {
-    async fn build_icon_handle_map(db: Arc<WaycastData>) -> HashMap<String, IconHandle> {
-        let path_or_names: Vec<String> = db.items().get_icons().await.unwrap_or_default();
+    async fn build_icon_handle_map(waycast: Arc<WaycastFacade>) -> HashMap<String, IconHandle> {
+        let path_or_names: Vec<String> = waycast.icon_names().await.unwrap_or_default();
         let mut handles: HashMap<String, IconHandle> = HashMap::new();
-        // TODO: Pass the configured resolver from above
-        let resolver = IconResolver::new();
 
         for p in path_or_names {
             // Key by the original icon name/path from the DB, NOT the resolved
             // path: lookups come from LauncherItem::icon, which holds that string.
-            let resolved_path = resolver.resolve_or_fallback_cached(db.clone(), &p).await;
+            let resolved_path = waycast.icon_path(&p).await;
             handles.insert(p, build_icon_handle(resolved_path));
         }
 
         handles
     }
-    async fn load_initial_data(db: Arc<WaycastData>) -> Vec<LauncherItem> {
-        db.items()
-            .get_items(Some(ItemKind::DesktopEntry))
-            .await
-            .unwrap_or(Vec::new())
+
+    async fn load_initial_data(waycast: Arc<WaycastFacade>) -> Vec<LauncherItem> {
+        waycast.initial_items().await.unwrap_or_default()
     }
 
-    async fn search(db: Arc<WaycastData>, query: String) -> Vec<LauncherItem> {
-        // Use sqlite fts to filter files first since there could be thousands
-        let file_results: Vec<LauncherItem> = db
-            .items()
-            .search(query.clone(), Some(ItemKind::File), 20)
-            .await
-            .unwrap_or(Vec::new());
-
-        let mut fm = FuzzyMatcher::new();
-        let mut rows = Vec::new();
-
-        let apps = db
-            .items()
-            .get_items(Some(ItemKind::DesktopEntry))
-            .await
-            .unwrap_or(Vec::new());
-
-        let projects = db
-            .items()
-            .get_items(Some(ItemKind::Project))
-            .await
-            .unwrap_or(Vec::new());
-
-        rows.extend(apps);
-        rows.extend(projects);
-
-        let mut candidates = rows;
-        candidates.extend(file_results);
-
-        let results: Vec<LauncherItem> = fm
-            .match_items(&query, &candidates, 5)
-            .into_iter()
-            .cloned()
-            .collect();
-
-        results
+    async fn search(waycast: Arc<WaycastFacade>, query: String) -> Vec<LauncherItem> {
+        waycast.search(query).await.unwrap_or_default()
     }
 
     fn handle_key_press(&mut self, key: keyboard::Key) -> Command<Message> {
@@ -284,7 +232,7 @@ impl Waycast {
     fn execute_item(&self) -> Command<Message> {
         info!("Executing");
         if let Some(item) = self.items.get(self.selected_index)
-            && let Err(e) = WaycastLauncher::execute_item(item.to_owned())
+            && let Err(e) = self.waycast.launch(item)
         {
             error!("Failed to launch: {e}");
         }
@@ -342,7 +290,7 @@ impl Waycast {
             .icon_handles
             .get(&item.icon)
             .cloned()
-            .unwrap_or_else(|| build_icon_handle(self.icon_resolver.resolve_fallback()));
+            .unwrap_or_else(|| build_icon_handle(self.waycast.fallback_icon()));
 
         let icon_view = build_icon_view(icon_handle);
 

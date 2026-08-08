@@ -1,12 +1,10 @@
-use std::path::Path;
 use std::sync::Arc;
-use std::{collections::HashSet, path::PathBuf, time::Instant};
-use thiserror::Error;
+use std::{path::PathBuf, time::Instant};
 
-use crate::core::data::{DataError, WaycastData};
-use crate::core::icon::IconResolver;
+use crate::core::data::DataError;
 use crate::core::{LauncherItem, WaycastScanner};
 use crate::daemon::watcher::{FileEvent, watch_directories};
+use crate::facade::WaycastFacade;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
@@ -18,17 +16,8 @@ use scanners::{ApplicationScanner, FileScanner, projects::ProjectScanner};
 
 static MAX_MPSC_BUF_SIZE: usize = 1;
 
-#[derive(Debug, Error)]
-pub enum DaemonError {
-    #[error("Failed to initialize daemon runtime: {0}")]
-    Runtime(#[source] std::io::Error),
-
-    #[error(transparent)]
-    Data(#[from] DataError),
-}
-
 pub struct WaycastDaemon {
-    db: WaycastData,
+    waycast: Arc<WaycastFacade>,
     rt: tokio::runtime::Runtime,
     app_scanner: Arc<ApplicationScanner>,
     project_scanner: Arc<ProjectScanner>,
@@ -36,30 +25,22 @@ pub struct WaycastDaemon {
 }
 
 impl WaycastDaemon {
-    pub fn new(
-        database_path: impl AsRef<Path>,
-        project_scan_paths: HashSet<PathBuf>,
-        file_scan_paths: HashSet<PathBuf>,
-        file_ignore_dirs: HashSet<String>,
-    ) -> Result<Self, DaemonError> {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .worker_threads(4)
-            .build()
-            .map_err(DaemonError::Runtime)?;
-
-        let db = rt.block_on(WaycastData::writeable_connection(&database_path))?;
+    pub fn new(waycast: Arc<WaycastFacade>, rt: tokio::runtime::Runtime) -> Self {
+        let scan_paths = &waycast.config().scan_paths;
         let app_scanner = Arc::new(ApplicationScanner);
-        let project_scanner = Arc::new(ProjectScanner::new(project_scan_paths));
-        let file_scanner = Arc::new(FileScanner::new(file_scan_paths, file_ignore_dirs));
+        let project_scanner = Arc::new(ProjectScanner::new(scan_paths.projects.clone()));
+        let file_scanner = Arc::new(FileScanner::new(
+            scan_paths.files.clone(),
+            scan_paths.ignore_dirs.clone(),
+        ));
 
-        Ok(Self {
-            db,
+        Self {
+            waycast,
             rt,
             app_scanner,
             project_scanner,
             file_scanner,
-        })
+        }
     }
 }
 
@@ -129,7 +110,14 @@ impl WaycastDaemon {
         &self,
         event_tx: mpsc::Sender<FileEvent>,
     ) -> std::thread::JoinHandle<()> {
-        let app_dirs = freedesktop::application_entry_paths();
+        let app_dirs: Vec<PathBuf> = self
+            .waycast
+            .config()
+            .scan_paths
+            .apps
+            .iter()
+            .cloned()
+            .collect();
 
         std::thread::spawn(move || {
             info!("Watching for changes to application entries");
@@ -161,7 +149,8 @@ impl WaycastDaemon {
             .await
             .map_err(|e| DataError::QueryError(format!("Application scanner task failed: {e}")))?;
 
-        self.db
+        self.waycast
+            .db()
             .items()
             .insert_of_kind(app_entries, crate::core::ItemKind::DesktopEntry)
             .await?;
@@ -180,7 +169,8 @@ impl WaycastDaemon {
             .await
             .map_err(|e| DataError::QueryError(format!("Projects scanner task failed: {e}")))?;
 
-        self.db
+        self.waycast
+            .db()
             .items()
             .insert_of_kind(project_entries, crate::core::ItemKind::Project)
             .await?;
@@ -224,7 +214,8 @@ impl WaycastDaemon {
 
         info!("Inserting {} items", items.len());
         let insert_span = info_span!("inserting");
-        self.db
+        self.waycast
+            .db()
             .items()
             .insert(items)
             .instrument(insert_span)
@@ -236,17 +227,16 @@ impl WaycastDaemon {
     /// Warm the icon cache so that we ideally only get cache hits in the UI
     async fn update_icon_cache(&self) -> Result<(), DataError> {
         info!("Warming icon cache");
-        let icons: Vec<String> = self.db.items().get_icons().await.unwrap_or(Vec::new());
-        let resolver = IconResolver::new();
+        let icons: Vec<String> = self
+            .waycast
+            .db()
+            .items()
+            .get_icons()
+            .await
+            .unwrap_or_default();
 
         for i in icons {
-            if let Some(path) = resolver.resolve(&i) {
-                let key = resolver.cache_key(&i);
-                self.db
-                    .cache()
-                    .put(&key, &path, Some(Duration::from_hours(8)))
-                    .await?;
-            }
+            self.waycast.icon_path(&i).await;
         }
 
         Ok(())

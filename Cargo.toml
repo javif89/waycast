@@ -13,7 +13,6 @@ keywords = ["launcher", "wayland", "application-launcher", "desktop"]
 
 [dependencies]
 clap = { version = "4.5.56", features = ["derive"] }
-config = "0.15.15"
 crossbeam-channel = "0.5.15"
 directories = "6.0.0"
 freedesktop = { version = "0.0.3", features = ["icon"] }
@@ -41,6 +40,7 @@ sqlx = { version = "0.9.0", features = [
 thiserror = "2.0.18"
 tokei = "14.0.0"
 tokio = { version = "1.49.0", features = ["full"] }
+toml = "1.1.4"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 walkdir = "2.5.0"

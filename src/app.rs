@@ -1,7 +1,6 @@
 use std::{
-    collections::HashSet,
     fs::OpenOptions,
-    path::PathBuf,
+    sync::Arc,
     sync::mpsc::{Receiver, Sender},
 };
 
@@ -10,7 +9,8 @@ use tracing::info;
 
 use crate::{
     core::config::AppConfig,
-    daemon::{DaemonError, WaycastDaemon},
+    daemon::WaycastDaemon,
+    facade::{self, WaycastFacade},
     socket::WaycastSocketListener,
     ui::WaycastUi,
 };
@@ -21,10 +21,12 @@ pub enum AppError {
     AlreadyRunning,
     #[error("Could not create lockfile: {0}")]
     LockIO(#[source] std::io::Error),
-    #[error(transparent)]
-    Daemon(#[from] DaemonError),
+    #[error("Failed to initialize runtime: {0}")]
+    Runtime(#[source] std::io::Error),
     #[error("Daemon thread panicked")]
     DaemonPanic,
+    #[error(transparent)]
+    Facade(#[from] facade::WaycastError),
 }
 
 /// Main container for the waycast app process. This acts
@@ -32,7 +34,7 @@ pub enum AppError {
 /// that need them as well as acting as a process suppervisor
 /// and central message bridge between threads.
 pub struct WaycastApplication {
-    cfg: AppConfig,
+    waycast: Arc<WaycastFacade>,
     // TODO: We can definitely merge daemon functionality into the general
     // app functionality. But doing it this way for now while we clean
     // the other stuff up.
@@ -60,19 +62,22 @@ pub enum AppMessage {
 impl WaycastApplication {
     pub fn new(cfg: AppConfig) -> Result<Self, AppError> {
         let lockfile = Self::get_lock(&cfg)?;
-        let daemon = WaycastDaemon::new(
-            &cfg.database_file,
-            cfg.scan_paths.projects.clone(),
-            cfg.scan_paths.files.clone(),
-            HashSet::new(),
-        )?;
+
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(4)
+            .build()
+            .map_err(AppError::Runtime)?;
 
         let (message_sender, message_channel) = std::sync::mpsc::channel::<AppMessage>();
 
         let socket_listener = WaycastSocketListener::new(cfg.socket_file.clone());
 
+        let waycast = Arc::new(WaycastFacade::new(cfg, rt.handle().clone())?);
+        let daemon = WaycastDaemon::new(waycast.clone(), rt);
+
         Ok(Self {
-            cfg,
+            waycast,
             daemon,
             message_channel,
             message_sender,
@@ -102,7 +107,7 @@ impl WaycastApplication {
                 info!("Received app message {:#?}", cmd);
                 match cmd {
                     AppMessage::Show => {
-                        Self::show_ui(self.cfg.database_file.clone());
+                        Self::show_ui(self.waycast.clone());
                     }
                     AppMessage::Ping => {
                         info!("Received ping");
@@ -123,10 +128,10 @@ impl WaycastApplication {
     // the long running waycast process. If this were to
     // be called normally, the thread would just be
     // immediately dropped and not do anything.
-    fn show_ui(database_file: PathBuf) {
+    fn show_ui(waycast: Arc<WaycastFacade>) {
         std::thread::spawn(move || {
             info!("Launching UI");
-            let _ = WaycastUi::run(database_file);
+            let _ = WaycastUi::run(waycast);
             info!("App exited");
         });
     }
